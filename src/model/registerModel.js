@@ -7,7 +7,7 @@ const registerSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: false,
+    required: true,
   },
   phn_number: {
     type: Number,
@@ -21,25 +21,11 @@ const registerSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-
-  address: {
-    street: {
-      type: String,
-      required: true
-    },
-    city: {
-      type: String,
-      required: true
-    },
-    district: {
-      type: String,
-      required: true
-    },
-    country: {
-      type: String,
-      required: true
-    }
+  location_id:{
+    type: String,
+    required: true,
   },
+
   profile_img: {
     type: String,
     //  validate: {
@@ -56,7 +42,7 @@ const registerSchema = new mongoose.Schema({
   },
   isSameNumberBusiness: {
     type: Boolean,
-    required: false
+    required: true
   },
   interest: [{
     type: String,
@@ -66,7 +52,10 @@ const registerSchema = new mongoose.Schema({
     type: String,
     required: false
   }],
-
+status:{
+  type: String,
+  required: true
+},
   otp: {
     type: String,
     required: false

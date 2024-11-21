@@ -3,10 +3,8 @@ import express from "express";
 
 const router=express.Router();
 
-router.post("/register",adminController.register);
-router.post("/login",adminController.login);
-router.post("/otpValidation",adminController.otpValidation)
-router.put("/updateRegister",adminController.updateRegister);
+router.get("/getPendingStatus",adminController.getPendingStatus);//for admin
+router.put("/updateBusinessStatus",adminController.updateBusinessStatus);//for admin
 
 
 export default router
