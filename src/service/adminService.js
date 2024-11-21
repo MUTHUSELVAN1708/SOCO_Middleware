@@ -5,25 +5,34 @@ import twilio from "twilio";
 import "dotenv/config";
 import crypto from "crypto";
 import jwt from "jsonwebtoken"
+import locationModel from "../model/locationModel.js";
+import businessregisterModel from "../model/BusinessModel.js";
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 
 const adminService = {
     register: async (data) => {
-        const { full_Name, phn_number, email, DOB, address, agree } = data;
+        const { full_Name, phn_number, email, DOB, password, status, address, isSameNumberBusiness, agree } = data;
         try {
 
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
                 throw { msg: "phone number is already exist" }
             }
+            const hashedpassword = await bcrypt.hash(password, 10)
+            console.log(hashedpassword, "kk")
+            const addresss = await locationModel.create({ address });
             const register = await registerModel.create({
+                location_id: addresss._id,
                 full_Name,
                 phn_number,
+                password: hashedpassword,
                 email,
+                status,
+
                 DOB,
-                address,
+                isSameNumberBusiness,
                 agree
             });
 
@@ -36,24 +45,44 @@ const adminService = {
     login: async (data) => {
         const { full_Name, phn_number, password } = data;
         try {
-            const user = await registerModel.findOne({ phn_number });
-            if (!user) {
-                throw { msg: "user not found please register" }
-            }
-            const otp = otpGenerator.generate(4, {
-                digits: true,
-                specialChars: false,
-                lowerCaseAlphabets: false,
-                upperCaseAlphabets: false,
-            });
-            console.log(otp);
-            await adminService.storeOtp(user._id, otp);
-            await adminService.sendOtp(phn_number, otp);
+            if (phn_number) {
+                const user = await registerModel.findOne({ phn_number });
+                if (!user) {
+                    throw { msg: "user not found please register" }
+                }
+                const otp = otpGenerator.generate(4, {
+                    digits: true,
+                    specialChars: false,
+                    lowerCaseAlphabets: false,
+                    upperCaseAlphabets: false,
+                });
+                console.log(otp);
+                await adminService.storeOtp(user._id, otp);
+                await adminService.sendOtp(phn_number, otp);
 
-            return {
-                message: "Authentication successful",
-                user_id: user._id,
-                // full_Name: user.full_Name,
+                return {
+                    message: "Authentication successful",
+                    user_id: user._id,
+                    // full_Name: user.full_Name,
+                }
+            } else {
+                const login = await registerModel.findOne({ full_Name });
+                if (!login) {
+                    throw { err: "username not found" }
+                }
+
+                const isPasswordMatch = await bcrypt.compare(password, login.password);
+                if (!isPasswordMatch) {
+                    throw {
+                        error: "Invalid password"
+                    };
+                }
+                const token = jwt.sign({
+                    user_id: login._id
+                }, SECRET_KEY);
+                return {
+                    token, login
+                };
             }
         } catch (error) {
             throw error;
@@ -106,7 +135,7 @@ const adminService = {
 
     sendOtp: async (phoneNumber, otp) => {
         try {
-            const sanitizedPhoneNumber = adminService.sanitizePhoneNumber(phoneNumber,countryCode);
+            const sanitizedPhoneNumber = adminService.sanitizePhoneNumber(phoneNumber, countryCode);
             if (!adminService.validatePhoneNumber(sanitizedPhoneNumber)) {
                 throw new Error("Invalid phone number format.");
             }
@@ -134,55 +163,131 @@ const adminService = {
     // =================
     otpValidation: async (data) => {
         const { user_id, otp } = data;
-    
+
         try {
-          const user = await registerModel.findById(user_id);
-    
-          if (!user) {
-            throw { error: "User not found." };
-          }
-          const isOtpValid = await adminService.verifyOtp(user_id, otp);
-          if (!isOtpValid) {
-            throw { error: "Invalid OTP." };
-          }
-          const token = jwt.sign({ user_id }, SECRET_KEY);
- 
-          return {token,user_id};
+            const user = await registerModel.findById(user_id);
+
+            if (!user) {
+                throw { error: "User not found." };
+            }
+            const isOtpValid = await adminService.verifyOtp(user_id, otp);
+            if (!isOtpValid) {
+                throw { error: "Invalid OTP." };
+            }
+            const token = jwt.sign({ user_id }, SECRET_KEY);
+
+            return { token, user_id };
         } catch (error) {
-          throw error;
+            throw error;
         }
-      },
-    
-    
+    },
+
+
     // ====================
-    verifyOtp:async(user_id,otp)=>{
-        try{
+    verifyOtp: async (user_id, otp) => {
+        try {
             const storedOtpEntry = await registerModel.findById(user_id);
             if (!storedOtpEntry) {
-              return false;
+                return false;
             }
             const isOtpValid = await bcrypt.compare(otp, storedOtpEntry.otp);
-      
+
             return isOtpValid;
-      
-        }catch(error){
+
+        } catch (error) {
             throw error
         }
     },
     // ==================
     updateRegister: async (data) => {
-        const { user_id, addNew_Interest, interest,profile_img } = data
+        const { user_id, addNew_Interest, interest, profile_img } = data
         try {
-    const update = await registerModel.findByIdAndUpdate(user_id, {
-        profile_img, addNew_Interest, interest
+            const update = await registerModel.findByIdAndUpdate(user_id, {
+                profile_img, addNew_Interest, interest
 
-        },
-            { new: true })
+            },
+                { new: true })
             return update
         } catch (error) {
             throw error
         }
-    }
+    },
+
+    // =======================
+
+    forgotPassword: async (data) => {
+        const { email, password } = data;
+
+        console.log(data, "data");
+
+        if (!email || !password) {
+            throw new Error("email and password are required.");
+        }
+
+        try {
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const update = await registerModel.findOneAndUpdate(
+                { email },
+                { password: hashedPassword },
+                { new: true }
+            );
+
+            if (!update) {
+                throw { err: "User not found or update failed." };
+            }
+
+            return {password:update.password};
+        } catch (error) {
+            console.error("Error in forgotPassword:", error);
+            throw error;
+        }
+    },
+    // ====================
+    BusinessRegister: async (businessData,data) => {
+        const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, GST_NO, status, Name, address, location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category, } = data;
+        
+        console.log(data,"data")
+        try {
+
+            const business = await registerModel.findOne({ isSameNumberBusiness });
+            if (business.isSameNumberBusiness == true) {
+                const addresss = await locationModel.create({ address });
+                const register = await businessregisterModel.create({
+                    location_id: addresss._id,
+                    Brand_Name, org_name, PAN_NO, GST_NO, Name, status,
+                    brand_logo, cover_img, agree, type_of_service, category, sub_category,
+                });
+
+                return register
+            }
+
+        } catch (error) {
+            throw error;
+        }
+    },
+    // ========================
+    getPendingStatus: async () => {
+        try {
+            const getStatus = await businessregisterModel.find({ status: "Pending" });
+            return getStatus
+        } catch (error) {
+            throw error
+        }
+    },
+    // =========================
+    updateBusinessStatus: async (data) => {
+        console.log(data)
+        try {
+            const updateBusinessStatus = await businessregisterModel.findOneAndUpdate({ _id:data.business_id} , 
+                { status:data.status }, 
+                { new: true }
+            );
+            return updateBusinessStatus
+        } catch (error) {
+            throw error
+        }
+    },
 }
 
 
