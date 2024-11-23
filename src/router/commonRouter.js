@@ -14,5 +14,6 @@ router.post("/otpValidation",adminController.otpValidation)
 router.put('/updateRegister',adminController.updateRegister);// save extra details
 router.put("/forgotPassword",adminController.forgotPassword);
 router.post("/BusinessRegister",adminController.BusinessRegister);
+router.post("/registerUserWithBusiness",adminController.registerUserWithBusiness);
 
 export default router;
