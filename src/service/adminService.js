@@ -418,6 +418,8 @@ const adminService = {
                 });
 
                 return register
+            }else{
+                throw new Error("invalid data to create business account")
             }
 
         } catch (error) {

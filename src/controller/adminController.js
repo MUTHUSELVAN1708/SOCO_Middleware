@@ -6,7 +6,7 @@ const adminController = {
     register: async (req, res, next) => {
         try {
             const register = await adminService.register(req.body);
-            res.status(200).json({
+            res.status(200).json({ status:200,
                 msg: "successfully created",
                 register
             })
@@ -24,7 +24,8 @@ const adminController = {
         try {
             const verifyEmailResult = await adminService.verifyEmail(email);
             res.status(200).json({
-                msg: "Email verification initiated successfully",
+                status:200,
+                msg: "OTP sent to email successfully",
                 data: verifyEmailResult
             });
         } catch (error) {
@@ -40,7 +41,8 @@ const adminController = {
         try {
             const verifyOtp = await adminService.verifingOtp(req.body);
             res.status(200).json({
-                msg: " otp verified successfully ",
+                status:200,
+                msg: "OTP verified successfully ",
                 verifyOtp
             })
         } catch (error) {
@@ -56,7 +58,8 @@ const adminController = {
     login: async (req, res,next) => {
         try {
             const login = await adminService.login(req.body);
-            res.status(200).json({
+            res.status(200).json({ status:200,
+                msg:"Logged in successfully",
                 login
             })
         } catch (error) {
@@ -71,7 +74,7 @@ const adminController = {
     otpValidation: async (req, res,next) => {
         try {
             const otpValidation = await adminService.otpValidation(req.body);
-            res.status(200).json({
+            res.status(200).json({ status:200,
                 otpValidation
             })
         } catch (error) {
@@ -87,7 +90,8 @@ const adminController = {
         try {
             const updateRegister = await adminService.updateRegister(req.body);
 
-            res.status(200).json({
+            res.status(200).json({ status:200,
+                msg:"updated successfully",
                 updateRegister
             })
         } catch (error) {
@@ -103,7 +107,7 @@ const adminController = {
     forgotPassword: async (req, res,next) => {
         try {
             const forgotPassword = await adminService.forgotPassword(req.body);
-            res.status(200).json({
+            res.status(200).json({ status:200,
                 msg: "updated successfully",
                 forgotPassword
             })
@@ -120,8 +124,8 @@ const adminController = {
         try {
             const BusinessRegister = await adminService.BusinessRegister(req.body);
             console.log(BusinessRegister, "kkjjh")
-            res.status(200).json({
-                msg: "Successfully created",
+            res.status(200).json({ status:200,
+                msg: "Registered Successfully",
                 BusinessRegister
             });
         } catch (error) {
@@ -137,7 +141,7 @@ const adminController = {
     getPendingStatus: async (req, res,next) => {
         try {
             const getPendingStatus = await adminService.getPendingStatus();
-            res.status(200).json({
+            res.status(200).json({ status:200,
                 msg: "successfully fetched",
                 getPendingStatus
             })
@@ -153,7 +157,7 @@ const adminController = {
     updateBusinessStatus: async (req, res,next) => {
         try {
             const updateBusinessStatus = await adminService.updateBusinessStatus(req.body);
-            res.status(200).json({
+            res.status(200).json({ status:200,
                 msg: " updated successfully ",
                 updateBusinessStatus
             })
