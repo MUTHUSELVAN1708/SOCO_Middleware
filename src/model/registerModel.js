@@ -60,7 +60,10 @@ status:{
     type: String,
     required: false
   },
-
+  reg_otp_id: {
+    type: String,
+    required: true
+  },
   timestamp: {
     type: Date,
     default: Date.now

@@ -1,7 +1,9 @@
 import adminService from "../service/adminService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
+
+
 const adminController = {
-    register: async (req, res) => {
+    register: async (req, res, next) => {
         try {
             const register = await adminService.register(req.body);
             res.status(200).json({
@@ -9,108 +11,130 @@ const adminController = {
                 register
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+
+    },
+    // =================
+    verifyEmail: async (req, res,next) => {
+        const { email } = req.params;
+        try {
+            const verifyEmailResult = await adminService.verifyEmail(email);
+            res.status(200).json({
+                msg: "Email verification initiated successfully",
+                data: verifyEmailResult
+            });
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    // ==========
+    verifyOtp: async (req, res,next) => {
+        try {
+            const verifyOtp = await adminService.verifingOtp(req.body);
+            res.status(200).json({
+                msg: " otp verified successfully ",
+                verifyOtp
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },
 
     // ==============================
-    login: async (req, res) => {
+    login: async (req, res,next) => {
         try {
             const login = await adminService.login(req.body);
             res.status(200).json({
                 login
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },
     // ===================================
-    otpValidation: async (req, res) => {
+    otpValidation: async (req, res,next) => {
         try {
             const otpValidation = await adminService.otpValidation(req.body);
             res.status(200).json({
                 otpValidation
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },
     // ================
-    updateRegister: async (req, res) => {
+    updateRegister: async (req, res,next) => {
         try {
-            const { user_id, addNew_Interest, interest } = req.body;
-
-            const profile_img_url = req.file
-                ? `${BASE_URL}/uploads/${req.file.filename}`
-                : null;
-
-            const updateRegister = await adminService.updateRegister({
-                user_id,
-                addNew_Interest,
-                interest,
-                profile_img: profile_img_url,
-            });
+            const updateRegister = await adminService.updateRegister(req.body);
 
             res.status(200).json({
                 updateRegister
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },
 
     // ==============================
-    forgotPassword: async (req, res) => {
+    forgotPassword: async (req, res,next) => {
         try {
             const forgotPassword = await adminService.forgotPassword(req.body);
             res.status(200).json({
-                msg:"updated successfully",
+                msg: "updated successfully",
                 forgotPassword
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },
     // ==================
-    BusinessRegister: async (req, res) => {
+    BusinessRegister: async (req, res,next) => {
         try {
-            console.log(req.files); 
-    
-            console.log(req.body);
-            const brand_logos = req.files['brand_logo'] ? req.files['brand_logo'].map(file => `${BASE_URL}/uploads/${file.filename}`) : [];
-            const cover_imgs = req.files['cover_img'] ? req.files['cover_img'].map(file => `${BASE_URL}/uploads/${file.filename}`) : [];
-    
-            const businessData = {
-                brand_logos,
-                cover_imgs,
-              
-            };
-    
-            const BusinessRegister = await adminService.BusinessRegister(businessData,req.body);
-    
+            const BusinessRegister = await adminService.BusinessRegister(req.body);
+            console.log(BusinessRegister, "kkjjh")
             res.status(200).json({
                 msg: "Successfully created",
                 BusinessRegister
             });
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error);
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
     },
-    
+
 
     // ===================
-    getPendingStatus: async (req, res) => {
+    getPendingStatus: async (req, res,next) => {
         try {
             const getPendingStatus = await adminService.getPendingStatus();
             res.status(200).json({
@@ -118,13 +142,15 @@ const adminController = {
                 getPendingStatus
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },
     // ===========================
-    updateBusinessStatus: async (req, res) => {
+    updateBusinessStatus: async (req, res,next) => {
         try {
             const updateBusinessStatus = await adminService.updateBusinessStatus(req.body);
             res.status(200).json({
@@ -132,8 +158,10 @@ const adminController = {
                 updateBusinessStatus
             })
         } catch (error) {
-            console.log(error);
-            res.status(500).json(error)
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
         }
 
     },

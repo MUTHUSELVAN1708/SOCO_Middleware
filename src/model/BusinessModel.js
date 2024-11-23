@@ -30,7 +30,19 @@ const BusinessregisterSchema = new mongoose.Schema({
     type: String,
  
     required: true
-  },                               
+  },  
+  
+  aadhar_img: {
+    type: String,
+ 
+    required: true
+  },                              
+  
+  pan_img: {
+    type: String,
+ 
+    required: true
+  }, 
   cover_img: {
     type: String,
     required: true
