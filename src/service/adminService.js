@@ -329,7 +329,7 @@ const adminService = {
             if (phn_number) {
                 const user = await registerModel.findOne({ phn_number });
                 if (!user) {
-                    throw { msg: "user not found please register" }
+                    throw { msg: "User not found, please register" };
                 }
                 const otp = otpGenerator.generate(4, {
                     digits: true,
@@ -340,33 +340,83 @@ const adminService = {
                 console.log(otp);
                 await adminService.storeOtp(user._id, otp);
                 await adminService.sendOtp(phn_number, otp);
-
+    
                 return {
-                    message: "Authentication successful",
-                    user_id: user._id,
-                    // full_Name: user.full_Name,
-                }
+                    status: 200,
+                    msg: "Authentication successful",
+                    login: {
+                        user_id: user._id,
+                        full_Name: user.full_Name,
+                        email: user.email,
+                        phn_number: user.phn_number,
+                        location_id: user.location_id,
+                        dob: user.DOB,
+                        agree: user.agree,
+                        isSameNumberBusiness: user.isSameNumberBusiness,
+                        interest: user.interest,
+                        addNewInterest: user.addNewInterest,
+                        status: user.status,
+                        regOtpId: user.reg_otp_id,
+                        timestamp: user.timestamp,
+                    },
+                };
             } else {
-                const login = await registerModel.findOne({ email });
-                if (!login) {
-                    throw new Error ("username not found")
+                const user = await registerModel.findOne({ email });
+                if (!user) {
+                    return {
+                        status: 400,
+                        msg: "Invalid credentials",
+                        login: null,
+                    };
                 }
-
-                const isPasswordMatch = await bcrypt.compare(password, login.password);
+    
+                const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
-                    throw new Error("Invalid password");
+                    return {
+                        status: 400,
+                        msg: "Invalid credentials",
+                        login: null,
+                    };
                 }
-                const token = jwt.sign({
-                    user_id: login._id
-                }, SECRET_KEY);
+    
+                const token = jwt.sign(
+                    { user_id: user._id },
+                    SECRET_KEY
+                );
+    
                 return {
-                    token, login
+                    status: 200,
+                    msg: "Login successful",
+                    login: {
+                        token,
+                        user: {
+                            id: user._id,
+                            full_Name: user.full_Name,
+                            email: user.email,
+                            phn_number: user.phn_number,
+                            location_id: user.location_id,
+                            dob: user.DOB,
+                            agree: user.agree,
+                            isSameNumberBusiness: user.isSameNumberBusiness,
+                            interest: user.interest,
+                            addNewInterest: user.addNewInterest,
+                            status: user.status,
+                            regOtpId: user.reg_otp_id,
+                            timestamp: user.timestamp,
+                        },
+                    },
                 };
             }
         } catch (error) {
-            throw error;
+            return {
+                status: 500,
+                msg: error.msg || "Something went wrong",
+                login: null,
+            };
         }
     },
+    
+    
     // ===================
     storeOtp: async (user_id, otp) => {
 
