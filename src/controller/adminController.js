@@ -103,20 +103,27 @@ const adminController = {
     
 
     // ==============================
-    login: async (req, res,next) => {
+    login: async (req, res, next) => {
         try {
-            const login = await adminService.login(req.body);
-            res.status(200).json({ status:200,
-                msg:"Logged in successfully",
-                login
-            })
+            const loginResponse = await adminService.login(req.body);
+    
+            if (loginResponse.status === 400 || loginResponse.status === 500) {
+                return res.status(loginResponse.status).json(loginResponse);
+            }
+    
+            res.status(200).json({
+                status: 200,
+                msg: "Logged in successfully",
+                login: loginResponse.login,
+            });
         } catch (error) {
-            error.error = error.message;
-            error.statuscode = 400;
-            next(error);
+            next({
+                statuscode: 400,
+                error: error.msg || "An unexpected error occurred",
+            });
         }
-
     },
+    
     // ===================================
     otpValidation: async (req, res,next) => {
         try {
