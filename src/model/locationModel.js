@@ -6,35 +6,35 @@ const locationSchema = new mongoose.Schema({
     address: {
         forbusiness: {
             type: Boolean,
-            required: true
+            required: false
         },
         lat: {
             type: Number,
-            required: true
+            required: false
         },
         lng: {
             type: Number,
-            required: true
+            required: false
         },
         street: {
             type: String,
-            required: true
+            required: false
         },
         city: {
             type: String,
-            required: true
+            required: false
         },
         district: {
             type: String,
-            required: true
+            required: false
         },
         country: {
             type: String,
-            required: true
+            required: false
         },
         Pincode: {
             type: Number,
-            required: true
+            required: false
         },
     },
 

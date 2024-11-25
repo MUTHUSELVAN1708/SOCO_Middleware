@@ -17,16 +17,17 @@ const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree } = data;
         try {
-
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
-                throw new Error("phone number is already exist" ) ;
+            const phnNumber = await registerModel.findOne({ phn_number });
+            if (phnNumber) {
+                const error = new Error("phone number is already exist");
+                error.status = 400; // Adding status 400 to the error
+                throw error;
             }
-           
-
-            const hashedpassword = await bcrypt.hash(password, 10)
-            // console.log(hashedpassword, "kk")
-
+    
+            const hashedpassword = await bcrypt.hash(password, 10);
+    
             const addresss = await locationModel.create({ address });
             const register = await registerModel.create({
                 location_id: addresss._id,
@@ -40,10 +41,13 @@ const adminService = {
                 isSameNumberBusiness,
                 agree
             });
-
-            return register
+    
+            return register;
         } catch (error) {
-            throw error
+            if (!error.status) {
+                error.status = 500; // Default to internal server error if no status
+            }
+            throw error;
         }
     },
 
@@ -173,34 +177,152 @@ const adminService = {
 
     //   ==========
     verifingOtp: async (data) => {
-        const { email, enteredOtp } = data; 
-        console.log(email, "Email for verification");
-
+        const { email, enteredOtp } = data;
         try {
             const storedOtpEntry = await otpModel.findOne({ email });
-            console.log(storedOtpEntry, "Stored OTP entry");
-
+    
             if (!storedOtpEntry) {
                 return {
                     success: false,
                     message: "No OTP entry found for the provided email",
                 };
             }
-
-            console.log(enteredOtp, "Entered OTP");
-
+    
             const isOtpValid = await bcrypt.compare(enteredOtp, storedOtpEntry.reg_otp);
-            console.log(isOtpValid, "OTP Validity");
-
+    
             if (!isOtpValid) {
-            
-                throw new Error("Invalid OTP entered")
+                return {
+                    success: false,
+                    message: "Invalid OTP entered",
+                };
             }
-            
+    
+            return {
+                success: true,
+                message: "OTP verified successfully",
+            };
         } catch (error) {
-           throw error
+            return {
+                success: false,
+                message: "An error occurred during OTP verification",
+                error: error.message,
+            };
         }
     },
+    
+
+    //   ==========
+    registerUserWithBusiness: async (data) => {
+        try {
+            const {
+                full_Name,
+                phn_number,
+                email,
+                DOB,
+                reg_otp_id,
+                password,
+                status,
+                address,
+                isSameNumberBusiness,
+                agree,
+                Brand_Name,
+                org_name,
+                PAN_NO,
+                aadhar_img,
+                pan_img,
+                GST_NO,
+                Name,
+                brand_logo,
+                cover_img,
+                type_of_service,
+                category,
+                sub_category,
+            } = data;
+    
+            // Initialize an error array to collect validation issues
+            let errors = [];
+
+            // Check for existing full name
+            const existingUserByFullName = await registerModel.findOne({ full_Name });
+            if (existingUserByFullName) {
+                errors.push("Name already exists. Name must be unique. ");
+            }
+    
+            // Check for existing phone number
+            const existingUserByPhone = await registerModel.findOne({ phn_number });
+            if (existingUserByPhone) {
+                errors.push("Phone number already exists.Try a different one or log in.");
+            }
+    
+            // Check for existing email
+            const existingUserByEmail = await registerModel.findOne({ email });
+            if (existingUserByEmail) {
+                errors.push("Email already exists. Try a different one or log in.");
+            }
+    
+        
+    
+            // If any errors exist, throw them together as a single error
+            if (errors.length > 0) {
+                const error = new Error(errors.join(" "));
+                error.status = 400;
+                throw error;
+            }
+    
+            // Create the address
+            const addresss = await locationModel.create({ address });
+            
+            // Hash the password
+            const hashedPassword = await bcrypt.hash(password, 10);
+    
+            // Create the user
+            const register = await registerModel.create({
+                location_id: addresss._id,
+                full_Name,
+                phn_number,
+                password: hashedPassword,
+                email,
+                status,
+                reg_otp_id,
+                DOB,
+                isSameNumberBusiness,
+                agree
+            });
+    
+            // Initialize business-related fields
+            let business = null;
+    
+            // If business information is needed
+            if (isSameNumberBusiness) {
+                business = await businessregisterModel.create({
+                    location_id: addresss._id,
+                    user_id: register._id, // Linking user ID to the business
+                    Brand_Name: Brand_Name || "",
+                    org_name: org_name || "",
+                    PAN_NO: PAN_NO || "",
+                    GST_NO: GST_NO || "",
+                    Name: Name || "",
+                    status: isSameNumberBusiness ? "Inactive" : "",
+                    aadhar_img: aadhar_img || "",
+                    pan_img: pan_img || "",
+                    brand_logo: brand_logo || "",
+                    cover_img: cover_img || "",
+                    agree: isSameNumberBusiness,
+                    type_of_service: type_of_service || "",
+                    category: category || "",
+                    sub_category: sub_category || "",
+                });
+            }
+    
+            return { register, business };
+        } catch (error) {
+            if (!error.status) {
+                error.status = 500; // Default to internal server error if no status
+            }
+            throw error;
+        }
+    },
+  
 
     // ==================================
     login: async (data) => {
@@ -209,7 +331,7 @@ const adminService = {
             if (phn_number) {
                 const user = await registerModel.findOne({ phn_number });
                 if (!user) {
-                    throw { msg: "user not found please register" }
+                    throw { msg: "User not found, please register" };
                 }
                 const otp = otpGenerator.generate(4, {
                     digits: true,
@@ -220,33 +342,83 @@ const adminService = {
                 console.log(otp);
                 await adminService.storeOtp(user._id, otp);
                 await adminService.sendOtp(phn_number, otp);
-
+    
                 return {
-                    message: "Authentication successful",
-                    user_id: user._id,
-                    // full_Name: user.full_Name,
-                }
+                    status: 200,
+                    msg: "Authentication successful",
+                    login: {
+                        user_id: user._id,
+                        full_Name: user.full_Name,
+                        email: user.email,
+                        phn_number: user.phn_number,
+                        location_id: user.location_id,
+                        dob: user.DOB,
+                        agree: user.agree,
+                        isSameNumberBusiness: user.isSameNumberBusiness,
+                        interest: user.interest,
+                        addNewInterest: user.addNewInterest,
+                        status: user.status,
+                        regOtpId: user.reg_otp_id,
+                        timestamp: user.timestamp,
+                    },
+                };
             } else {
-                const login = await registerModel.findOne({ email });
-                if (!login) {
-                    throw new Error ("username not found")
+                const user = await registerModel.findOne({ email });
+                if (!user) {
+                    return {
+                        status: 400,
+                        msg: "Invalid credentials",
+                        login: null,
+                    };
                 }
-
-                const isPasswordMatch = await bcrypt.compare(password, login.password);
+    
+                const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
-                    throw new Error("Invalid password");
+                    return {
+                        status: 400,
+                        msg: "Invalid credentials",
+                        login: null,
+                    };
                 }
-                const token = jwt.sign({
-                    user_id: login._id
-                }, SECRET_KEY);
+    
+                const token = jwt.sign(
+                    { user_id: user._id },
+                    SECRET_KEY
+                );
+    
                 return {
-                    token, login
+                    status: 200,
+                    msg: "Login successful",
+                    login: {
+                        token,
+                        user: {
+                            id: user._id,
+                            full_Name: user.full_Name,
+                            email: user.email,
+                            phn_number: user.phn_number,
+                            location_id: user.location_id,
+                            dob: user.DOB,
+                            agree: user.agree,
+                            isSameNumberBusiness: user.isSameNumberBusiness,
+                            interest: user.interest,
+                            addNewInterest: user.addNewInterest,
+                            status: user.status,
+                            regOtpId: user.reg_otp_id,
+                            timestamp: user.timestamp,
+                        },
+                    },
                 };
             }
         } catch (error) {
-            throw error;
+            return {
+                status: 500,
+                msg: error.msg || "Something went wrong",
+                login: null,
+            };
         }
     },
+    
+    
     // ===================
     storeOtp: async (user_id, otp) => {
 
@@ -403,7 +575,7 @@ const adminService = {
         }
     },
     // ====================
-    BusinessRegister: async (data) => {
+    businessRegister: async (data) => {
         const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, aadhar_img, pan_img, GST_NO, status, Name, address, location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
     
         console.log(data, "Received Data");

@@ -3,27 +3,27 @@ import mongoose from "mongoose";
 const BusinessregisterSchema = new mongoose.Schema({
   Brand_Name: {
     type: String,
-    required: true,
+    required: false,
   },
   org_name: {
     type: String,
-    required: true,
+    required: false,
   },
   PAN_NO: {
     type: Number,
-    required: true,
+    required: false,
   },
   GST_NO: {
     type: String,
-    required: true,
+    required: false,
   },
   Name: {
     type: String,
-    required: true,
+    required: false,
   },
   location_id:{
     type: String,
-    required: true,
+    required: false,
   },
 
   aadhar_img: { type: String, required: true },
@@ -36,21 +36,21 @@ const BusinessregisterSchema = new mongoose.Schema({
   },
   type_of_service: {
     type: String,
-    required: true
+    required: false
   },
   category: {
     type: String,
-    required: true
+    required: false
   },
   sub_category: {
     type: String,
-    required: true
+    required: false
   },
 
   status: {
     type: String,
     enum:["active","Inactive","Pending"],
-    required: true
+    required: false
   },
  
   timestamp: {

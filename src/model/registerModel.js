@@ -62,7 +62,7 @@ status:{
   },
   reg_otp_id: {
     type: String,
-    required: true
+    required: false
   },
   timestamp: {
     type: Date,
