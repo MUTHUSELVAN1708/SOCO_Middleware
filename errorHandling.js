@@ -6,7 +6,7 @@ var errorHandling = (error, req, res, next) => {
       timestamp: new Date(),
       err_status: error.statuscode,
       name: error.name,
-      err_message: error.message,
+      msg: error.message,
       trace: error.stack,
     });
   };

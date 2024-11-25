@@ -252,7 +252,31 @@ const adminController = {
             console.error('Error uploading images:', error);
             res.status(500).json({ message: 'An error occurred while uploading the images.' });
         }
+    },
+
+
+     fileUpload : async (req, res) => {
+        try {
+            console.log('file process');
+            if (!req.file) {
+                return res.status(400).json({ message: 'No file uploaded!' });
+            }
+    
+            const uploadedFileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    
+            res.status(200).json({
+                message: 'File uploaded successfully!',
+                fileUrl: uploadedFileUrl,
+                fileName: req.file.filename,
+                fileType: req.file.mimetype,
+                fileSize: req.file.size,
+            });
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            res.status(500).json({ message: 'An error occurred while uploading the file.' });
+        }
     }
+    
 
 
 }

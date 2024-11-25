@@ -1,9 +1,10 @@
 import express from "express";
- import adminController from "../controller/adminController.js"
+import adminController from "../controller/adminController.js";
+import multer from "multer";
 
- import multer from "multer";
-const router=express.Router();
+const router = express.Router();
 
+// Multer Storage Configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/'); // Destination folder for uploads
@@ -13,33 +14,85 @@ const storage = multer.diskStorage({
     },
 });
 
-const upload = multer({ 
+// Image-Only Upload Configuration
+const uploadImages = multer({ 
     storage,
     fileFilter: (req, file, cb) => {
-        // Allow only image file types
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
             cb(new Error('Only image files are allowed!'), false);
         }
-    }
+    },
 });
 
+// General File Upload Configuration (Images, Videos, PDFs, Excel, etc.)
+const uploadFiles = multer({ 
+    storage,
+    fileFilter: (req, file, cb) => {
+        const allowedMimeTypes = [
+            'image/jpeg',
+            'image/jpg', 
+            'image/png', 
+            'image/gif',
+            'video/mp4',
+            'application/msword',
+            'application/pdf',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ];
 
-router.post("/register",adminController.register);
-router.post("/verifyEmail/:email",adminController.verifyEmail);//before register
-router.post("/verifyOtp",adminController.verifyOtp);
-router.post("/login",adminController.login);
-router.post("/otpValidation",adminController.otpValidation)
-router.put('/updateRegister',adminController.updateRegister);// save extra details
-router.put("/forgotPassword",adminController.forgotPassword);
-router.post("/BusinessRegister",adminController.BusinessRegister);
-router.post("/imgUpload",upload.fields([
-    { name: 'brand_logo' },  
-    { name: 'cover_img' },
-    { name: 'pan_img' },
-    { name: 'aadhar_img' },
-    {name:'profile_img'}
-]),adminController.imgUpload);
+        if (allowedMimeTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type! Allowed types: JPEG, PNG, GIF, MP4, PDF, Excel.'), false);
+        }
+    },
+});
+
+// Routes
+router.post("/register", adminController.register);
+router.post("/verifyEmail/:email", adminController.verifyEmail); // Before register
+router.post("/verifyOtp", adminController.verifyOtp);
+router.post("/login", adminController.login);
+router.post("/otpValidation", adminController.otpValidation);
+router.put('/updateRegister', adminController.updateRegister); // Save extra details
+router.put("/forgotPassword", adminController.forgotPassword);
+router.post("/BusinessRegister", adminController.BusinessRegister);
+router.post("/registerUserWithBusiness", adminController.registerUserWithBusiness);
+
+// Image Upload Route
+router.post(
+    "/imgUpload", 
+    uploadImages.fields([
+        { name: 'brand_logo' },
+        { name: 'cover_img' },
+        { name: 'pan_img' },
+        { name: 'aadhar_img' },
+        { name: 'profile_img' },
+    ]), 
+    adminController.imgUpload
+);
+
+// General File Upload Route
+router.post(
+    "/fileUpload",
+    uploadFiles.single('file'),
+    (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'No file uploaded!' });
+            }
+
+            const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            res.status(200).json({
+                message: 'File uploaded successfully!',
+                fileUrl,
+            });
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    }
+);
 
 export default router;
