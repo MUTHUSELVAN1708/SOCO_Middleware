@@ -216,6 +216,7 @@ const adminService = {
     //   ==========
     registerUserWithBusiness: async (data) => {
         try {
+        
             const {
                 full_Name,
                 phn_number,
@@ -227,18 +228,29 @@ const adminService = {
                 address,
                 isSameNumberBusiness,
                 agree,
-                Brand_Name,
+                businessType,
+                natureOfBusiness,
                 org_name,
+                businessName,
+                Brand_Name,
+                ownerName,
+                businessAddress,
+                busCity,
+                busState,
+                busPinCode,
+                busEmail,
+                busPhone,
                 PAN_NO,
+                aadharNo,
                 aadhar_img,
                 pan_img,
                 GST_NO,
-                Name,
                 brand_logo,
                 cover_img,
                 type_of_service,
                 category,
                 sub_category,
+                businessAgree,
             } = data;
     
             // Initialize an error array to collect validation issues
@@ -295,26 +307,37 @@ const adminService = {
             let business = null;
     
             // If business information is needed
-            if (isSameNumberBusiness) {
+            
                 business = await businessregisterModel.create({
                     location_id: addresss._id,
-                    user_id: register._id, // Linking user ID to the business
+                    user_id: register._id, 
                     Brand_Name: Brand_Name || "",
                     org_name: org_name || "",
                     PAN_NO: PAN_NO || "",
+                    aadharNo: aadharNo || "",
                     GST_NO: GST_NO || "",
-                    Name: Name || "",
-                    status: isSameNumberBusiness ? "Inactive" : "",
+                    Name:  register.full_Name,
+                    status: "Inactive",
                     aadhar_img: aadhar_img || "",
                     pan_img: pan_img || "",
                     brand_logo: brand_logo || "",
                     cover_img: cover_img || "",
-                    agree: isSameNumberBusiness,
+                    businessAgree: businessAgree,
                     type_of_service: type_of_service || "",
                     category: category || "",
                     sub_category: sub_category || "",
+                    ownerName: ownerName || "",
+                    businessAddress: businessAddress || "", 
+                    businessCity: busCity || "",
+                    businessState: busState || "",
+                    businessPinCode: busPinCode || "", 
+                    businessEmail: busEmail || "", 
+                    businessPhone: busPhone || "", 
+                    businessType: businessType || "",
+                    natureOfBusiness: natureOfBusiness || "", 
+                    businessName: businessName || "" 
                 });
-            }
+        
     
             return { register, business };
         } catch (error) {

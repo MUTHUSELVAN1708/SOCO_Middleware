@@ -1,19 +1,29 @@
-// import mongoose from "../db/db.js";
 import mongoose from "mongoose";
+
 const BusinessregisterSchema = new mongoose.Schema({
   Brand_Name: {
     type: String,
     required: false,
   },
+  
+  user_id: {
+    type: String,
+    required: false,
+  },
+
   org_name: {
     type: String,
     required: false,
   },
   PAN_NO: {
-    type: Number,
+    type: String,
     required: false,
   },
   GST_NO: {
+    type: String,
+    required: false,
+  },
+  aadharNo: {
     type: String,
     required: false,
   },
@@ -21,16 +31,28 @@ const BusinessregisterSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
-  location_id:{
+  location_id: {
     type: String,
     required: false,
   },
 
-  aadhar_img: { type: String, required: true },
-  pan_img: { type: String, required: true },
-  cover_img: { type: String, required: true },
-  brand_logo: { type: String, required: true },
-  agree: {
+  aadhar_img: { 
+    type: String, 
+    required: false 
+  },
+  pan_img: { 
+    type: String, 
+    required: false 
+  },
+  cover_img: { 
+    type: String, 
+    required: false 
+  },
+  brand_logo: { 
+    type: String, 
+    required: false 
+  },
+  businessAgree: {
     type: Boolean,
     required: false
   },
@@ -49,7 +71,7 @@ const BusinessregisterSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum:["active","Inactive","Pending"],
+    enum: ["active", "Inactive", "Pending"],
     required: false
   },
  
@@ -57,12 +79,65 @@ const BusinessregisterSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+
+  ownerName: {
+    type: String,
+    required: false
+  },
+
+  businessAddress: {
+    type: String,
+    required: false
+  },
+
+  businessCity: {
+    type: String,
+    required: false
+  },
+
+  businessState: {
+    type: String,
+    required: false
+  },
+
+  businessPinCode: {
+    type: String,
+    required: false
+  },
+
+  businessEmail: {
+    type: String,
+    required: false
+  },
+
+  businessPhone: {
+    type: String,
+    required: false
+  },
+
+  businessType: {
+    type: String,
+    required: false
+  },
+
+  natureOfBusiness: {
+    type: String,
+    required: false
+  },
+
+  businessName: {
+    type: String,
+    required: false
+  }
+
 }, {
   versionKey: false
 });
+
 BusinessregisterSchema.virtual("business_id").get(function () {
   return this._id.toString();
 });
+
 const businessregisterModel = mongoose.model("businessRegister", BusinessregisterSchema);
 
 export default businessregisterModel;
