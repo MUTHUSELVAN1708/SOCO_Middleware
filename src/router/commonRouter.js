@@ -33,14 +33,13 @@ router.post("/login",adminController.login);
 router.post("/otpValidation",adminController.otpValidation)
 router.put('/updateRegister',adminController.updateRegister);// save extra details
 router.put("/forgotPassword",adminController.forgotPassword);
-router.post("/BusinessRegister", 
-    upload.fields([
-        { name: 'brand_logo' },  
-        { name: 'cover_img' },
-        { name: 'pan_img' },
-        { name: 'aadhar_img' }
-    ]), 
-    adminController.BusinessRegister
-);
+router.post("/BusinessRegister",adminController.BusinessRegister);
+router.post("/imgUpload",upload.fields([
+    { name: 'brand_logo' },  
+    { name: 'cover_img' },
+    { name: 'pan_img' },
+    { name: 'aadhar_img' },
+    {name:'profile_img'}
+]),adminController.imgUpload);
 
 export default router;

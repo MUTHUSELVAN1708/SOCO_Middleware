@@ -108,7 +108,9 @@ const adminController = {
     login: async (req, res, next) => {
         try {
             const loginResponse = await adminService.login(req.body);
-           
+            res.status(200).json({
+                status: 200,
+    
             if (loginResponse.status === 400 || loginResponse.status === 500) {
                 return res.status(loginResponse.status).json(loginResponse);
             }
@@ -117,14 +119,13 @@ const adminController = {
                 status: 200,
                 msg: "Logged in successfully",
                 login: loginResponse.login,
-            })
+            });
         } catch (error) {
             next({
                 statuscode: 400,
-                error: error.message || "An unexpected error occurred",
+                error: error.msg || "An unexpected error occurred",
             });
         }
-
     },
     
     // ===================================
@@ -182,8 +183,24 @@ const adminController = {
     // ==================
     BusinessRegister: async (req, res, next) => {
         try {
+            // console.log('Raw Data:', req.body);
+            // console.log('Files:', req.files);
+            const rawData = JSON.parse(req.body.data);
+            // console.log(rawData);
+            const brand_logo = req.files['brand_logo'] ? `${BASE_URL}/uploads/${req.files['brand_logo'][0].filename}` : ''; 
+            const cover_img = req.files['cover_img'] ? `${BASE_URL}/uploads/${req.files['cover_img'][0].filename}` : '';
+            const pan_img = req.files['pan_img'] ? `${BASE_URL}/uploads/${req.files['pan_img'][0].filename}` : '';  
+            const aadhar_img = req.files['aadhar_img'] ? `${BASE_URL}/uploads/${req.files['aadhar_img'][0].filename}` : '';
+            
+            const businessData = {
+                ...rawData, 
+                brand_logo,
+                cover_img,
+                pan_img,
+                aadhar_img
+            };
     
-            const BusinessRegister = await adminService.businessRegister(req.body);
+            const BusinessRegister = await adminService.BusinessRegister(businessData);
             console.log(BusinessRegister, "Service Response");
     
             res.status(200).json({
@@ -234,25 +251,6 @@ const adminController = {
         }
 
     },
-
-    // ==========================
-    imgUpload: async (req, res) => {
-        try {
-            if (!req.files || Object.keys(req.files).length === 0) {
-                return res.status(400).json({ message: 'No file uploaded!' });
-            }
-    
-            const uploadedFiles = {};
-            for (const [fieldName, files] of Object.entries(req.files)) {
-                uploadedFiles[fieldName] = files.map(file => `${req.protocol}://${req.get('host')}/uploads/${file.filename}`);
-            }
-    
-            res.status(200).json({ uploadedFiles });
-        } catch (error) {
-            console.error('Error uploading images:', error);
-            res.status(500).json({ message: 'An error occurred while uploading the images.' });
-        }
-    }
 
 
 }

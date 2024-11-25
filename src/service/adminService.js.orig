@@ -19,8 +19,6 @@ const adminService = {
         try {
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
-            const phnNumber = await registerModel.findOne({ phn_number });
-            if (phnNumber) {
                 const error = new Error("phone number is already exist");
                 error.status = 400; // Adding status 400 to the error
                 throw error;
@@ -42,8 +40,7 @@ const adminService = {
                 agree
             });
     
-            return register
-        }
+            return register;
         } catch (error) {
             if (!error.status) {
                 error.status = 500; // Default to internal server error if no status
@@ -90,8 +87,7 @@ const adminService = {
             reg_otp: hashedOtp,
         });
 
-        return otpRecord
-    }
+        return otpRecord;}
            
         } catch (error) {
             console.error("Error in verifyEmail service:", error);
@@ -577,15 +573,25 @@ const adminService = {
         }
     },
     // ====================
-    businessRegister: async (data) => {
-        const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, aadhar_img, pan_img, GST_NO, status, Name, address,
-             location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
+<<<<<<< HEAD
+    BusinessRegister: async (data) => {
+        const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, aadhar_img, pan_img, GST_NO, status, Name, address, location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
     
         console.log(data, "Received Data");
     
+=======
+    businessRegister: async (data) => {
+        const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO,aadhar_img,pan_img, GST_NO, status, Name, address, location_id,
+            brand_logo, cover_img, agree, type_of_service, category, sub_category, } = data;
+
+        console.log(data, "dta")
+>>>>>>> 6c1dd86499c6947e3ea25ade350cac7acef43f7f
         try {
             if (isSameNumberBusiness == true) {
+                // Store address in a separate collection
                 const addressDoc = await locationModel.create({ address });
+    
+                // Register the business with raw and file data
                 const register = await businessregisterModel.create({
                     location_id: addressDoc._id,
                     Brand_Name,
