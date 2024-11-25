@@ -6,7 +6,8 @@ const adminController = {
     register: async (req, res, next) => {
         try {
             const register = await adminService.register(req.body);
-            res.status(200).json({ status:200,
+            res.status(200).json({
+                status: 200,
                 msg: "successfully created",
                 register
             })
@@ -19,12 +20,12 @@ const adminController = {
 
     },
     // =================
-    verifyEmail: async (req, res,next) => {
+    verifyEmail: async (req, res, next) => {
         const { email } = req.params;
         try {
             const verifyEmailResult = await adminService.verifyEmail(email);
             res.status(200).json({
-                status:200,
+                status: 200,
                 msg: "OTP sent to email successfully",
                 data: verifyEmailResult
             });
@@ -37,11 +38,11 @@ const adminController = {
     },
 
     // ==========
-    verifyOtp: async (req, res,next) => {
+    verifyOtp: async (req, res, next) => {
         try {
             const verifyOtp = await adminService.verifingOtp(req.body);
             res.status(200).json({
-                status:200,
+                status: 200,
                 msg: "OTP verified successfully ",
                 verifyOtp
             })
@@ -55,11 +56,12 @@ const adminController = {
     },
 
     // ==============================
-    login: async (req, res,next) => {
+    login: async (req, res, next) => {
         try {
             const login = await adminService.login(req.body);
-            res.status(200).json({ status:200,
-                msg:"Logged in successfully",
+            res.status(200).json({
+                status: 200,
+                msg: "Logged in successfully",
                 login
             })
         } catch (error) {
@@ -71,10 +73,11 @@ const adminController = {
 
     },
     // ===================================
-    otpValidation: async (req, res,next) => {
+    otpValidation: async (req, res, next) => {
         try {
             const otpValidation = await adminService.otpValidation(req.body);
-            res.status(200).json({ status:200,
+            res.status(200).json({
+                status: 200,
                 otpValidation
             })
         } catch (error) {
@@ -86,12 +89,13 @@ const adminController = {
 
     },
     // ================
-    updateRegister: async (req, res,next) => {
+    updateRegister: async (req, res, next) => {
         try {
             const updateRegister = await adminService.updateRegister(req.body);
 
-            res.status(200).json({ status:200,
-                msg:"updated successfully",
+            res.status(200).json({
+                status: 200,
+                msg: "updated successfully",
                 updateRegister
             })
         } catch (error) {
@@ -104,10 +108,11 @@ const adminController = {
     },
 
     // ==============================
-    forgotPassword: async (req, res,next) => {
+    forgotPassword: async (req, res, next) => {
         try {
             const forgotPassword = await adminService.forgotPassword(req.body);
-            res.status(200).json({ status:200,
+            res.status(200).json({
+                status: 200,
                 msg: "updated successfully",
                 forgotPassword
             })
@@ -120,11 +125,30 @@ const adminController = {
 
     },
     // ==================
-    BusinessRegister: async (req, res,next) => {
+    BusinessRegister: async (req, res, next) => {
         try {
-            const BusinessRegister = await adminService.BusinessRegister(req.body);
-            console.log(BusinessRegister, "kkjjh")
-            res.status(200).json({ status:200,
+            // console.log('Raw Data:', req.body);
+            // console.log('Files:', req.files);
+            const rawData = JSON.parse(req.body.data);
+            // console.log(rawData);
+            const brand_logo = req.files['brand_logo'] ? `${BASE_URL}/uploads/${req.files['brand_logo'][0].filename}` : ''; 
+            const cover_img = req.files['cover_img'] ? `${BASE_URL}/uploads/${req.files['cover_img'][0].filename}` : '';
+            const pan_img = req.files['pan_img'] ? `${BASE_URL}/uploads/${req.files['pan_img'][0].filename}` : '';  
+            const aadhar_img = req.files['aadhar_img'] ? `${BASE_URL}/uploads/${req.files['aadhar_img'][0].filename}` : '';
+            
+            const businessData = {
+                ...rawData, 
+                brand_logo,
+                cover_img,
+                pan_img,
+                aadhar_img
+            };
+    
+            const BusinessRegister = await adminService.BusinessRegister(businessData);
+            console.log(BusinessRegister, "Service Response");
+    
+            res.status(200).json({
+                status: 200,
                 msg: "Registered Successfully",
                 BusinessRegister
             });
@@ -135,13 +159,14 @@ const adminController = {
             next(error);
         }
     },
-
+    
 
     // ===================
-    getPendingStatus: async (req, res,next) => {
+    getPendingStatus: async (req, res, next) => {
         try {
             const getPendingStatus = await adminService.getPendingStatus();
-            res.status(200).json({ status:200,
+            res.status(200).json({
+                status: 200,
                 msg: "successfully fetched",
                 getPendingStatus
             })
@@ -154,10 +179,11 @@ const adminController = {
 
     },
     // ===========================
-    updateBusinessStatus: async (req, res,next) => {
+    updateBusinessStatus: async (req, res, next) => {
         try {
             const updateBusinessStatus = await adminService.updateBusinessStatus(req.body);
-            res.status(200).json({ status:200,
+            res.status(200).json({
+                status: 200,
                 msg: " updated successfully ",
                 updateBusinessStatus
             })

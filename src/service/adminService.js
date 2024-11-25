@@ -404,28 +404,43 @@ const adminService = {
     },
     // ====================
     BusinessRegister: async (data) => {
-        const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO,aadhar_img,pan_img, GST_NO, status, Name, address, location_id,
-            brand_logo, cover_img, agree, type_of_service, category, sub_category, } = data;
-
-        console.log(data, "dta")
+        const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, aadhar_img, pan_img, GST_NO, status, Name, address, location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
+    
+        console.log(data, "Received Data");
+    
         try {
             if (isSameNumberBusiness == true) {
-                const addresss = await locationModel.create({ address });
+                // Store address in a separate collection
+                const addressDoc = await locationModel.create({ address });
+    
+                // Register the business with raw and file data
                 const register = await businessregisterModel.create({
-                    location_id: addresss._id,
-                    Brand_Name, org_name, PAN_NO, GST_NO, Name, status,aadhar_img,pan_img,
-                    brand_logo, cover_img, agree, type_of_service, category, sub_category,
+                    location_id: addressDoc._id,
+                    Brand_Name,
+                    org_name,
+                    PAN_NO,
+                    GST_NO,
+                    Name,
+                    status,
+                    aadhar_img,
+                    pan_img,
+                    brand_logo,
+                    cover_img,
+                    agree,
+                    type_of_service,
+                    category,
+                    sub_category
                 });
-
-                return register
-            }else{
-                throw new Error("invalid data to create business account")
+    
+                return register;
+            } else {
+                throw new Error("Invalid data to create a business account");
             }
-
         } catch (error) {
             throw error;
         }
     },
+    
     // ========================
     getPendingStatus: async () => {
         try {

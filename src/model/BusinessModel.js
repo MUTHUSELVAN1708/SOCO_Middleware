@@ -26,27 +26,10 @@ const BusinessregisterSchema = new mongoose.Schema({
     required: true,
   },
 
-  brand_logo: {
-    type: String,
- 
-    required: true
-  },  
-  
-  aadhar_img: {
-    type: String,
- 
-    required: true
-  },                              
-  
-  pan_img: {
-    type: String,
- 
-    required: true
-  }, 
-  cover_img: {
-    type: String,
-    required: true
-  },
+  aadhar_img: { type: String, required: true },
+  pan_img: { type: String, required: true },
+  cover_img: { type: String, required: true },
+  brand_logo: { type: String, required: true },
   agree: {
     type: Boolean,
     required: false
