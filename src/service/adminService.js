@@ -148,7 +148,7 @@ const adminService = {
                 },
             });
             const mailOptions = {
-                from: "jenijenifer1511@gmail.com", 
+                from: "soco.infobusiness@gmail.com", 
                 to: receiverMail,
                 subject: "SOCO OTP Code for Verification", 
                 text: `Dear User,
