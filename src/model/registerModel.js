@@ -148,6 +148,24 @@ const registerSchema = new mongoose.Schema(
       companyName: { type: String, required: false },
       designation: { type: String, required: false },
     },
+    
+  friend: [friendModel],
+  highlights: [{
+        type: String,
+        required: false
+      }],
+      isAlreadyFriend: {
+            type: Boolean,
+            required: false
+          },
+          isVerified: {
+                type: Boolean,
+                required: false
+              },
+              posts: {
+                    type: Number,
+                    required: false
+                  },
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }
