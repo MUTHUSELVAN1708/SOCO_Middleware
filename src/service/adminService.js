@@ -1,4 +1,4 @@
-import registerModel from "../model/registerModel.js";
+import  registerModel from "../model/registerModel.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import otpGenerator from "otp-generator";
@@ -218,7 +218,6 @@ const adminService = {
     //   ==========
     registerUserWithBusiness: async (data) => {
         try {
-
             const {
                 full_Name,
                 phn_number,
@@ -226,6 +225,7 @@ const adminService = {
                 DOB,
                 reg_otp_id,
                 password,
+                profile_url,
                 status,
                 address,
                 isSameNumberBusiness,
@@ -244,6 +244,7 @@ const adminService = {
                 busPhone,
                 PAN_NO,
                 aadharNo,
+                accountIsPublic,
                 aadhar_img,
                 pan_img,
                 GST_NO,
@@ -253,32 +254,26 @@ const adminService = {
                 category,
                 sub_category,
                 businessAgree,
+                postCount = 0,
+                followerCount = 0,
+                followingCount = 0,
+                needPermissionForFollowing = false,
+                school = "",
+                educationLevel = "",
+                working = "",
+                important = false,
             } = data;
 
-            // Initialize an error array to collect validation issues
+    
+            // Validate required fields
             let errors = [];
+            if (!full_Name) errors.push("Full name is required.");
+            if (!phn_number) errors.push("Phone number is required.");
+            if (!email) errors.push("Email is required.");
+            if (!password) errors.push("Password is required.");
+            if (!address) errors.push("Address is required.");
+            if (!agree) errors.push("Agreement is required.");
 
-            // Check for existing full name
-            const existingUserByFullName = await registerModel.findOne({ full_Name });
-            if (existingUserByFullName) {
-                errors.push("Name already exists. Name must be unique. ");
-            }
-
-            // Check for existing phone number
-            const existingUserByPhone = await registerModel.findOne({ phn_number });
-            if (existingUserByPhone) {
-                errors.push("Phone number already exists.Try a different one or log in.");
-            }
-
-            // Check for existing email
-            const existingUserByEmail = await registerModel.findOne({ email });
-            if (existingUserByEmail) {
-                errors.push("Email already exists. Try a different one or log in.");
-            }
-
-
-
-            // If any errors exist, throw them together as a single error
             if (errors.length > 0) {
                 const error = new Error(errors.join(" "));
                 error.status = 400;
@@ -292,25 +287,45 @@ const adminService = {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             // Create the user
+    
+            // Check for existing users
+            const existingUserByFullName = await registerModel.findOne({ full_Name });
+            if (existingUserByFullName) errors.push("Name already exists. Name must be unique.");
+            const existingUserByPhone = await registerModel.findOne({ phn_number });
+            if (existingUserByPhone) errors.push("Phone number already exists. Try a different one or log in.");
+            const existingUserByEmail = await registerModel.findOne({ email });
+            if (existingUserByEmail) errors.push("Email already exists. Try a different one or log in.");
+            if (errors.length > 0) {
+                const error = new Error(errors.join(" "));
+                error.status = 400;
+                throw error;
+            }
+    
+            // Create user entry
             const register = await registerModel.create({
                 location_id: addresss._id,
                 full_Name,
                 phn_number,
                 password: hashedPassword,
                 email,
+                profile_url : profile_url || "",
                 status,
+                accountIsPublic,
                 reg_otp_id,
                 DOB,
                 isSameNumberBusiness,
-                agree
+                agree,
+                postCount,
+                followerCount,
+                followingCount,
+                needPermissionForFollowing,
+                school,
+                educationLevel,
+                working,
             });
 
-            // Initialize business-related fields
-            let business = null;
-
-            // If business information is needed
-
-            business = await businessregisterModel.create({
+            // Create business entry
+            const business = await businessregisterModel.create({
                 location_id: addresss._id,
                 user_id: register._id,
                 Brand_Name: Brand_Name || "",
@@ -325,6 +340,11 @@ const adminService = {
                 brand_logo: brand_logo || "",
                 cover_img: cover_img || "",
                 businessAgree: businessAgree,
+                accountIsPublic,
+                businessAgree,
+                postCount,
+                followerCount,
+                followingCount,
                 type_of_service: type_of_service || "",
                 category: category || "",
                 sub_category: sub_category || "",
@@ -337,15 +357,12 @@ const adminService = {
                 businessPhone: busPhone || "",
                 businessType: businessType || "",
                 natureOfBusiness: natureOfBusiness || "",
-                businessName: businessName || ""
+                businessName: businessName || "",
+                important,
             });
-
-
             return { register, business };
         } catch (error) {
-            if (!error.status) {
-                error.status = 500; // Default to internal server error if no status
-            }
+            if (!error.status) error.status = 500;
             throw error;
         }
     },
