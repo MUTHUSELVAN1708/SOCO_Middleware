@@ -1,48 +1,61 @@
 // import mongoose from "../db/db.js";
 import mongoose from "mongoose";
+
+const friendModel = new mongoose.Schema({
+  // id: {
+  //   type: String,
+  //   required: true
+  // },
+  username: {
+    type: String,
+    required: false
+  },
+  profileImageUrl: {
+    type: String,
+    required: false
+  },
+  isFollowing: {
+    type: Boolean,
+    required: false
+  },
+});
 const registerSchema = new mongoose.Schema({
   full_Name: {
     type: String,
-    required: true,
+    required: false,
   },
   password: {
     type: String,
-    required: true,
+    required: false,
   },
   phn_number: {
     type: Number,
-    required: true,
+    required: false,
   },
   email: {
     type: String,
-    required: true,
+    required: false,
   },
   DOB: {
     type: String,
-    required: true,
+    required: false,
   },
-  location_id:{
+  location_id: {
     type: String,
-    required: true,
+    required: false,
   },
 
   profile_img: {
     type: String,
-    //  validate: {
-    //   validator: function(v) {
-    //     return /^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|svg))$/i.test(v); 
-    //   },
-    //   message: props => `${props.value} is not a valid image URL!`
-    // },
     required: false
   },
   agree: {
     type: Boolean,
-    required: true
+    required: false
   },
   isSameNumberBusiness: {
     type: Boolean,
-    required: true
+    required: false
   },
   interest: [{
     type: String,
@@ -52,10 +65,10 @@ const registerSchema = new mongoose.Schema({
     type: String,
     required: false
   }],
-status:{
-  type: String,
-  required: true
-},
+  status: {
+    type: String,
+    required: false
+  },
   otp: {
     type: String,
     required: false
@@ -64,6 +77,40 @@ status:{
     type: String,
     required: false
   },
+  // username: {
+  //   type: String,
+  //   required: false
+  // },
+  bio: {
+    type: String,
+    required: false
+  },
+  posts: {
+    type: Number,
+    required: false
+  },
+  followers: {
+    type: Number,
+    required: false
+  },
+  
+  isVerified: {
+    type: Boolean,
+    required: false
+  },
+  isAlreadyFriend: {
+    type: Boolean,
+    required: false
+  },
+  isPrivate: {
+    type: Boolean,
+    required: false
+  },
+  highlights: [{
+    type: String,
+    required: false
+  }],
+  friend: [friendModel],
   timestamp: {
     type: Date,
     default: Date.now
@@ -76,4 +123,4 @@ registerSchema.virtual("user_id").get(function () {
 });
 const registerModel = mongoose.model("user", registerSchema);
 
-export default registerModel;
+export default registerModel;  

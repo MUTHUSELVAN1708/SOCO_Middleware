@@ -9,6 +9,8 @@ import jwt from "jsonwebtoken"
 import locationModel from "../model/locationModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
 import otpModel from "../model/regOtpModel.js";
+import { constants } from "buffer";
+import postModel from "../model/postModel.js";
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
@@ -19,31 +21,31 @@ const adminService = {
         try {
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
-            const phnNumber = await registerModel.findOne({ phn_number });
-            if (phnNumber) {
-                const error = new Error("phone number is already exist");
-                error.status = 400; // Adding status 400 to the error
-                throw error;
+                const phnNumber = await registerModel.findOne({ phn_number });
+                if (phnNumber) {
+                    const error = new Error("phone number is already exist");
+                    error.status = 400; // Adding status 400 to the error
+                    throw error;
+                }
+
+                const hashedpassword = await bcrypt.hash(password, 10);
+
+                const addresss = await locationModel.create({ address });
+                const register = await registerModel.create({
+                    location_id: addresss._id,
+                    full_Name,
+                    phn_number,
+                    password: hashedpassword,
+                    email,
+                    status,
+                    reg_otp_id,
+                    DOB,
+                    isSameNumberBusiness,
+                    agree
+                });
+
+                return register
             }
-    
-            const hashedpassword = await bcrypt.hash(password, 10);
-    
-            const addresss = await locationModel.create({ address });
-            const register = await registerModel.create({
-                location_id: addresss._id,
-                full_Name,
-                phn_number,
-                password: hashedpassword,
-                email,
-                status,
-                reg_otp_id,
-                DOB,
-                isSameNumberBusiness,
-                agree
-            });
-    
-            return register
-        }
         } catch (error) {
             if (!error.status) {
                 error.status = 500; // Default to internal server error if no status
@@ -59,46 +61,46 @@ const adminService = {
             if (existingEmail) {
                 throw new Error("Email already exists");
             }
-    
+
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
                 throw new Error("Invalid email format");
             }
-    
+
             const otp = otpGenerator.generate(4, {
                 digits: true,
                 specialChars: false,
                 lowerCaseAlphabets: false,
                 upperCaseAlphabets: false,
             });
-    
+
             console.log("Generated OTP:", otp);
-    
+
             const emailSent = await adminService.SendOTPEmail(email, otp);
             console.log("Email sending status:", emailSent);
-      const existingOtpRecord = await otpModel.findOne({ email });
-    if (existingOtpRecord) {
-        const hashedOtp = await bcrypt.hash(otp, 10);
-        existingOtpRecord.reg_otp = hashedOtp;
-        await existingOtpRecord.save();
-        console.log("OTP updated for existing email");
-        return existingOtpRecord;
-    } else{
-         const hashedOtp = await bcrypt.hash(otp, 10);
-        const otpRecord = await otpModel.create({
-            email,
-            reg_otp: hashedOtp,
-        });
+            const existingOtpRecord = await otpModel.findOne({ email });
+            if (existingOtpRecord) {
+                const hashedOtp = await bcrypt.hash(otp, 10);
+                existingOtpRecord.reg_otp = hashedOtp;
+                await existingOtpRecord.save();
+                console.log("OTP updated for existing email");
+                return existingOtpRecord;
+            } else {
+                const hashedOtp = await bcrypt.hash(otp, 10);
+                const otpRecord = await otpModel.create({
+                    email,
+                    reg_otp: hashedOtp,
+                });
 
-        return otpRecord
-    }
-           
+                return otpRecord
+            }
+
         } catch (error) {
             console.error("Error in verifyEmail service:", error);
             throw new Error(error.message || "Failed to verify email");
         }
     },
-    
+
     // ====================
     storedOtp: async (user_id, reg_otp) => {
 
@@ -136,21 +138,21 @@ const adminService = {
 
         try {
             const transporter = nodemailer.createTransport({
-                host: "smtp.gmail.com", 
-                port: 465, 
-                secure: true, 
+                host: "smtp.gmail.com",
+                port: 465,
+                secure: true,
                 auth: {
                     user: process.env.EMAIL_USER,
                     pass: process.env.EMAIL_PASS,
                 },
                 tls: {
-                    rejectUnauthorized: false, 
+                    rejectUnauthorized: false,
                 },
             });
             const mailOptions = {
-                from: "soco.infobusiness@gmail.com", 
+                from: "soco.infobusiness@gmail.com",
                 to: receiverMail,
-                subject: "SOCO OTP Code for Verification", 
+                subject: "SOCO OTP Code for Verification",
                 text: `Dear User,
             
             Thank you for choosing soco!
@@ -166,14 +168,14 @@ const adminService = {
             Best regards,  
             The soco Team`
             };
-            
+
             const info = await transporter.sendMail(mailOptions);
             console.log("OTP email sent:", info.response);
 
             return info.response;
         } catch (error) {
             console.error("Error in sending OTP Email:", error);
-            throw new Error ("Error in sending OTP Email")
+            throw new Error("Error in sending OTP Email")
         }
     },
 
@@ -182,23 +184,23 @@ const adminService = {
         const { email, enteredOtp } = data;
         try {
             const storedOtpEntry = await otpModel.findOne({ email });
-    
+
             if (!storedOtpEntry) {
                 return {
                     success: false,
                     message: "No OTP entry found for the provided email",
                 };
             }
-    
+
             const isOtpValid = await bcrypt.compare(enteredOtp, storedOtpEntry.reg_otp);
-    
+
             if (!isOtpValid) {
                 return {
                     success: false,
                     message: "Invalid OTP entered",
                 };
             }
-    
+
             return {
                 success: true,
                 message: "OTP verified successfully",
@@ -211,12 +213,12 @@ const adminService = {
             };
         }
     },
-    
+
 
     //   ==========
     registerUserWithBusiness: async (data) => {
         try {
-        
+
             const {
                 full_Name,
                 phn_number,
@@ -252,7 +254,7 @@ const adminService = {
                 sub_category,
                 businessAgree,
             } = data;
-    
+
             // Initialize an error array to collect validation issues
             let errors = [];
 
@@ -261,34 +263,34 @@ const adminService = {
             if (existingUserByFullName) {
                 errors.push("Name already exists. Name must be unique. ");
             }
-    
+
             // Check for existing phone number
             const existingUserByPhone = await registerModel.findOne({ phn_number });
             if (existingUserByPhone) {
                 errors.push("Phone number already exists.Try a different one or log in.");
             }
-    
+
             // Check for existing email
             const existingUserByEmail = await registerModel.findOne({ email });
             if (existingUserByEmail) {
                 errors.push("Email already exists. Try a different one or log in.");
             }
-    
-        
-    
+
+
+
             // If any errors exist, throw them together as a single error
             if (errors.length > 0) {
                 const error = new Error(errors.join(" "));
                 error.status = 400;
                 throw error;
             }
-    
+
             // Create the address
             const addresss = await locationModel.create({ address });
-            
+
             // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
-    
+
             // Create the user
             const register = await registerModel.create({
                 location_id: addresss._id,
@@ -302,43 +304,43 @@ const adminService = {
                 isSameNumberBusiness,
                 agree
             });
-    
+
             // Initialize business-related fields
             let business = null;
-    
+
             // If business information is needed
-            
-                business = await businessregisterModel.create({
-                    location_id: addresss._id,
-                    user_id: register._id, 
-                    Brand_Name: Brand_Name || "",
-                    org_name: org_name || "",
-                    PAN_NO: PAN_NO || "",
-                    aadharNo: aadharNo || "",
-                    GST_NO: GST_NO || "",
-                    Name:  register.full_Name,
-                    status: "Inactive",
-                    aadhar_img: aadhar_img || "",
-                    pan_img: pan_img || "",
-                    brand_logo: brand_logo || "",
-                    cover_img: cover_img || "",
-                    businessAgree: businessAgree,
-                    type_of_service: type_of_service || "",
-                    category: category || "",
-                    sub_category: sub_category || "",
-                    ownerName: ownerName || "",
-                    businessAddress: businessAddress || "", 
-                    businessCity: busCity || "",
-                    businessState: busState || "",
-                    businessPinCode: busPinCode || "", 
-                    businessEmail: busEmail || "", 
-                    businessPhone: busPhone || "", 
-                    businessType: businessType || "",
-                    natureOfBusiness: natureOfBusiness || "", 
-                    businessName: businessName || "" 
-                });
-        
-    
+
+            business = await businessregisterModel.create({
+                location_id: addresss._id,
+                user_id: register._id,
+                Brand_Name: Brand_Name || "",
+                org_name: org_name || "",
+                PAN_NO: PAN_NO || "",
+                aadharNo: aadharNo || "",
+                GST_NO: GST_NO || "",
+                Name: register.full_Name,
+                status: "Inactive",
+                aadhar_img: aadhar_img || "",
+                pan_img: pan_img || "",
+                brand_logo: brand_logo || "",
+                cover_img: cover_img || "",
+                businessAgree: businessAgree,
+                type_of_service: type_of_service || "",
+                category: category || "",
+                sub_category: sub_category || "",
+                ownerName: ownerName || "",
+                businessAddress: businessAddress || "",
+                businessCity: busCity || "",
+                businessState: busState || "",
+                businessPinCode: busPinCode || "",
+                businessEmail: busEmail || "",
+                businessPhone: busPhone || "",
+                businessType: businessType || "",
+                natureOfBusiness: natureOfBusiness || "",
+                businessName: businessName || ""
+            });
+
+
             return { register, business };
         } catch (error) {
             if (!error.status) {
@@ -347,7 +349,7 @@ const adminService = {
             throw error;
         }
     },
-  
+
 
     // ==================================
     login: async (data) => {
@@ -367,7 +369,7 @@ const adminService = {
                 console.log(otp);
                 await adminService.storeOtp(user._id, otp);
                 await adminService.sendOtp(phn_number, otp);
-    
+
                 return {
                     status: 200,
                     msg: "Authentication successful",
@@ -396,7 +398,7 @@ const adminService = {
                         login: null,
                     };
                 }
-    
+
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     return {
@@ -405,12 +407,12 @@ const adminService = {
                         login: null,
                     };
                 }
-    
+
                 const token = jwt.sign(
                     { user_id: user._id },
                     SECRET_KEY
                 );
-    
+
                 return {
                     status: 200,
                     msg: "Login successful",
@@ -442,8 +444,8 @@ const adminService = {
             };
         }
     },
-    
-    
+
+
     // ===================
     storeOtp: async (user_id, otp) => {
 
@@ -524,7 +526,7 @@ const adminService = {
             const user = await registerModel.findById(user_id);
 
             if (!user) {
-                throw new Error ("User not found")
+                throw new Error("User not found")
             }
             const isOtpValid = await adminService.verifyOtp(user_id, otp);
             if (!isOtpValid) {
@@ -590,7 +592,7 @@ const adminService = {
             );
 
             if (!update) {
-                throw new Error("User not found or update failed" ) 
+                throw new Error("User not found or update failed")
             }
 
             return { password: update.password };
@@ -602,10 +604,10 @@ const adminService = {
     // ====================
     businessRegister: async (data) => {
         const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, aadhar_img, pan_img, GST_NO, status, Name, address,
-             location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
-    
+            location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
+
         console.log(data, "Received Data");
-    
+
         try {
             if (isSameNumberBusiness == true) {
                 const addressDoc = await locationModel.create({ address });
@@ -626,7 +628,7 @@ const adminService = {
                     category,
                     sub_category
                 });
-    
+
                 return register;
             } else {
                 throw new Error("Invalid data to create a business account");
@@ -635,7 +637,7 @@ const adminService = {
             throw error;
         }
     },
-    
+
     // ========================
     getPendingStatus: async () => {
         try {
@@ -658,6 +660,93 @@ const adminService = {
             throw error
         }
     },
+    // =======================
+    searchRecomdation: async (data) => {
+        try {
+            if (!data || typeof data !== 'string' || !data.trim()) {
+                return { success: false, message: "Invalid or missing query parameter" };
+            }
+
+            const results = await registerModel.find({
+                full_Name: { $regex: `^${data}`, $options: 'i' } // Case-insensitive match starting with `data`
+            }).select('full_Name profile_img');
+
+            if (results.length === 0) {
+                throw new Error("No matching results found");
+            }
+
+            const formattedResults = results.map(result => ({
+                full_Name: result.full_Name,
+                profile_img: result.profile_img,
+            }));
+
+            return { success: true, data: formattedResults };
+        } catch (error) {
+            console.error(`Error in searchRecomdation: ${error.message}`);
+            throw error
+        }
+    },
+    // =================
+    friendRequest: async (data) => {
+        const { user_id, username, profileImageUrl, isFollowing } = data;
+
+        try {
+            const updatedUser = await registerModel.findOneAndUpdate(
+                { _id: user_id },
+                { $push: { friend: { username, profileImageUrl, isFollowing } } },
+                { new: true }
+            );
+
+            if (!updatedUser) {
+                throw new Error("User not found");
+            }
+
+            return updatedUser;
+        } catch (error) {
+            throw error;
+        }
+    },
+    //   =====
+    createpost: async (data) => {
+        const { user_id, imageUrl, caption, likes, comments, tags } = data;
+
+        try {
+            const getpost=await postModel.findOne({user_id});
+            if(getpost){
+                const updatedPost = await postModel.findOneAndUpdate(
+                    { user_id }, 
+                    { $push: { posts: { imageUrl, caption, likes, comments, tags } } }, 
+                    { new: true } // Return the updated document
+                );
+                return updatedPost;
+            }else{
+            const post = await postModel.create({
+                user_id, imageUrl, caption, likes, comments, tags
+            });
+            
+            return post;
+}
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    //   ==================
+    getPost: async (user_id) => {
+        // console.log(user_id,"jjj")
+
+        try {
+            const getpost = await postModel.findOne({user_id});
+            if (!getpost) {
+                throw new Error(" post not found");
+            }
+            return getpost;
+        } catch (error) {
+            throw error;
+        }
+    },
+
+
 }
 
 

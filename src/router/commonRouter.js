@@ -92,7 +92,13 @@ router.post(
         } catch (error) {
             res.status(500).json({ message: error.message });
         }
-    }
-);
+    },
+
+    // ====
+    router.post("/searchRecomdation/:data",adminController.searchRecomdation));
+    router.post("/friendRequest",adminController.friendRequest);
+    router.post("/post",adminController.createpost);
+    router.get("/getPost/:id",adminController.getPost);
+
 
 export default router;

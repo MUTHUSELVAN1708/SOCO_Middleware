@@ -1,3 +1,4 @@
+import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
 
@@ -41,25 +42,25 @@ const adminController = {
     verifyOtp: async (req, res, next) => {
         try {
             const { email, enteredOtp } = req.body;
-    
+
             if (!email || !enteredOtp) {
                 const error = new Error("Email and OTP are required");
                 error.statuscode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-    
+
             if (!/^\d+$/.test(enteredOtp)) {
                 const error = new Error("OTP must contain only numeric values");
                 error.statuscode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-    
+
             console.log(req.body);
-    
+
             const verifyOtp = await adminService.verifingOtp(req.body);
-    
+
             res.status(200).json({
                 status: 200,
                 msg: "OTP verified successfully",
@@ -69,11 +70,11 @@ const adminController = {
             error.error = error.message;
             console.error(error);
             const statusCode = error.statuscode || 500;
-    
+
             // Add specific error type for OTP verification failure
-            const errorType = error.errorType || 
+            const errorType = error.errorType ||
                 (statusCode === 400 ? "OtpVerificationError" : "ServerError");
-    
+
             res.status(statusCode).json({
                 status: statusCode,
                 msg: error.message || "An unexpected error occurred",
@@ -96,23 +97,23 @@ const adminController = {
             // Ensure error structure is consistent
             error.status = error.status || 400; // Default to 400 if no status set
             error.message = error.message || 'Something went wrong';
-            
+
             // Pass the error to the next middleware
             next(error);
         }
     },
-    
-    
+
+
 
     // ==============================
     login: async (req, res, next) => {
         try {
             const loginResponse = await adminService.login(req.body);
-           
+
             if (loginResponse.status === 400 || loginResponse.status === 500) {
                 return res.status(loginResponse.status).json(loginResponse);
             }
-    
+
             res.status(200).json({
                 status: 200,
                 msg: "Logged in successfully",
@@ -126,7 +127,7 @@ const adminController = {
         }
 
     },
-    
+
     // ===================================
     otpValidation: async (req, res, next) => {
         try {
@@ -182,10 +183,10 @@ const adminController = {
     // ==================
     BusinessRegister: async (req, res, next) => {
         try {
-    
+
             const BusinessRegister = await adminService.businessRegister(req.body);
             console.log(BusinessRegister, "Service Response");
-    
+
             res.status(200).json({
                 status: 200,
                 msg: "Registered Successfully",
@@ -198,7 +199,7 @@ const adminController = {
             next(error);
         }
     },
-    
+
 
     // ===================
     getPendingStatus: async (req, res, next) => {
@@ -241,12 +242,12 @@ const adminController = {
             if (!req.files || Object.keys(req.files).length === 0) {
                 return res.status(400).json({ message: 'No file uploaded!' });
             }
-    
+
             const uploadedFiles = {};
             for (const [fieldName, files] of Object.entries(req.files)) {
                 uploadedFiles[fieldName] = files.map(file => `${req.protocol}://${req.get('host')}/uploads/${file.filename}`);
             }
-    
+
             res.status(200).json({ uploadedFiles });
         } catch (error) {
             console.error('Error uploading images:', error);
@@ -255,15 +256,15 @@ const adminController = {
     },
 
 
-     fileUpload : async (req, res) => {
+    fileUpload: async (req, res) => {
         try {
             console.log('file process');
             if (!req.file) {
                 return res.status(400).json({ message: 'No file uploaded!' });
             }
-    
+
             const uploadedFileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-    
+
             res.status(200).json({
                 message: 'File uploaded successfully!',
                 fileUrl: uploadedFileUrl,
@@ -275,8 +276,73 @@ const adminController = {
             console.error('Error uploading file:', error);
             res.status(500).json({ message: 'An error occurred while uploading the file.' });
         }
-    }
-    
+    },
+    // ==================
+    searchRecomdation: async (req, res) => {
+        try {
+            const { data } = req.params;
+
+            if (!data) {
+                return res.status(400).json({ message: "Data parameter is required" });
+            }
+
+            const search = await adminService.searchRecomdation(data);
+
+
+            res.status(200).json({
+                status: 200,
+                msg: "Fetched successfully",
+                search,
+            });
+        } catch (error) {
+            return res.status(404).json({ status: 400, message: "No matching results found" });
+        }
+    },
+    // ====================
+    friendRequest: async (req, res,next) => {
+        try {
+            const friendRequest = await adminService.friendRequest(req.body);
+            res.status(200).json({
+                status:200,
+                friendRequest})
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // =====================
+    createpost: async (req, res,next) => {
+        try {
+            const post = await adminService.createpost(req.body);
+            res.status(200).json({
+                status:200,
+                post})
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ==================
+    getPost:async (req, res,next) => {
+        const {id}=req.params
+        try {
+            const getpost = await adminService.getPost(id);
+            res.status(200).json({
+                status:200,
+                getpost})
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+
 
 
 }
