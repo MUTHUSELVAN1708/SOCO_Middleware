@@ -575,10 +575,10 @@ const adminService = {
     },
     // ==================
     updateRegister: async (data) => {
-        const { user_id, addNew_Interest, interest, profile_img } = data
+        const { user_id, addNew_Interest, interest, profile_url } = data
         try {
             const update = await registerModel.findByIdAndUpdate(user_id, {
-                profile_img, addNew_Interest, interest
+                profile_url, addNew_Interest, interest
 
             },
                 { new: true })
@@ -678,29 +678,62 @@ const adminService = {
         }
     },
     // =======================
-    searchRecomdation: async (data) => {
+    searchRecommendation  : async (query, page = 1, limit = 12) => {
         try {
-            if (!data || typeof data !== 'string' || !data.trim()) {
+            if (!query || typeof query !== 'string' || !query.trim()) {
                 return { success: false, message: "Invalid or missing query parameter" };
             }
-
-            const results = await registerModel.find({
-                full_Name: { $regex: `^${data}`, $options: 'i' } // Case-insensitive match starting with `data`
-            }).select('full_Name profile_img');
-
-            if (results.length === 0) {
-                throw new Error("No matching results found");
+    
+            const normalizedQuery = query.toLowerCase();
+    
+            const results = await registerModel.find().select('id full_Name profile_url');
+    
+            const filteredResults = results.map(result => {
+                const fullNameLower = result.full_Name.toLowerCase();
+                let score = -1;
+    
+                if (fullNameLower.startsWith(normalizedQuery)) {
+                    score = 100; // High relevance for prefix match
+                } else if (fullNameLower.includes(normalizedQuery)) {
+                    score = 50; // Medium relevance for substring match
+                }
+                return score > 0 ? {
+                    id: result._id,
+                    full_Name: result.full_Name,
+                    profile_url: result.profile_url || "",
+                    score
+                } : null;
+            }).filter(item => item !== null);
+    
+            // Sort results by relevance score
+            filteredResults.sort((a, b) => b.score - a.score);
+    
+            if (filteredResults.length === 0) {
+                return { success: false, message: "No matching results found" };
             }
+    
+            // Implement pagination
+            const totalResults = filteredResults.length;
+            const totalPages = Math.ceil(totalResults / limit);
+            const currentPage = Math.max(1, Math.min(page, totalPages));
+            const startIndex = (currentPage - 1) * limit;
+            const paginatedResults = filteredResults.slice(startIndex, startIndex + limit);
 
-            const formattedResults = results.map(result => ({
-                full_Name: result.full_Name,
-                profile_img: result.profile_img,
-            }));
-
-            return { success: true, data: formattedResults };
+            return {
+                success: true,
+                data: paginatedResults,
+                pagination: {
+                    totalResults,
+                    totalPages,
+                    currentPage,
+                    limit,
+                    hasNextPage: currentPage < totalPages,
+                    hasPreviousPage: currentPage > 1
+                }
+            };
         } catch (error) {
-            console.error(`Error in searchRecomdation: ${error.message}`);
-            throw error
+            console.error(`Error in updateBusinessStatus: ${error.message}`);
+            return { success: false, message: error.message };
         }
     },
     // =================
