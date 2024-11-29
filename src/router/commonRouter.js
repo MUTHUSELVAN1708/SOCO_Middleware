@@ -69,7 +69,7 @@ router.post(
         { name: 'cover_img' },
         { name: 'pan_img' },
         { name: 'aadhar_img' },
-        { name: 'profile_img' },
+        { name: 'profile_url' },
     ]), 
     adminController.imgUpload
 );
@@ -95,7 +95,7 @@ router.post(
     },
 
     // ====
-    router.post("/searchRecomdation/:data",adminController.searchRecomdation));
+    router.get("/searchRecommendation/:data",adminController.searchRecommendation));
     router.post("/friendRequest",adminController.friendRequest);
     router.post("/post",adminController.createpost);
     router.get("/getPost/:id",adminController.getPost);

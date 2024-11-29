@@ -529,10 +529,10 @@ const adminService = {
     },
     // ==================
     updateRegister: async (data) => {
-        const { user_id, addNew_Interest, interest, profile_img } = data
+        const { user_id, addNew_Interest, interest, profile_url } = data
         try {
             const update = await registerModel.findByIdAndUpdate(user_id, {
-                profile_img, addNew_Interest, interest
+                profile_url, addNew_Interest, interest
 
             },
                 { new: true })

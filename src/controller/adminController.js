@@ -278,7 +278,7 @@ const adminController = {
         }
     },
     // ==================
-    searchRecomdation: async (req, res) => {
+    searchRecommendation: async (req, res) => {
         try {
             const { data } = req.params;
 
@@ -286,7 +286,7 @@ const adminController = {
                 return res.status(400).json({ message: "Data parameter is required" });
             }
 
-            const search = await adminService.searchRecomdation(data);
+            const search = await adminService.searchRecommendation(data);
 
 
             res.status(200).json({

@@ -44,7 +44,7 @@ const friendModel = new mongoose.Schema({
 //     required: false,
 //   },
 
-//   profile_img: {
+//   profile_url: {
 //     type: String,
 //     required: false
 //   },
@@ -127,7 +127,7 @@ const registerSchema = new mongoose.Schema(
     email: { type: String, required: true },
     DOB: { type: String, required: true },
     location_id: { type: String, required: true },
-    profile_img: { type: String, required: false },
+    profile_url: { type: String, required: false },
     agree: { type: Boolean, required: true },
     isSameNumberBusiness: { type: Boolean, required: true },
     interest: [{ type: String, required: false }],
