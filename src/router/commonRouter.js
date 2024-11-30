@@ -98,7 +98,7 @@ router.post(
     router.get("/searchRecommendation/:data",adminController.searchRecommendation));
     router.post("/friendRequest",adminController.friendRequest);
     router.post("/post",adminController.createpost);
-    router.get("/getPost/:id",adminController.getPost);
+    router.get("/getPosts/:id",adminController.getPosts);
 
 
 export default router;
