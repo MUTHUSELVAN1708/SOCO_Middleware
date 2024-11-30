@@ -10,7 +10,7 @@ import locationModel from "../model/locationModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
-import postModel from "../model/postModel.js";
+import Post from "../model/postModel.js";
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
@@ -761,8 +761,8 @@ const adminService = {
         const { user_id, imageUrl, caption, likes, comments, tags } = data;
 
         try {
-            const getpost=await postModel.findOne({user_id});
-            if(getpost){
+            const getPosts=await postModel.findOne({user_id});
+            if(getPosts){
                 const updatedPost = await postModel.findOneAndUpdate(
                     { user_id }, 
                     { $push: { posts: { imageUrl, caption, likes, comments, tags } } }, 
@@ -782,19 +782,36 @@ const adminService = {
     },
 
     //   ==================
-    getPost: async (user_id) => {
-        // console.log(user_id,"jjj")
-
+    getPosts: async (user_id, page = 1, limit = 25) => {
         try {
-            const getpost = await postModel.findOne({user_id});
-            if (!getpost) {
-                throw new Error(" post not found");
-            }
-            return getpost;
+            const skip = (page - 1) * limit;
+    
+            // Fetch posts with pagination and sorting
+            const posts = await Post.find({ user_id })
+                .sort({ timestamp: -1 })
+                .skip(skip)
+                .limit(limit)
+                .select('imageUrl caption likes tags timestamp');
+    
+            // Count total results for pagination
+            const totalResults = await Post.countDocuments({ user_id });
+            const totalPages = Math.ceil(totalResults / limit);
+    
+            return {
+                posts,
+                pagination: {
+                    totalResults,
+                    totalPages,
+                    currentPage: page,
+                    limit,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
+                },
+            };
         } catch (error) {
             throw error;
         }
-    },
+    }, 
 
 
 }
