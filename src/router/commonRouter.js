@@ -94,11 +94,18 @@ router.post(
         }
     },
 
-    // ====
+    // ========
     router.get("/searchRecommendation/:data",adminController.searchRecommendation));
     router.post("/friendRequest",adminController.friendRequest);
     router.post("/post",adminController.createpost);
     router.get("/getPost/:id",adminController.getPost);
 
+    router.post("/followUser",adminController.followUser);
+    router.post("/unfollowUser",adminController.unfollowUser);
+    router.get("/getFollowers/:id",adminController.getFollowers);
+    router.get("/getFollowing/:id",adminController.getFollowing);
+    router.put("/AcceptRequest",adminController.AcceptRequest);
+
+    router.get("/suggestUsers/:id",adminController.suggestUsers);
 
 export default router;

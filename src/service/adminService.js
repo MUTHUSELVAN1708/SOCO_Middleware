@@ -1,4 +1,4 @@
-import  registerModel from "../model/registerModel.js";
+import registerModel from "../model/registerModel.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import otpGenerator from "otp-generator";
@@ -11,6 +11,7 @@ import businessregisterModel from "../model/BusinessModel.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import postModel from "../model/postModel.js";
+import followerModel from "../model/followerModel.js";
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
@@ -264,7 +265,7 @@ const adminService = {
                 important = false,
             } = data;
 
-    
+
             // Validate required fields
             let errors = [];
             if (!full_Name) errors.push("Full name is required.");
@@ -287,7 +288,7 @@ const adminService = {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             // Create the user
-    
+
             // Check for existing users
             const existingUserByFullName = await registerModel.findOne({ full_Name });
             if (existingUserByFullName) errors.push("Name already exists. Name must be unique.");
@@ -300,7 +301,7 @@ const adminService = {
                 error.status = 400;
                 throw error;
             }
-    
+
             // Create user entry
             const register = await registerModel.create({
                 location_id: addresss._id,
@@ -308,7 +309,7 @@ const adminService = {
                 phn_number,
                 password: hashedPassword,
                 email,
-                profile_url : profile_url || "",
+                profile_url: profile_url || "",
                 status,
                 accountIsPublic,
                 reg_otp_id,
@@ -678,20 +679,20 @@ const adminService = {
         }
     },
     // =======================
-    searchRecommendation  : async (query, page = 1, limit = 12) => {
+    searchRecommendation: async (query, page = 1, limit = 12) => {
         try {
             if (!query || typeof query !== 'string' || !query.trim()) {
                 return { success: false, message: "Invalid or missing query parameter" };
             }
-    
+
             const normalizedQuery = query.toLowerCase();
-    
+
             const results = await registerModel.find().select('id full_Name profile_url');
-    
+
             const filteredResults = results.map(result => {
                 const fullNameLower = result.full_Name.toLowerCase();
                 let score = -1;
-    
+
                 if (fullNameLower.startsWith(normalizedQuery)) {
                     score = 100; // High relevance for prefix match
                 } else if (fullNameLower.includes(normalizedQuery)) {
@@ -704,14 +705,14 @@ const adminService = {
                     score
                 } : null;
             }).filter(item => item !== null);
-    
+
             // Sort results by relevance score
             filteredResults.sort((a, b) => b.score - a.score);
-    
+
             if (filteredResults.length === 0) {
                 return { success: false, message: "No matching results found" };
             }
-    
+
             // Implement pagination
             const totalResults = filteredResults.length;
             const totalPages = Math.ceil(totalResults / limit);
@@ -756,26 +757,26 @@ const adminService = {
             throw error;
         }
     },
-    //   =====
+    //=========
     createpost: async (data) => {
         const { user_id, imageUrl, caption, likes, comments, tags } = data;
 
         try {
-            const getpost=await postModel.findOne({user_id});
-            if(getpost){
+            const getpost = await postModel.findOne({ user_id });
+            if (getpost) {
                 const updatedPost = await postModel.findOneAndUpdate(
-                    { user_id }, 
-                    { $push: { posts: { imageUrl, caption, likes, comments, tags } } }, 
+                    { user_id },
+                    { $push: { posts: { imageUrl, caption, likes, comments, tags } } },
                     { new: true } // Return the updated document
                 );
                 return updatedPost;
-            }else{
-            const post = await postModel.create({
-                user_id, imageUrl, caption, likes, comments, tags
-            });
-            
-            return post;
-}
+            } else {
+                const post = await postModel.create({
+                    user_id, imageUrl, caption, likes, comments, tags
+                });
+
+                return post;
+            }
         } catch (error) {
             throw error;
         }
@@ -786,7 +787,7 @@ const adminService = {
         // console.log(user_id,"jjj")
 
         try {
-            const getpost = await postModel.findOne({user_id});
+            const getpost = await postModel.findOne({ user_id });
             if (!getpost) {
                 throw new Error(" post not found");
             }
@@ -795,6 +796,164 @@ const adminService = {
             throw error;
         }
     },
+    // ======================
+
+    followUser: async (user_id, follower_id) => {
+        try {
+            const verifyAcc = await registerModel.findOne({ _id: follower_id });
+            console.log(verifyAcc);
+
+            if (!verifyAcc) {
+                throw new Error('User not found');
+            }
+
+            let followStatus = '';
+            if (verifyAcc.accountIsPublic == true) {
+                followStatus = 'accepted';
+            } else {
+                followStatus = 'requested';
+            }
+
+            const existingFollow = await followerModel.findOne({ user_id, follower_id });
+            if (existingFollow) {
+                if (existingFollow.status === 'blocked') {
+                    throw new Error('You are blocked by this user');
+                }
+                await followerModel.updateOne(
+                    { user_id, follower_id },
+                    { $set: { status: followStatus } }
+                );
+            } else {
+                await followerModel.create({ user_id, follower_id, status: followStatus });
+            }
+
+            const followcount = await registerModel.findOneAndUpdate(
+                { _id: user_id },
+                { $inc: { followerCount: 1 } },
+                { new: true }
+            );
+
+            const followingcount = await registerModel.findOneAndUpdate(
+                { _id: follower_id },
+                { $inc: { followingCount: 1 } },
+                { new: true }
+            );
+
+            return { followcount, followingcount, status: followStatus };
+        } catch (error) {
+            throw new Error('Unable to follow user: ' + error.message);
+        }
+    },
+
+
+    //==========================
+    unfollowUser: async (user_id, follower_id) => {
+        try {
+            const unfollow = await followerModel.findOneAndDelete({ user_id, follower_id });
+            await registerModel.findOneAndUpdate(
+                { _id: user_id },
+                { $inc: { followerCount: -1 } },
+                { new: true }
+            );
+
+            await registerModel.findOneAndUpdate(
+                { _id: follower_id },
+                { $inc: { followingCount: -1 } },
+                { new: true }
+            );
+            return unfollow
+        } catch (error) {
+            throw new Error('Unable to unfollow user: ' + error.message);
+        }
+    },
+
+    // ============================
+    getFollowers: async (user_id) => {
+        try {
+            const getFollowers = await followerModel.find({ user_id })
+                .populate('follower_id', 'full_Name profile_url')
+                .exec();
+            return getFollowers
+        } catch (error) {
+            throw new Error('Unable to fetch followers: ' + error.message);
+        }
+    },
+
+    // ============================
+    getFollowing: async (follower_id) => {
+        try {
+            const getFollowing = await followerModel.find({ follower_id })
+                .populate('user_id', 'full_Name profile_url')
+                .exec();
+            return getFollowing
+        } catch (error) {
+            throw new Error('Unable to fetch following: ' + error.message);
+        }
+    },
+    //   ====================
+    AcceptRequest: async (data) => {
+        const { follow_id, status } = data
+        try {
+            const statuss = await followerModel.findByIdAndUpdate(follow_id,
+                { status: status },
+                { new: true })
+            return status
+        } catch (error) {
+            throw error
+        }
+    },
+    //   =============================
+    suggestUsers: async (user_id) => {
+        try {
+            const currentUser = await registerModel.findById(user_id);
+
+            const currentUserFollowers = await followerModel.find({ user_id: user_id, status: 'accepted' }).select('follower_id');
+            const followerIds = currentUserFollowers.map(follow => follow.follower_id);
+
+            const interestMatches = await registerModel.find({
+                interest: { $in: currentUser.interest },
+                _id: { $ne: user_id },
+                accountIsPublic: true,
+            });
+
+            console.log(interestMatches, "int")
+
+            const mutualFollowers = await registerModel.aggregate([
+                {
+                    $lookup: {
+                        from: 'followers',
+                        localField: '_id',
+                        foreignField: 'follower_id',
+                        as: 'followers'
+                    }
+                },
+                { $unwind: '$followers' },
+                {
+                    $match: {
+                        'followers.user_id': { $in: followerIds },
+                        _id: { $ne: user_id }
+                    }
+                },
+                { $limit: 10 }
+            ]);
+
+            console.log(mutualFollowers, "mu")
+            const locationMatches = await registerModel.find({
+                location_id: currentUser.location_id,
+                _id: { $ne: user_id },
+                accountIsPublic: true
+            });
+            console.log(locationMatches, "lo")
+            const suggestedUsers = [...new Set([...interestMatches, ...mutualFollowers, ...locationMatches])];
+
+            return suggestedUsers;
+
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+            throw new Error('Unable to fetch suggestions');
+        }
+    },
+
 
 
 }

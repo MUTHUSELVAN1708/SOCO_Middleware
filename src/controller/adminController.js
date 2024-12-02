@@ -341,7 +341,79 @@ const adminController = {
             next(error);
         }
     },
+// ==================
+followUser: async (req, res) => {
+    try {
+      const { user_id, follower_id } = req.body;
+      const follow = await adminService.followUser(user_id, follower_id);
+      res.status(200).json({ message: 'User followed successfully', data: follow });
+    } catch (error) {
+      res.status(500).json({ message: 'Error following user', error: error.message });
+    }
+  },
 
+  // =========================
+  unfollowUser: async (req, res) => {
+    try {
+      const { user_id, follower_id } = req.body;
+      await adminService.unfollowUser(user_id, follower_id);
+      res.status(200).json({ message: 'User unfollowed successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error unfollowing user', error: error.message });
+    }
+  },
+
+  // ============================
+  getFollowers: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const followers = await adminService.getFollowers(id);
+      res.status(200).json({ message: 'Followers fetched successfully', data: followers });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching followers', error: error.message });
+    }
+  },
+
+  //===========================
+  getFollowing: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const following = await adminService.getFollowing(id);
+      res.status(200).json({ message: 'Following fetched successfully', data: following });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching following', error: error.message });
+    }
+  },
+
+//   ========================
+AcceptRequest: async (req, res,next) => {
+    try {
+        const AcceptRequest = await adminService.AcceptRequest(req.body);
+        res.status(200).json({
+            status:200,
+            AcceptRequest})
+    } catch (error) {
+        error.error = error.message;
+        console.error(error);
+        error.statuscode = 400;
+        next(error);
+    }
+},
+//   =========================
+suggestUsers: async (req, res,next) => {
+    const{id}=req.params;
+    try {
+        const suggestUsers = await adminService.suggestUsers(id);
+        res.status(200).json({
+            status:200,
+            suggestUsers})
+    } catch (error) {
+        error.error = error.message;
+        console.error(error);
+        error.statuscode = 400;
+        next(error);
+    }
+},
 
 
 

@@ -126,7 +126,7 @@ const registerSchema = new mongoose.Schema(
     phn_number: { type: Number, required: true },
     email: { type: String, required: true },
     DOB: { type: String, required: true },
-    location_id: { type: String, required: true },
+    location_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Location' },
     profile_url: { type: String, required: false },
     agree: { type: Boolean, required: true },
     isSameNumberBusiness: { type: Boolean, required: true },
@@ -149,7 +149,6 @@ const registerSchema = new mongoose.Schema(
       designation: { type: String, required: false },
     },
     
-  friend: [friendModel],
   highlights: [{
         type: String,
         required: false
