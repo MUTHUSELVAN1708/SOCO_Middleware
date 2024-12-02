@@ -327,14 +327,21 @@ const adminController = {
         }
     },
     // ==================
-    getPost:async (req, res,next) => {
-        const {id}=req.params
+    getPosts: async (req, res, next) => {
+        const { id } = req.params;
+        const page = parseInt(req.query.page, 10) || 1; 
+        const limit = parseInt(req.query.limit, 10) || 25;
+    
         try {
-            const getpost = await adminService.getPost(id);
+            const getPosts = await adminService.getPosts(id, page, limit);
+    
             res.status(200).json({
-                status:200,
-                getpost})
+                status: 200,
+                data: getPosts,
+            });
         } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            error.statusCode = 400;
             error.error = error.message;
             console.error(error);
             error.statuscode = 400;
@@ -384,7 +391,7 @@ followUser: async (req, res) => {
       res.status(500).json({ message: 'Error fetching following', error: error.message });
     }
   },
-
+    
 //   ========================
 AcceptRequest: async (req, res,next) => {
     try {
