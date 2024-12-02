@@ -758,10 +758,7 @@ const adminService = {
         }
     },
     //=========
-    createpost: async (data) => {
-        const { user_id, imageUrl, caption, likes, comments, tags } = data;
-
-        try {
+    
     createpost: async (data) => {
         const { user_id, imageUrl, caption, likes, comments, tags } = data;
 
@@ -784,6 +781,7 @@ const adminService = {
         } catch (error) {
             throw error;
         }
+        
     },
 
     //   ==================

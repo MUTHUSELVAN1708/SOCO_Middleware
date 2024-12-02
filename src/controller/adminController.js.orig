@@ -1,3 +1,4 @@
+import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
 
@@ -41,25 +42,25 @@ const adminController = {
     verifyOtp: async (req, res, next) => {
         try {
             const { email, enteredOtp } = req.body;
-    
+
             if (!email || !enteredOtp) {
                 const error = new Error("Email and OTP are required");
                 error.statuscode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-    
+
             if (!/^\d+$/.test(enteredOtp)) {
                 const error = new Error("OTP must contain only numeric values");
                 error.statuscode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-    
+
             console.log(req.body);
-    
+
             const verifyOtp = await adminService.verifingOtp(req.body);
-    
+
             res.status(200).json({
                 status: 200,
                 msg: "OTP verified successfully",
@@ -69,11 +70,11 @@ const adminController = {
             error.error = error.message;
             console.error(error);
             const statusCode = error.statuscode || 500;
-    
+
             // Add specific error type for OTP verification failure
-            const errorType = error.errorType || 
+            const errorType = error.errorType ||
                 (statusCode === 400 ? "OtpVerificationError" : "ServerError");
-    
+
             res.status(statusCode).json({
                 status: statusCode,
                 msg: error.message || "An unexpected error occurred",
@@ -96,38 +97,37 @@ const adminController = {
             // Ensure error structure is consistent
             error.status = error.status || 400; // Default to 400 if no status set
             error.message = error.message || 'Something went wrong';
-            
+
             // Pass the error to the next middleware
             next(error);
         }
     },
-    
-    
+
+
 
     // ==============================
     login: async (req, res, next) => {
         try {
             const loginResponse = await adminService.login(req.body);
-            res.status(200).json({
-                status: 200,
-    
+
             if (loginResponse.status === 400 || loginResponse.status === 500) {
                 return res.status(loginResponse.status).json(loginResponse);
             }
-    
+
             res.status(200).json({
                 status: 200,
                 msg: "Logged in successfully",
                 login: loginResponse.login,
-            });
+            })
         } catch (error) {
             next({
                 statuscode: 400,
-                error: error.msg || "An unexpected error occurred",
+                error: error.message || "An unexpected error occurred",
             });
         }
+
     },
-    
+
     // ===================================
     otpValidation: async (req, res, next) => {
         try {
@@ -183,26 +183,10 @@ const adminController = {
     // ==================
     BusinessRegister: async (req, res, next) => {
         try {
-            // console.log('Raw Data:', req.body);
-            // console.log('Files:', req.files);
-            const rawData = JSON.parse(req.body.data);
-            // console.log(rawData);
-            const brand_logo = req.files['brand_logo'] ? `${BASE_URL}/uploads/${req.files['brand_logo'][0].filename}` : ''; 
-            const cover_img = req.files['cover_img'] ? `${BASE_URL}/uploads/${req.files['cover_img'][0].filename}` : '';
-            const pan_img = req.files['pan_img'] ? `${BASE_URL}/uploads/${req.files['pan_img'][0].filename}` : '';  
-            const aadhar_img = req.files['aadhar_img'] ? `${BASE_URL}/uploads/${req.files['aadhar_img'][0].filename}` : '';
-            
-            const businessData = {
-                ...rawData, 
-                brand_logo,
-                cover_img,
-                pan_img,
-                aadhar_img
-            };
-    
-            const BusinessRegister = await adminService.BusinessRegister(businessData);
+
+            const BusinessRegister = await adminService.businessRegister(req.body);
             console.log(BusinessRegister, "Service Response");
-    
+
             res.status(200).json({
                 status: 200,
                 msg: "Registered Successfully",
@@ -215,7 +199,7 @@ const adminController = {
             next(error);
         }
     },
-    
+
 
     // ===================
     getPendingStatus: async (req, res, next) => {
@@ -251,6 +235,194 @@ const adminController = {
         }
 
     },
+
+    // ==========================
+    imgUpload: async (req, res) => {
+        try {
+            if (!req.files || Object.keys(req.files).length === 0) {
+                return res.status(400).json({ message: 'No file uploaded!' });
+            }
+
+            const uploadedFiles = {};
+            for (const [fieldName, files] of Object.entries(req.files)) {
+                uploadedFiles[fieldName] = files.map(file => `${req.protocol}://${req.get('host')}/uploads/${file.filename}`);
+            }
+
+            res.status(200).json({ uploadedFiles });
+        } catch (error) {
+            console.error('Error uploading images:', error);
+            res.status(500).json({ message: 'An error occurred while uploading the images.' });
+        }
+    },
+
+
+    fileUpload: async (req, res) => {
+        try {
+            console.log('file process');
+            if (!req.file) {
+                return res.status(400).json({ message: 'No file uploaded!' });
+            }
+
+            const uploadedFileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+            res.status(200).json({
+                message: 'File uploaded successfully!',
+                fileUrl: uploadedFileUrl,
+                fileName: req.file.filename,
+                fileType: req.file.mimetype,
+                fileSize: req.file.size,
+            });
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            res.status(500).json({ message: 'An error occurred while uploading the file.' });
+        }
+    },
+    // ==================
+    searchRecommendation: async (req, res) => {
+        try {
+            const { data } = req.params;
+
+            if (!data) {
+                return res.status(400).json({ message: "Data parameter is required" });
+            }
+
+            const search = await adminService.searchRecommendation(data);
+
+
+            res.status(200).json({
+                status: 200,
+                msg: "Fetched successfully",
+                search,
+            });
+        } catch (error) {
+            return res.status(404).json({ status: 400, message: "No matching results found" });
+        }
+    },
+    // ====================
+    friendRequest: async (req, res,next) => {
+        try {
+            const friendRequest = await adminService.friendRequest(req.body);
+            res.status(200).json({
+                status:200,
+                friendRequest})
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // =====================
+    createpost: async (req, res,next) => {
+        try {
+            const post = await adminService.createpost(req.body);
+            res.status(200).json({
+                status:200,
+                post})
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ==================
+    getPosts: async (req, res, next) => {
+        const { id } = req.params;
+        const page = parseInt(req.query.page, 10) || 1; 
+        const limit = parseInt(req.query.limit, 10) || 25;
+    
+        try {
+            const getPosts = await adminService.getPosts(id, page, limit);
+    
+            res.status(200).json({
+                status: 200,
+                data: getPosts,
+            });
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            error.statusCode = 400;
+            next(error);
+        }
+    },
+<<<<<<< HEAD
+// ==================
+followUser: async (req, res) => {
+    try {
+      const { user_id, follower_id } = req.body;
+      const follow = await adminService.followUser(user_id, follower_id);
+      res.status(200).json({ message: 'User followed successfully', data: follow });
+    } catch (error) {
+      res.status(500).json({ message: 'Error following user', error: error.message });
+    }
+  },
+
+  // =========================
+  unfollowUser: async (req, res) => {
+    try {
+      const { user_id, follower_id } = req.body;
+      await adminService.unfollowUser(user_id, follower_id);
+      res.status(200).json({ message: 'User unfollowed successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error unfollowing user', error: error.message });
+    }
+  },
+
+  // ============================
+  getFollowers: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const followers = await adminService.getFollowers(id);
+      res.status(200).json({ message: 'Followers fetched successfully', data: followers });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching followers', error: error.message });
+    }
+  },
+
+  //===========================
+  getFollowing: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const following = await adminService.getFollowing(id);
+      res.status(200).json({ message: 'Following fetched successfully', data: following });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching following', error: error.message });
+    }
+  },
+
+//   ========================
+AcceptRequest: async (req, res,next) => {
+    try {
+        const AcceptRequest = await adminService.AcceptRequest(req.body);
+        res.status(200).json({
+            status:200,
+            AcceptRequest})
+    } catch (error) {
+        error.error = error.message;
+        console.error(error);
+        error.statuscode = 400;
+        next(error);
+    }
+},
+//   =========================
+suggestUsers: async (req, res,next) => {
+    const{id}=req.params;
+    try {
+        const suggestUsers = await adminService.suggestUsers(id);
+        res.status(200).json({
+            status:200,
+            suggestUsers})
+    } catch (error) {
+        error.error = error.message;
+        console.error(error);
+        error.statuscode = 400;
+        next(error);
+    }
+},
+
+=======
+    
+>>>>>>> 1327c3bccc8f984a6d988e259f9224307765ace0
 
 
 }
