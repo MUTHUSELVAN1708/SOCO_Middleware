@@ -696,86 +696,116 @@ const adminService = {
         }
     },
     // =======================
-    searchRecommendation: async (query, location, page = 1, limit = 12) => {
-        console.log(query, location, "ki");
 
+    searchRecommendation: async (query, typeOfSearch = "Name", page = 1, limit = 25) => {
         try {
-
-
-            const normalizedQuery = query.trim().toLowerCase();
-            console.log(`Normalized Query: ${normalizedQuery}`);
-
-            let locationResults = [];
-            if (location && typeof location === 'string' && location.trim()) {
-                const normalizedLocation = location.trim().toLowerCase();
-                console.log(`Normalized Location: ${normalizedLocation}`);
-
-                locationResults = await locationModel.find({
+            if (!query || typeof query !== 'string' || !query.trim()) {
+                return { success: false, message: "Invalid or missing query parameter" };
+            }
+    
+            const normalizedQuery = query.toLowerCase();
+            let results;
+    
+            const isNumericQuery = !isNaN(normalizedQuery);
+    
+            if (typeOfSearch === "Location") {
+                const locationResults = await locationModel.find({
                     $or: [
-                        { "address.city": { $regex: normalizedLocation, $options: 'i' } },
-                        { "address.street": { $regex: normalizedLocation, $options: 'i' } },
-                        { "address.country": { $regex: normalizedLocation, $options: 'i' } }
+                        { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
+                        { 'address.city': { $regex: normalizedQuery, $options: 'i' } },
+                        { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
+                        { 'address.country': { $regex: normalizedQuery, $options: 'i' } },
+                        ...(isNumericQuery ? [{ 'address.Pincode': { $eq: Number(normalizedQuery) } }] : [])
                     ]
-                }).select('_id address user_id');
-
-                console.log(`Location Results: ${JSON.stringify(locationResults, null, 2)}`);
-
+                }).select('_id address');
+    
                 if (locationResults.length === 0) {
                     return { success: false, message: "No matching locations found" };
                 }
-            }
-            let users = [];
-            if (locationResults.length > 0) {
-
-                const locationIds = locationResults.map(loc => new mongoose.Types.ObjectId(loc.user_id));
-                users = await registerModel.find({ _id: { $in: locationIds } }).select('_id full_Name profile_url location_id');
+    
+                const locationIds = locationResults.map(location => location._id);
+                results = await registerModel.find({
+                    location_id: { $in: locationIds }
+                }).select('_id full_Name profile_url location_id')
+                .exec();
+    
+            } else if (typeOfSearch === "Name") {
+                results = await registerModel.find()
+                    .select('_id full_Name profile_url location_id')
+                    .populate('location_id', 'address')
+                    .exec();
             } else {
-
-                users = await registerModel.find({
-                    full_Name: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id full_Name profile_url location_id');
+                return { success: false, message: "Invalid TypeOfSearch parameter" };
             }
-
-            console.log(`Users Found: ${JSON.stringify(users, null, 2)}`);
-
-            if (users.length === 0) {
-                return { success: false, message: "No users found matching the query" };
-            }
-
-
-            const filteredResults = users.map(user => {
-                const fullNameLower = user.full_Name.toLowerCase();
+    
+            const filteredResults = await Promise.all(results.map(async (result) => {
                 let score = -1;
-
-                if (fullNameLower.startsWith(normalizedQuery)) {
-                    score = 100; 
-                } else if (fullNameLower.includes(normalizedQuery)) {
-                    score = 50; 
+    
+                if (typeOfSearch === "Name") {
+                    const fullNameLower = result.full_Name.toLowerCase();
+                    if (fullNameLower.startsWith(normalizedQuery)) {
+                        score = 100;
+                    } else if (fullNameLower.includes(normalizedQuery)) {
+                        score = 50;
+                    }
+                } else if (typeOfSearch === "Location" && result.location_id) {
+                    // Fetch the location document based on location_id
+                    const locationAddress = await locationModel.findById(result.location_id);
+    
+                    if (!locationAddress) {
+                        return null; // Skip this result if no location is found
+                    }
+    
+                    const { street, city, district, country, Pincode } = locationAddress.address || {};
+                    
+                    if (!street && !city && !district && !country && !Pincode) {
+                        return null; // Skip if address fields are missing
+                    }
+    
+                    // Map the fields to lowercase strings for comparison
+                    const locationFields = [street, city, district, country].map(field =>
+                        field ? field.toString().toLowerCase() : ''
+                    );
+    
+                    // Check if any of the location fields match the normalized query
+                    if (locationFields.some(field => field.includes(normalizedQuery))) {
+                        score = 100;
+                    }
+    
+                    // Check if Pincode exists and matches the normalized query
+                    if (typeof Pincode === 'number' && Pincode.toString().includes(normalizedQuery)) {
+                        score = 100;
+                    }
                 }
-
-                if (score > 0) {
-                    return {
-                        _id: user._id,
-                        full_Name: user.full_Name,
-                        profile_url: user.profile_url,
-                        location_id: user.location_id,
-                        score
-                    };
-                }
-                return null; 
-            }).filter(item => item !== null); 
-
-            filteredResults.sort((a, b) => b.score - a.score);
-
-            const totalResults = filteredResults.length;
+    
+                return score > 0
+                    ? {
+                        id: result._id,
+                        full_Name: result.full_Name,
+                        profile_url: result.profile_url || "",
+                        score,
+                        location: result.location_id ? result.location_id.address : null
+                    }
+                    : null;
+            }));
+    
+            const filteredResultsWithoutNulls = filteredResults.filter(item => item !== null);
+    
+            filteredResultsWithoutNulls.sort((a, b) => b.score - a.score);
+    
+            if (filteredResultsWithoutNulls.length === 0) {
+                return { success: false, message: "No matching results found" };
+            }
+    
+            const totalResults = filteredResultsWithoutNulls.length;
             const totalPages = Math.ceil(totalResults / limit);
             const currentPage = Math.max(1, Math.min(page, totalPages));
             const startIndex = (currentPage - 1) * limit;
-            const paginatedResults = filteredResults.slice(startIndex, startIndex + limit);
-
-            const response = {
+            const paginatedResults = filteredResultsWithoutNulls.slice(startIndex, startIndex + limit);
+    
+            return {
                 success: true,
-                data: paginatedResults, 
+                data: paginatedResults,
                 pagination: {
                     totalResults,
                     totalPages,
@@ -785,18 +815,12 @@ const adminService = {
                     hasPreviousPage: currentPage > 1
                 }
             };
-
-            return response;
-
-
+    
         } catch (error) {
-            console.error(`Error in searchRecommendation: ${error.message}`);
             return { success: false, message: error.message };
         }
-    },
-
-
-
+    }
+    ,
 
     // =================
     friendRequest: async (data) => {

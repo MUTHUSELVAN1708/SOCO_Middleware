@@ -278,22 +278,41 @@ const adminController = {
         }
     },
     // ==================
-    searchRecommendation: async (req,res,next) => {
-        const {query,location}=req.body
+    searchRecommendation: async (req,res, next) => {
         try {
-            const searchRecommendation = await adminService.searchRecommendation(query, location);
-            res.status(200).json({
-                status:200,
-                searchRecommendation})
+            // const {query,typeOfSearch}=req.params;
+            const query = req.query.query.trim(); 
+            const typeOfSearch = req.query.typeOfSearch.trim();
+            const page =  1; 
+            const limit = 25;
     
+            if (!query) {
+                return res.status(400).json({ message: "Query parameter is required" });
+            }
+    
+            const search = await adminService.searchRecommendation(query, typeOfSearch || "Name", parseInt(page) || 1, parseInt(limit) || 25);
+    
+            if (!search.success) {
+                return res.status(404).json({
+                    status: 404,
+                    message: search.message || "No matching results found",
+                });
+            }
+    
+            return res.status(200).json({
+                status: 200,
+                message: "Fetched successfully",
+                data: search.data,
+                pagination: search.pagination,
+            });
         } catch (error) {
+            error.statusCode = 400;
             error.error = error.message;
-            console.error(error);
             error.statuscode = 400;
-            next(error);  
+            next(error);
         }
     },
-    
+       
     // ====================
     friendRequest: async (req, res,next) => {
         try {
