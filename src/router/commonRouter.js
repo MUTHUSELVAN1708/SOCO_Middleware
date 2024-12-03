@@ -95,7 +95,7 @@ router.post(
     },
 
     // ========
-    router.get("/searchRecommendation/:data",adminController.searchRecommendation));
+    router.get("/searchRecommendation",adminController.searchRecommendation));
     router.post("/friendRequest",adminController.friendRequest);
     router.post("/post",adminController.createpost);
     router.get("/getPosts/:id",adminController.getPosts);

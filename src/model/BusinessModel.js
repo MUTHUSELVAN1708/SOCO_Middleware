@@ -9,7 +9,7 @@ const BusinessregisterSchema = new mongoose.Schema(
     GST_NO: { type: String, required: false },
     aadharNo: { type: String, required: false },
     Name: { type: String, required: false },
-    location_id: { type: String, required: false },
+    location_id: { type: mongoose.Schema.Types.ObjectId, default: null, ref: 'location', required: false },
     aadhar_img: { type: String, required: false },
     pan_img: { type: String, required: false },
     cover_img: { type: String, required: false },

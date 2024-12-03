@@ -17,6 +17,6 @@ postSchema.index({ user_id: 1, timestamp: -1 });
 postSchema.index({ user_id: 1 });
 postSchema.index({ timestamp: -1 });
 
-const Post = mongoose.model('post', postSchema);
+const postModel = mongoose.model('post', postSchema);
 
-export default Post;
+export default postModel;

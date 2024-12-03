@@ -10,9 +10,9 @@ import locationModel from "../model/locationModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
-import Post from "../model/postModel.js";
 import followerModel from "../model/followerModel.js";
-
+import postModel from "../model/postModel.js";
+import mongoose from "mongoose"
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 
@@ -224,6 +224,7 @@ const adminService = {
                 phn_number,
                 email,
                 DOB,
+                location_id,
                 reg_otp_id,
                 password,
                 profile_url,
@@ -265,7 +266,6 @@ const adminService = {
                 important = false,
             } = data;
 
-
             // Validate required fields
             let errors = [];
             if (!full_Name) errors.push("Full name is required.");
@@ -276,35 +276,30 @@ const adminService = {
             if (!agree) errors.push("Agreement is required.");
 
             if (errors.length > 0) {
-                const error = new Error(errors.join(" "));
-                error.status = 400;
-                throw error;
+                throw { status: 400, message: errors.join(" ") };
             }
 
-            // Create the address
-            const addresss = await locationModel.create({ address });
+            // Check for existing users
+            const existingUser = await Promise.all([
+                registerModel.findOne({ full_Name }),
+                registerModel.findOne({ phn_number }),
+                registerModel.findOne({ email }),
+            ]);
+
+            if (existingUser[0]) errors.push("Name already exists. Name must be unique.");
+            if (existingUser[1]) errors.push("Phone number already exists. Try a different one or log in.");
+            if (existingUser[2]) errors.push("Email already exists. Try a different one or log in.");
+
+            if (errors.length > 0) {
+                throw { status: 400, message: errors.join(" ") };
+            }
 
             // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Create the user
-
-            // Check for existing users
-            const existingUserByFullName = await registerModel.findOne({ full_Name });
-            if (existingUserByFullName) errors.push("Name already exists. Name must be unique.");
-            const existingUserByPhone = await registerModel.findOne({ phn_number });
-            if (existingUserByPhone) errors.push("Phone number already exists. Try a different one or log in.");
-            const existingUserByEmail = await registerModel.findOne({ email });
-            if (existingUserByEmail) errors.push("Email already exists. Try a different one or log in.");
-            if (errors.length > 0) {
-                const error = new Error(errors.join(" "));
-                error.status = 400;
-                throw error;
-            }
-
             // Create user entry
             const register = await registerModel.create({
-                location_id: addresss._id,
+                location_id,
                 full_Name,
                 phn_number,
                 password: hashedPassword,
@@ -325,9 +320,28 @@ const adminService = {
                 working,
             });
 
+            console.log("User registered:", register);
+
+            // Create the address
+            const addressEntry = await locationModel.create({
+                user_id: register._id,
+                address,
+            });
+
+            console.log("Address created:", addressEntry);
+
+            // Update user with address ID
+            const updatedUser = await registerModel.findByIdAndUpdate(
+                register._id,
+                { location_id: addressEntry._id },
+                { new: true }
+            );
+
+            console.log("Updated user:", updatedUser);
+
             // Create business entry
             const business = await businessregisterModel.create({
-                location_id: addresss._id,
+                location_id: addressEntry._id,
                 user_id: register._id,
                 Brand_Name: Brand_Name || "",
                 org_name: org_name || "",
@@ -340,9 +354,8 @@ const adminService = {
                 pan_img: pan_img || "",
                 brand_logo: brand_logo || "",
                 cover_img: cover_img || "",
-                businessAgree: businessAgree,
-                accountIsPublic,
                 businessAgree,
+                accountIsPublic,
                 postCount,
                 followerCount,
                 followingCount,
@@ -361,10 +374,14 @@ const adminService = {
                 businessName: businessName || "",
                 important,
             });
-            return { register, business };
+
+            console.log("Business registered:", business);
+
+            return { success: true, user: updatedUser, business };
+
         } catch (error) {
-            if (!error.status) error.status = 500;
-            throw error;
+            console.error("Error in registerUserWithBusiness:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
 
@@ -679,50 +696,86 @@ const adminService = {
         }
     },
     // =======================
-    searchRecommendation: async (query, page = 1, limit = 12) => {
+    searchRecommendation: async (query, location, page = 1, limit = 12) => {
+        console.log(query, location, "ki");
+
         try {
-            if (!query || typeof query !== 'string' || !query.trim()) {
-                return { success: false, message: "Invalid or missing query parameter" };
+
+
+            const normalizedQuery = query.trim().toLowerCase();
+            console.log(`Normalized Query: ${normalizedQuery}`);
+
+            let locationResults = [];
+            if (location && typeof location === 'string' && location.trim()) {
+                const normalizedLocation = location.trim().toLowerCase();
+                console.log(`Normalized Location: ${normalizedLocation}`);
+
+                locationResults = await locationModel.find({
+                    $or: [
+                        { "address.city": { $regex: normalizedLocation, $options: 'i' } },
+                        { "address.street": { $regex: normalizedLocation, $options: 'i' } },
+                        { "address.country": { $regex: normalizedLocation, $options: 'i' } }
+                    ]
+                }).select('_id address user_id');
+
+                console.log(`Location Results: ${JSON.stringify(locationResults, null, 2)}`);
+
+                if (locationResults.length === 0) {
+                    return { success: false, message: "No matching locations found" };
+                }
+            }
+            let users = [];
+            if (locationResults.length > 0) {
+
+                const locationIds = locationResults.map(loc => new mongoose.Types.ObjectId(loc.user_id));
+                users = await registerModel.find({ _id: { $in: locationIds } }).select('_id full_Name profile_url location_id');
+            } else {
+
+                users = await registerModel.find({
+                    full_Name: { $regex: normalizedQuery, $options: 'i' }
+                }).select('_id full_Name profile_url location_id');
             }
 
-            const normalizedQuery = query.toLowerCase();
+            console.log(`Users Found: ${JSON.stringify(users, null, 2)}`);
 
-            const results = await registerModel.find().select('id full_Name profile_url');
+            if (users.length === 0) {
+                return { success: false, message: "No users found matching the query" };
+            }
 
-            const filteredResults = results.map(result => {
-                const fullNameLower = result.full_Name.toLowerCase();
+
+            const filteredResults = users.map(user => {
+                const fullNameLower = user.full_Name.toLowerCase();
                 let score = -1;
 
                 if (fullNameLower.startsWith(normalizedQuery)) {
-                    score = 100; // High relevance for prefix match
+                    score = 100; 
                 } else if (fullNameLower.includes(normalizedQuery)) {
-                    score = 50; // Medium relevance for substring match
+                    score = 50; 
                 }
-                return score > 0 ? {
-                    id: result._id,
-                    full_Name: result.full_Name,
-                    profile_url: result.profile_url || "",
-                    score
-                } : null;
-            }).filter(item => item !== null);
 
-            // Sort results by relevance score
+                if (score > 0) {
+                    return {
+                        _id: user._id,
+                        full_Name: user.full_Name,
+                        profile_url: user.profile_url,
+                        location_id: user.location_id,
+                        score
+                    };
+                }
+                return null; 
+            }).filter(item => item !== null); 
+
             filteredResults.sort((a, b) => b.score - a.score);
 
-            if (filteredResults.length === 0) {
-                return { success: false, message: "No matching results found" };
-            }
-
-            // Implement pagination
             const totalResults = filteredResults.length;
             const totalPages = Math.ceil(totalResults / limit);
             const currentPage = Math.max(1, Math.min(page, totalPages));
             const startIndex = (currentPage - 1) * limit;
             const paginatedResults = filteredResults.slice(startIndex, startIndex + limit);
 
-            return {
+            const response = {
                 success: true,
-                data: paginatedResults,
+                data: paginatedResults, 
                 pagination: {
                     totalResults,
                     totalPages,
@@ -732,11 +785,19 @@ const adminService = {
                     hasPreviousPage: currentPage > 1
                 }
             };
+
+            return response;
+
+
         } catch (error) {
-            console.error(`Error in updateBusinessStatus: ${error.message}`);
+            console.error(`Error in searchRecommendation: ${error.message}`);
             return { success: false, message: error.message };
         }
     },
+
+
+
+
     // =================
     friendRequest: async (data) => {
         const { user_id, username, profileImageUrl, isFollowing } = data;
@@ -758,13 +819,13 @@ const adminService = {
         }
     },
     //=========
-    
+
     createpost: async (data) => {
         const { user_id, imageUrl, caption, likes, comments, tags } = data;
 
         try {
-            const getPosts=await postModel.findOne({user_id});
-            if(getPosts){
+            const getPosts = await postModel.findOne({ user_id });
+            if (getPosts) {
                 const updatedPost = await postModel.findOneAndUpdate(
                     { user_id },
                     { $push: { posts: { imageUrl, caption, likes, comments, tags } } },
@@ -781,25 +842,25 @@ const adminService = {
         } catch (error) {
             throw error;
         }
-        
+
     },
 
     //   ==================
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
             const skip = (page - 1) * limit;
-    
+
             // Fetch posts with pagination and sorting
-            const posts = await Post.find({ user_id })
+            const posts = await postModel.find({ user_id })
                 .sort({ timestamp: -1 })
                 .skip(skip)
                 .limit(limit)
                 .select('imageUrl caption likes tags timestamp');
-    
+
             // Count total results for pagination
-            const totalResults = await Post.countDocuments({ user_id });
+            const totalResults = await postModel.countDocuments({ user_id });
             const totalPages = Math.ceil(totalResults / limit);
-    
+
             return {
                 posts,
                 pagination: {
@@ -814,7 +875,7 @@ const adminService = {
         } catch (error) {
             throw error;
         }
-    }, 
+    },
     // ======================
 
     followUser: async (user_id, follower_id) => {
@@ -957,11 +1018,20 @@ const adminService = {
             ]);
 
             console.log(mutualFollowers, "mu")
-            const locationMatches = await registerModel.find({
-                location_id: currentUser.location_id,
-                _id: { $ne: user_id },
-                accountIsPublic: true
-            });
+            const userLocation = await locationModel.findById(currentUser.location_id);
+
+            if (!userLocation) {
+                console.warn("User's location not found, skipping location-based suggestions");
+            }
+
+            const locationMatches = userLocation
+                ? await registerModel.find({
+                    location_id: currentUser.location_id,
+                    _id: { $ne: user_id }, // Exclude current user
+                    accountIsPublic: true,
+                })
+                : [];
+
             console.log(locationMatches, "lo")
             const suggestedUsers = [...new Set([...interestMatches, ...mutualFollowers, ...locationMatches])];
 

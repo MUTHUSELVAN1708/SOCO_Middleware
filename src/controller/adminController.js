@@ -278,26 +278,22 @@ const adminController = {
         }
     },
     // ==================
-    searchRecommendation: async (req, res) => {
+    searchRecommendation: async (req,res,next) => {
+        const {query,location}=req.body
         try {
-            const { data } = req.params;
-
-            if (!data) {
-                return res.status(400).json({ message: "Data parameter is required" });
-            }
-
-            const search = await adminService.searchRecommendation(data);
-
-
+            const searchRecommendation = await adminService.searchRecommendation(query, location);
             res.status(200).json({
-                status: 200,
-                msg: "Fetched successfully",
-                search,
-            });
+                status:200,
+                searchRecommendation})
+    
         } catch (error) {
-            return res.status(404).json({ status: 400, message: "No matching results found" });
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);  
         }
     },
+    
     // ====================
     friendRequest: async (req, res,next) => {
         try {
