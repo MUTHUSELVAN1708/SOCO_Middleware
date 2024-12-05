@@ -1,6 +1,8 @@
 import express from "express";
 import adminController from "../controller/adminController.js";
-import multer from "multer";
+import multer from "multer"; 
+import registerModel from '../model/registerModel.js';
+import businessRegisterModel from '../model/BusinessModel.js';
 
 const router = express.Router();
 
@@ -73,8 +75,82 @@ router.post(
     ]), 
     adminController.imgUpload
 );
-
+const allowedAccountTypes = ['user', 'business']; 
+const allowedFields = ['profile_url', 'avatar_url'];
 // General File Upload Route
+router.post(
+    "/fileUploadByAccountType",
+    uploadFiles.single('file'),
+    async (req, res) => {
+  
+      try {
+        const { accountType, id, fieldName } = req.body;
+  
+        // Check if file is uploaded
+        if (!req.file) {
+          console.warn('No file uploaded in request.');
+          return res.status(422).json({ message: 'No file uploaded!' });
+        }
+        // Validate required parameters
+        if (!accountType || !id || !fieldName) {
+          console.error('Missing required parameters:', { accountType, id, fieldName });
+          return res.status(400).json({ message: 'Missing required parameters!' });
+        }
+  
+        // Validate account type
+        if (!allowedAccountTypes.includes(accountType)) {
+          console.error(`Invalid account type provided: ${accountType}`);
+          return res.status(400).json({ message: 'Invalid account type!' });
+        }
+  
+        // Validate field name
+        if (!allowedFields.includes(fieldName)) {
+          console.error(`Invalid field name provided: ${fieldName}`);
+          return res.status(400).json({ message: `Invalid field name: ${fieldName}` });
+        }
+  
+        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  
+        if (accountType === 'user') {
+          const user = await registerModel.findById(id);
+          if (!user) {
+            console.warn(`User not found for ID: ${id}`);
+            return res.status(404).json({ message: 'User not found!' });
+          }
+  
+          user[fieldName] = fileUrl;
+          await user.save();
+          return res.status(200).json({
+            message: 'File uploaded and user updated successfully!',
+            fileUrl,
+          });
+        } else if (accountType === 'business') {
+          const business = await businessRegisterModel.findById(id);
+          if (!business) {
+            console.warn(`Business not found for ID: ${id}`);
+            return res.status(404).json({ message: 'Business not found!' });
+          }
+  
+          business[fieldName] = fileUrl;
+          await business.save();
+          return res.status(200).json({
+            message: 'File uploaded and business updated successfully!',
+            fileUrl,
+          });
+        } else {
+          console.error(`Unhandled account type: ${accountType}`);
+          return res.status(400).json({ message: 'Invalid account type!' });
+        }
+      } catch (error) {
+        console.error('Error during file upload:', {
+          message: error.message,
+          stack: error.stack,
+        });
+        res.status(500).json({ message: 'Internal server error.' });
+      }
+    }
+  );
+  
 router.post(
     "/fileUpload",
     uploadFiles.single('file'),
