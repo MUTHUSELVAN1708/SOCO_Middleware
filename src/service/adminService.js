@@ -342,7 +342,7 @@ const adminService = {
 
             // Create business entry
             const business = await businessregisterModel.create({
-                location_id: addressEntry._id,
+                // location_id: addressEntry._id,
                 user_id: register._id,
                 Brand_Name: Brand_Name || "",
                 org_name: org_name || "",
@@ -697,18 +697,18 @@ const adminService = {
         }
     },
     // =======================
-
     searchRecommendation: async (query, typeOfSearch = "Name", page = 1, limit = 25) => {
         try {
             if (!query || typeof query !== 'string' || !query.trim()) {
                 return { success: false, message: "Invalid or missing query parameter" };
             }
-
+    
             const normalizedQuery = query.toLowerCase();
             let results;
-
+    
             const isNumericQuery = !isNaN(normalizedQuery);
-
+    
+            // Handle search for different types
             if (typeOfSearch === "Location") {
                 const locationResults = await locationModel.find({
                     $or: [
@@ -719,91 +719,107 @@ const adminService = {
                         ...(isNumericQuery ? [{ 'address.Pincode': { $eq: Number(normalizedQuery) } }] : [])
                     ]
                 }).select('_id address');
-
+    
                 if (locationResults.length === 0) {
                     return { success: false, message: "No matching locations found" };
                 }
-
+    
                 const locationIds = locationResults.map(location => location._id);
                 results = await registerModel.find({
                     location_id: { $in: locationIds }
-                }).select('_id full_Name profile_url location_id')
-                    .exec();
-
+                }).select('_id full_Name profile_url location_id');
             } else if (typeOfSearch === "Name") {
                 results = await registerModel.find()
                     .select('_id full_Name profile_url location_id')
-                    .populate('location_id', 'address')
-                    .exec();
+                    .populate('location_id', 'address');
+            } else if (typeOfSearch === "Business") {
+               
+                results = await businessregisterModel.find({
+                    $or: [
+                        { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessCity: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessState: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessPinCode: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessName: { $regex: normalizedQuery, $options: 'i' } }
+                    ]
+                }).select('_id businessName ownerName businessEmail businessPhone businessAddress businessCity businessState businessPinCode natureOfBusiness');
             } else {
                 return { success: false, message: "Invalid TypeOfSearch parameter" };
             }
-
-            const filteredResults = await Promise.all(results.map(async (result) => {
-                let score = -1;
-
-                if (typeOfSearch === "Name") {
-                    const fullNameLower = result.full_Name.toLowerCase();
-                    if (fullNameLower.startsWith(normalizedQuery)) {
-                        score = 100;
-                    } else if (fullNameLower.includes(normalizedQuery)) {
-                        score = 50;
+    
+          
+            const filteredResults = await Promise.all(
+                results.map(async (result) => {
+                    let score = -1;
+    
+                    if (typeOfSearch === "Name") {
+                        const fullNameLower = result.full_Name.toLowerCase();
+                        if (fullNameLower.startsWith(normalizedQuery)) {
+                            score = 100;
+                        } else if (fullNameLower.includes(normalizedQuery)) {
+                            score = 50;
+                        }
+                    } else if (typeOfSearch === "Location" && result.location_id) {
+                        const locationAddress = await locationModel.findById(result.location_id);
+                        if (!locationAddress) return null;
+    
+                        const { street, city, district, country, Pincode } = locationAddress.address || {};
+    
+                        const locationFields = [street, city, district, country].map(field =>
+                            field ? field.toString().toLowerCase() : ''
+                        );
+    
+                        if (locationFields.some(field => field.includes(normalizedQuery))) {
+                            score = 100;
+                        } else if (Pincode && Pincode.toString().includes(normalizedQuery)) {
+                            score = 100;
+                        }
+                    } else if (typeOfSearch === "Business") {
+                        const { businessName, businessCity, businessState, businessPinCode } = result;
+                        const businessFields = [businessName, businessCity, businessState, businessPinCode].map(field =>
+                            field ? field.toString().toLowerCase() : ''
+                        );
+    
+                        if (businessFields.some(field => field.includes(normalizedQuery))) {
+                            score = 100;
+                        }
                     }
-                } else if (typeOfSearch === "Location" && result.location_id) {
-                    // Fetch the location document based on location_id
-                    const locationAddress = await locationModel.findById(result.location_id);
-
-                    if (!locationAddress) {
-                        return null; // Skip this result if no location is found
-                    }
-
-                    const { street, city, district, country, Pincode } = locationAddress.address || {};
-
-                    if (!street && !city && !district && !country && !Pincode) {
-                        return null; // Skip if address fields are missing
-                    }
-
-                    // Map the fields to lowercase strings for comparison
-                    const locationFields = [street, city, district, country].map(field =>
-                        field ? field.toString().toLowerCase() : ''
-                    );
-
-                    // Check if any of the location fields match the normalized query
-                    if (locationFields.some(field => field.includes(normalizedQuery))) {
-                        score = 100;
-                    }
-
-                    // Check if Pincode exists and matches the normalized query
-                    if (typeof Pincode === 'number' && Pincode.toString().includes(normalizedQuery)) {
-                        score = 100;
-                    }
-                }
-
-                return score > 0
-                    ? {
-                        id: result._id,
-                        full_Name: result.full_Name,
-                        profile_url: result.profile_url || "",
-                        score,
-                        location: result.location_id ? result.location_id.address : null
-                    }
-                    : null;
-            }));
-
+    
+                    return score > 0
+                        ? {
+                            id: result._id,
+                            name: typeOfSearch === "Business" ? result.businessName : result.full_Name,
+                            type: typeOfSearch === "Business" ? "business" : "normal",
+                            profile_url: result.profile_url || "",
+                            email: typeOfSearch === "Business" ? result.businessEmail : undefined,
+                            phone: typeOfSearch === "Business" ? result.businessPhone : undefined,
+                            score,
+                            location: typeOfSearch === "Business"
+                                ? {
+                                    address: result.businessAddress,
+                                    city: result.businessCity,
+                                    state: result.businessState,
+                                    pinCode: result.businessPinCode
+                                  }
+                                : result.location_id ? result.location_id.address : null
+                        }
+                        : null;
+                })
+            );
+    
             const filteredResultsWithoutNulls = filteredResults.filter(item => item !== null);
-
             filteredResultsWithoutNulls.sort((a, b) => b.score - a.score);
-
+    
             if (filteredResultsWithoutNulls.length === 0) {
                 return { success: false, message: "No matching results found" };
             }
-
+    
             const totalResults = filteredResultsWithoutNulls.length;
             const totalPages = Math.ceil(totalResults / limit);
             const currentPage = Math.max(1, Math.min(page, totalPages));
             const startIndex = (currentPage - 1) * limit;
             const paginatedResults = filteredResultsWithoutNulls.slice(startIndex, startIndex + limit);
-
+    
             return {
                 success: true,
                 data: paginatedResults,
@@ -816,12 +832,13 @@ const adminService = {
                     hasPreviousPage: currentPage > 1
                 }
             };
-
+    
         } catch (error) {
             return { success: false, message: error.message };
         }
-    }
-    ,
+    },
+    
+    
 
     // =================
     friendRequest: async (data) => {
@@ -1078,28 +1095,59 @@ const adminService = {
     },
 
     // ============================
-    getFollowers: async (user_id) => {
+    getFollowers: async (user_id, page = 1, limit = 10) => {
         try {
-            const getFollowers = await followerModel.find({ user_id })
+            // Calculate the number of documents to skip
+            const skip = (page - 1) * limit;
+    
+            // Fetch followers with pagination
+            const getFollowers = await followerModel
+                .find({ user_id })
                 .populate('follower_id', 'full_Name profile_url')
+                .skip(skip) // Skip documents for previous pages
+                .limit(limit) // Limit the number of documents to fetch
                 .exec();
-            return getFollowers
+    
+            // Get the total count of followers for the given user
+            const totalFollowers = await followerModel.countDocuments({ user_id });
+    
+            return {
+                followers: getFollowers,
+                totalFollowers,
+                currentPage: page,
+                totalPages: Math.ceil(totalFollowers / limit),
+            };
         } catch (error) {
             throw new Error('Unable to fetch followers: ' + error.message);
         }
     },
+    
 
     // ============================
-    getFollowing: async (follower_id) => {
+    getFollowing: async (follower_id, page = 1, limit = 10) => {
         try {
-            const getFollowing = await followerModel.find({ follower_id })
+            const skip = (page - 1) * limit;
+
+            const getFollowing = await followerModel
+                .find({ follower_id })
                 .populate('user_id', 'full_Name profile_url')
+                .skip(skip) 
+                .limit(limit)
                 .exec();
-            return getFollowing
+    
+            const totalFollowing = await followerModel.countDocuments({ follower_id });
+    
+            return {
+                following: getFollowing,
+                totalFollowing,
+                currentPage: page,
+                totalPages: Math.ceil(totalFollowing / limit),
+            };
         } catch (error) {
             throw new Error('Unable to fetch following: ' + error.message);
         }
     },
+    
     //   ====================
     AcceptRequest: async (data) => {
         const { follow_id, status } = data
