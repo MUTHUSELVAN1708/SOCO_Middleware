@@ -1,15 +1,15 @@
 import mongoose from "mongoose";
 
 const postSchema = new mongoose.Schema({
-    user_id: { type:String, required: true },
+    user_id: { type: String, required: true },
     posts: [
         {
             imageUrl: { type: String },
             caption: { type: String },
             isScheduled: { type: Boolean },
             scheduleDateTime: { type: Date },
-            likes: { type: Number, default: 0 }, // Should be a Number
-            comments: { type: [String], default: [] }, // Should be an Array of Strings
+            likes: { type: Number, default: 0 },
+            comments: { type: [String], default: [] },
             tags: { type: [String] },
             description: { type: String },
             isVideo: { type: Boolean },
@@ -24,21 +24,23 @@ const postSchema = new mongoose.Schema({
             isProcessing: { type: Boolean },
             isTrimming: { type: Boolean },
             mentions: { type: [String] },
-            filters: { type: [String] },
+            filters: { type: [Object] },
             quality: { type: String },
             visibility: { type: String },
             aspectRatio: { type: String },
-            status:{ type: String },
+            status: { type: String },
         }
     ],
-    timestamp:{type:Date,default:Date.now}
-    },{
-        versionKey: false
-    });
-    postSchema.virtual("Post_id").get(function () {
-        return this._id.toString();
-    });
+    timestamp: { type: Date, default: Date.now }
+}, {
+    versionKey: false
+});
 
-const postModel = mongoose.model("Post", postSchema);
+postSchema.virtual("Post_id").get(function () {
+    return this._id.toString();
+});
+
+// Rename the model to avoid conflict
+const postModel = mongoose.model("post", postSchema);
 
 export default postModel;
