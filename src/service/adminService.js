@@ -13,6 +13,7 @@ import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import postModel from "../model/postModel.js";
 import mongoose from "mongoose"
+import cron from "node-cron"
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 
@@ -702,12 +703,12 @@ const adminService = {
             if (!query || typeof query !== 'string' || !query.trim()) {
                 return { success: false, message: "Invalid or missing query parameter" };
             }
-    
+
             const normalizedQuery = query.toLowerCase();
             let results;
-    
+
             const isNumericQuery = !isNaN(normalizedQuery);
-    
+
             if (typeOfSearch === "Location") {
                 const locationResults = await locationModel.find({
                     $or: [
@@ -718,17 +719,17 @@ const adminService = {
                         ...(isNumericQuery ? [{ 'address.Pincode': { $eq: Number(normalizedQuery) } }] : [])
                     ]
                 }).select('_id address');
-    
+
                 if (locationResults.length === 0) {
                     return { success: false, message: "No matching locations found" };
                 }
-    
+
                 const locationIds = locationResults.map(location => location._id);
                 results = await registerModel.find({
                     location_id: { $in: locationIds }
                 }).select('_id full_Name profile_url location_id')
-                .exec();
-    
+                    .exec();
+
             } else if (typeOfSearch === "Name") {
                 results = await registerModel.find()
                     .select('_id full_Name profile_url location_id')
@@ -737,10 +738,10 @@ const adminService = {
             } else {
                 return { success: false, message: "Invalid TypeOfSearch parameter" };
             }
-    
+
             const filteredResults = await Promise.all(results.map(async (result) => {
                 let score = -1;
-    
+
                 if (typeOfSearch === "Name") {
                     const fullNameLower = result.full_Name.toLowerCase();
                     if (fullNameLower.startsWith(normalizedQuery)) {
@@ -751,33 +752,33 @@ const adminService = {
                 } else if (typeOfSearch === "Location" && result.location_id) {
                     // Fetch the location document based on location_id
                     const locationAddress = await locationModel.findById(result.location_id);
-    
+
                     if (!locationAddress) {
                         return null; // Skip this result if no location is found
                     }
-    
+
                     const { street, city, district, country, Pincode } = locationAddress.address || {};
-                    
+
                     if (!street && !city && !district && !country && !Pincode) {
                         return null; // Skip if address fields are missing
                     }
-    
+
                     // Map the fields to lowercase strings for comparison
                     const locationFields = [street, city, district, country].map(field =>
                         field ? field.toString().toLowerCase() : ''
                     );
-    
+
                     // Check if any of the location fields match the normalized query
                     if (locationFields.some(field => field.includes(normalizedQuery))) {
                         score = 100;
                     }
-    
+
                     // Check if Pincode exists and matches the normalized query
                     if (typeof Pincode === 'number' && Pincode.toString().includes(normalizedQuery)) {
                         score = 100;
                     }
                 }
-    
+
                 return score > 0
                     ? {
                         id: result._id,
@@ -788,21 +789,21 @@ const adminService = {
                     }
                     : null;
             }));
-    
+
             const filteredResultsWithoutNulls = filteredResults.filter(item => item !== null);
-    
+
             filteredResultsWithoutNulls.sort((a, b) => b.score - a.score);
-    
+
             if (filteredResultsWithoutNulls.length === 0) {
                 return { success: false, message: "No matching results found" };
             }
-    
+
             const totalResults = filteredResultsWithoutNulls.length;
             const totalPages = Math.ceil(totalResults / limit);
             const currentPage = Math.max(1, Math.min(page, totalPages));
             const startIndex = (currentPage - 1) * limit;
             const paginatedResults = filteredResultsWithoutNulls.slice(startIndex, startIndex + limit);
-    
+
             return {
                 success: true,
                 data: paginatedResults,
@@ -815,7 +816,7 @@ const adminService = {
                     hasPreviousPage: currentPage > 1
                 }
             };
-    
+
         } catch (error) {
             return { success: false, message: error.message };
         }
@@ -843,30 +844,135 @@ const adminService = {
         }
     },
     //=========
+    createPost: async (data) => {
+        console.log("Received data for creating post:", data);
 
-    createpost: async (data) => {
-        const { user_id, imageUrl, caption, likes, comments, tags } = data;
+        const {
+            user_id,
+            imageUrl,
+            caption,
+            isScheduled,
+            scheduleDateTime,
+            likes,
+            comments,
+            tags,
+            description,
+            isVideo,
+            location,
+            mediaFile,
+            thumbnailFile,
+            videoDuration,
+            enableComments,
+            enableFavorites,
+            ageGroup,
+            uploadProgress,
+            isProcessing,
+            isTrimming,
+            mentions,
+            filters,
+            quality,
+            visibility,
+            aspectRatio,
+        } = data;
 
         try {
-            const getPosts = await postModel.findOne({ user_id });
-            if (getPosts) {
-                const updatedPost = await postModel.findOneAndUpdate(
-                    { user_id },
-                    { $push: { posts: { imageUrl, caption, likes, comments, tags } } },
-                    { new: true } // Return the updated document
-                );
-                return updatedPost;
-            } else {
-                const post = await postModel.create({
-                    user_id, imageUrl, caption, likes, comments, tags
-                });
+            // Validate the user
+            const user = await registerModel.findById(user_id);
+            if (!user) {
+                throw new Error("User not found");
+            }
 
-                return post;
+            // Create the post object
+            let newPost = {
+                imageUrl,
+                caption,
+                isScheduled,
+                likes,
+                comments,
+                tags,
+                description,
+                isVideo,
+                location,
+                mediaFile,
+                thumbnailFile,
+                videoDuration,
+                enableComments,
+                enableFavorites,
+                ageGroup,
+                uploadProgress,
+                isProcessing,
+                isTrimming,
+                mentions,
+                filters,
+                quality,
+                visibility,
+                aspectRatio,
+                status: isScheduled ? "scheduled" : "published",
+            };
+
+            if (isScheduled) {
+                if (!scheduleDateTime) {
+                    throw new Error("Scheduled date and time must be provided for scheduled posts.");
+                }
+
+                const scheduledTime = new Date(scheduleDateTime);
+                console.log(scheduledTime, "scheduledTime");
+
+                if (isNaN(scheduledTime.getTime())) {
+                    throw new Error("Invalid scheduleDateTime provided.");
+                }
+
+                const now = new Date();
+                const delay = scheduledTime.getTime() - now.getTime();
+
+                if (delay > 0) {
+                    console.log(`Post will be stored after ${delay} ms`);
+
+                    setTimeout(async () => {
+                        try {
+                            newPost.scheduleDateTime = scheduledTime;
+
+                            // Change the status to "published" before saving
+                            newPost.status = "published";
+
+                            let userPost = await postModel.findOne({ user_id });
+
+                            if (!userPost) {
+                                userPost = await postModel.create({ user_id, posts: [newPost] });
+                            } else {
+                                userPost.posts.push(newPost);
+                                await userPost.save();
+                            }
+                            console.log("Post saved successfully at the scheduled time:", userPost);
+
+                        } catch (error) {
+                            console.error("Error storing scheduled post:", error.message);
+                        }
+                    }, delay);
+
+                    return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
+                } else {
+                    throw new Error("Scheduled time is in the past. Please provide a future date and time.");
+                }
+            } else {
+                newPost.status = "published";
+
+                let userPost = await postModel.findOne({ user_id });
+
+                if (!userPost) {
+                    userPost = await postModel.create({ user_id, posts: [newPost] });
+                } else {
+                    userPost.posts.push(newPost);
+                    await userPost.save();
+                }
+
+                console.log("Post saved successfully:", userPost);
+                return userPost;
             }
         } catch (error) {
-            throw error;
+            console.error("Error creating post:", error.message);
+            throw new Error("Failed to create the post.");
         }
-
     },
 
     //   ==================

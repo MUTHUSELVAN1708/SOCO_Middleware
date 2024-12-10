@@ -328,17 +328,22 @@ const adminController = {
         }
     },
     // =====================
-    createpost: async (req, res,next) => {
+    createpost: async (req, res, next) => {
         try {
-            const post = await adminService.createpost(req.body);
+            console.log("Received request to create post:", req.body);
+            
+            // Pass the request body to the service for processing
+            const post = await adminService.createPost(req.body);
+    
+            // Respond with the status and created post
             res.status(200).json({
-                status:200,
-                post})
+                status: 200,
+                post
+            });
         } catch (error) {
-            error.error = error.message;
-            console.error(error);
-            error.statuscode = 400;
-            next(error);
+            console.error("Error creating post:", error.message);
+            error.statuscode = 400;  // Set a status code for error
+            next(error);  // Pass error to the next middleware for centralized error handling
         }
     },
     // ==================

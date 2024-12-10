@@ -196,7 +196,7 @@ router.post(
 // Social Features
 router.get("/searchRecommendation", adminController.searchRecommendation);
 router.post("/friendRequest", adminController.friendRequest);
-router.post("/createpost", adminController.createpost);
+router.post("/post", adminController.createpost);
 router.get("/getPosts/:id", adminController.getPosts);
 router.post("/followUser", adminController.followUser);
 router.post("/unfollowUser", adminController.unfollowUser);

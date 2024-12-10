@@ -1,22 +1,44 @@
 import mongoose from "mongoose";
 
 const postSchema = new mongoose.Schema({
-  user_id: {
-      type: String,  // Change this to String if you want to store user_id as a string
-      required: true
-  },
-  imageUrl: String,
-  caption: String,
-  likes: Number,
-  tags: [String],
-  timestamp: { type: Date, default: Date.now }
-});
+    user_id: { type:String, required: true },
+    posts: [
+        {
+            imageUrl: { type: String },
+            caption: { type: String },
+            isScheduled: { type: Boolean },
+            scheduleDateTime: { type: Date },
+            likes: { type: Number, default: 0 }, // Should be a Number
+            comments: { type: [String], default: [] }, // Should be an Array of Strings
+            tags: { type: [String] },
+            description: { type: String },
+            isVideo: { type: Boolean },
+            location: { type: String },
+            mediaFile: { type: String },
+            thumbnailFile: { type: String },
+            videoDuration: { type: Number },
+            enableComments: { type: Boolean, default: true },
+            enableFavorites: { type: Boolean, default: true },
+            ageGroup: { type: String },
+            uploadProgress: { type: Number },
+            isProcessing: { type: Boolean },
+            isTrimming: { type: Boolean },
+            mentions: { type: [String] },
+            filters: { type: [String] },
+            quality: { type: String },
+            visibility: { type: String },
+            aspectRatio: { type: String },
+            status:{ type: String },
+        }
+    ],
+    timestamp:{type:Date,default:Date.now}
+    },{
+        versionKey: false
+    });
+    postSchema.virtual("Post_id").get(function () {
+        return this._id.toString();
+    });
 
-// Create indexes for better query performance
-postSchema.index({ user_id: 1, timestamp: -1 });
-postSchema.index({ user_id: 1 });
-postSchema.index({ timestamp: -1 });
-
-const postModel = mongoose.model('post', postSchema);
+const postModel = mongoose.model("Post", postSchema);
 
 export default postModel;
