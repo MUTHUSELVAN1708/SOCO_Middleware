@@ -12,6 +12,7 @@ import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import postModel from "../model/postModel.js";
+import createPostModel from "../model/createPostModel.js";
 import mongoose from "mongoose"
 import cron from "node-cron"
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
@@ -837,8 +838,6 @@ const adminService = {
             return { success: false, message: error.message };
         }
     },
-    
-    
 
     // =================
     friendRequest: async (data) => {
@@ -861,9 +860,7 @@ const adminService = {
         }
     },
     //=========
-    createPost: async (data) => {
-        console.log("Received data for creating post:", data);
-
+    createPost: async (data) => {    
         const {
             user_id,
             imageUrl,
@@ -891,19 +888,21 @@ const adminService = {
             visibility,
             aspectRatio,
         } = data;
-
+    
         try {
             // Validate the user
             const user = await registerModel.findById(user_id);
             if (!user) {
                 throw new Error("User not found");
             }
-
-            // Create the post object
+    
+            // Create the post object with all fields
             let newPost = {
+                user_id,
                 imageUrl,
                 caption,
                 isScheduled,
+                scheduleDateTime,
                 likes,
                 comments,
                 tags,
@@ -924,74 +923,44 @@ const adminService = {
                 quality,
                 visibility,
                 aspectRatio,
-                status: isScheduled ? "scheduled" : "published",
+                status: isScheduled ? "scheduled" : "published", // Set status based on scheduling
             };
-
-            if (isScheduled) {
-                if (!scheduleDateTime) {
-                    throw new Error("Scheduled date and time must be provided for scheduled posts.");
-                }
-
-                const scheduledTime = new Date(scheduleDateTime);
-                console.log(scheduledTime, "scheduledTime");
-
-                if (isNaN(scheduledTime.getTime())) {
-                    throw new Error("Invalid scheduleDateTime provided.");
-                }
-
-                const now = new Date();
-                const delay = scheduledTime.getTime() - now.getTime();
-
-                if (delay > 0) {
-                    console.log(`Post will be stored after ${delay} ms`);
-
-                    setTimeout(async () => {
-                        try {
-                            newPost.scheduleDateTime = scheduledTime;
-
-                            // Change the status to "published" before saving
-                            newPost.status = "published";
-
-                            let userPost = await postModel.findOne({ user_id });
-
-                            if (!userPost) {
-                                userPost = await postModel.create({ user_id, posts: [newPost] });
-                            } else {
-                                userPost.posts.push(newPost);
-                                await userPost.save();
-                            }
-                            console.log("Post saved successfully at the scheduled time:", userPost);
-
-                        } catch (error) {
-                            console.error("Error storing scheduled post:", error.message);
-                        }
-                    }, delay);
-
-                    return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
-                } else {
-                    throw new Error("Scheduled time is in the past. Please provide a future date and time.");
-                }
-            } else {
-                newPost.status = "published";
-
-                let userPost = await postModel.findOne({ user_id });
-
-                if (!userPost) {
-                    userPost = await postModel.create({ user_id, posts: [newPost] });
-                } else {
-                    userPost.posts.push(newPost);
-                    await userPost.save();
-                }
-
-                console.log("Post saved successfully:", userPost);
-                return userPost;
+    
+            // Log the data to ensure it's correct
+            console.log("Final new post object:", newPost);
+    
+            // If the post is scheduled, handle scheduling logic
+            if (isScheduled && scheduleDateTime) {
+                // Use moment to format the schedule time correctly
+                const scheduleTime = moment(scheduleDateTime).toDate();
+    
+                // Schedule the post to be updated when the time comes
+                cron.schedule(scheduleTime, async () => {
+                    try {
+                        // Change the status of the post to 'published' when the scheduled time arrives
+                        newPost.status = 'published';
+                        await createPostModel.create(newPost); // Save the post as published
+                        console.log(`Post for user ${user_id} published at ${scheduleTime}`);
+                    } catch (error) {
+                        console.error('Error publishing scheduled post:', error);
+                    }
+                });
+    
+                // Log the scheduled time for verification
+                console.log(`Post scheduled for: ${scheduleTime}`);
             }
+    
+            // Directly create and save the new post without checking for existing ones
+            const userPost = new createPostModel(newPost);
+            await userPost.save();
+    
+            console.log("Post saved successfully:", userPost);
+            return userPost;
         } catch (error) {
             console.error("Error creating post:", error.message);
             throw new Error("Failed to create the post.");
         }
     },
-
     //   ==================
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
