@@ -391,6 +391,16 @@ followUser: async (req, res) => {
   },
 
   // ============================
+  getTopFollowersById: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const followers = await adminService.getTopFollowersById(id);
+      res.status(200).json({ message: 'Followers fetched successfully', data: followers });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching followers', error: error.message });
+    }
+  },
+
   getFollowers: async (req, res) => {
     try {
       const { id } = req.params;
