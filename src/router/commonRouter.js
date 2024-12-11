@@ -200,6 +200,7 @@ router.get("/getPosts/:id", adminController.getPosts);
 router.post("/followUser", adminController.followUser);
 router.post("/unfollowUser", adminController.unfollowUser);
 router.get("/getFollowers/:id", adminController.getFollowers);
+router.get("/getTopFollowersById/:id", adminController.getTopFollowersById);
 router.get("/getFollowing/:id", adminController.getFollowing);
 router.put("/AcceptRequest", adminController.AcceptRequest);
 router.get("/suggestUsers/:id", adminController.suggestUsers);
