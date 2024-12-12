@@ -933,7 +933,6 @@ const adminService = {
     //         return { success: false, message: error.message };
     //     }
     // },
-
     searchRecommendation: async (query, typeOfSearch = "Name", page = 1, limit = 25) => {
         try {
             if (!query || typeof query !== 'string' || !query.trim()) {
@@ -953,50 +952,46 @@ const adminService = {
                     ]
                 }).select('_id address');
     
-                // Map location IDs for users
                 const locationIds = locationResults.map(location => location._id);
     
                 const userResults = await registerModel.find({
                     location_id: { $in: locationIds }
-                }).select('_id full_Name profile_url score');
+                }).select('_id full_Name profile_url');
     
                 const formattedUserResults = userResults.map(user => ({
                     _id: user._id,
                     full_Name: user.full_Name,
                     type: "User",
                     profile_url: user.profile_url || "",
-                    score: user.score || 0
+                    score: 1 // Assign a base score
                 }));
     
-                // Search in businessRegisterModel for business-related addresses
                 const businessResults = await businessregisterModel.find({
                     $or: [
-                        { businessStreet: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
                         { businessCity: { $regex: normalizedQuery, $options: 'i' } },
                         { businessState: { $regex: normalizedQuery, $options: 'i' } },
                         { businessPinCode: { $regex: normalizedQuery, $options: 'i' } }
                     ]
-                }).select('_id businessName profile_url score');
+                }).select('_id businessName brand_logo');
     
                 const formattedBusinessResults = businessResults.map(business => ({
                     _id: business._id,
                     name: business.businessName,
                     type: "Business",
-                    profile_url: business.profile_url || "",
-                    score: business.score || 0
+                    profile_url: business.brand_logo || "",
+                    score: 1 // Assign a base score
                 }));
     
-                // Combine results
                 results = [...formattedUserResults, ...formattedBusinessResults];
             } else if (typeOfSearch === "Name") {
-                // Name search logic
                 const userResults = await registerModel.find({
                     full_Name: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id full_Name profile_url score');
+                }).select('_id full_Name profile_url');
     
                 const businessResults = await businessregisterModel.find({
                     businessName: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id businessName profile_url score');
+                }).select('_id businessName brand_logo');
     
                 results = [
                     ...userResults.map(user => ({
@@ -1004,14 +999,14 @@ const adminService = {
                         full_Name: user.full_Name,
                         type: "User",
                         profile_url: user.profile_url || "",
-                        score: user.score || 0
+                        score: user.full_Name.toLowerCase().includes(normalizedQuery) ? 10 : 5 // Higher score for exact matches
                     })),
                     ...businessResults.map(business => ({
                         _id: business._id,
                         businessName: business.businessName,
                         type: "Business",
-                        profile_url: business.profile_url || "",
-                        score: business.score || 0
+                        profile_url: business.brand_logo || "",
+                        score: business.businessName.toLowerCase().includes(normalizedQuery) ? 10 : 5 // Higher score for exact matches
                     }))
                 ];
             } else {
@@ -1021,6 +1016,9 @@ const adminService = {
             if (results.length === 0) {
                 return { success: false, message: "No matching results found" };
             }
+    
+            // Sort results by score (highest first)
+            results.sort((a, b) => b.score - a.score);
     
             // Pagination
             const totalResults = results.length;
