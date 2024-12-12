@@ -944,7 +944,6 @@ const adminService = {
             let results;
     
             if (typeOfSearch === "Location") {
-                // Search in locationModel for user-related addresses
                 const locationResults = await locationModel.find({
                     $or: [
                         { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
@@ -959,14 +958,14 @@ const adminService = {
     
                 const userResults = await registerModel.find({
                     location_id: { $in: locationIds }
-                }).select('_id full_Name profile_url location_id');
+                }).select('_id full_Name profile_url score');
     
                 const formattedUserResults = userResults.map(user => ({
-                    id: user._id,
-                    name: user.full_Name,
+                    _id: user._id,
+                    full_Name: user.full_Name,
                     type: "User",
                     profile_url: user.profile_url || "",
-                    location: locationResults.find(location => location._id.toString() === user.location_id.toString())?.address || null
+                    score: user.score || 0
                 }));
     
                 // Search in businessRegisterModel for business-related addresses
@@ -977,48 +976,42 @@ const adminService = {
                         { businessState: { $regex: normalizedQuery, $options: 'i' } },
                         { businessPinCode: { $regex: normalizedQuery, $options: 'i' } }
                     ]
-                }).select('_id businessName profile_url businessStreet businessCity businessState businessPinCode');
+                }).select('_id businessName profile_url score');
     
                 const formattedBusinessResults = businessResults.map(business => ({
-                    id: business._id,
+                    _id: business._id,
                     name: business.businessName,
                     type: "Business",
                     profile_url: business.profile_url || "",
-                    location: {
-                      
-                        city: business.businessCity || "",
-                        state: business.businessState || "",
-                        pinCode: business.businessPinCode || ""
-                    }
+                    score: business.score || 0
                 }));
     
                 // Combine results
                 results = [...formattedUserResults, ...formattedBusinessResults];
             } else if (typeOfSearch === "Name") {
-                // Name search logic (as before)
+                // Name search logic
                 const userResults = await registerModel.find({
                     full_Name: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id full_Name profile_url location_id');
+                }).select('_id full_Name profile_url score');
     
-                const businessResults = await businessRegisterModel.find({
+                const businessResults = await businessregisterModel.find({
                     businessName: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id businessName profile_url businessEmail businessPhone');
+                }).select('_id businessName profile_url score');
     
                 results = [
                     ...userResults.map(user => ({
-                        id: user._id,
-                        name: user.full_Name,
+                        _id: user._id,
+                        full_Name: user.full_Name,
                         type: "User",
                         profile_url: user.profile_url || "",
-                        location_id: user.location_id || null
+                        score: user.score || 0
                     })),
                     ...businessResults.map(business => ({
-                        id: business._id,
-                        name: business.businessName,
+                        _id: business._id,
+                        businessName: business.businessName,
                         type: "Business",
                         profile_url: business.profile_url || "",
-                        email: business.businessEmail || "",
-                        phone: business.businessPhone || ""
+                        score: business.score || 0
                     }))
                 ];
             } else {
@@ -1052,6 +1045,7 @@ const adminService = {
             return { success: false, message: error.message };
         }
     },
+    
     
     
     // =================
