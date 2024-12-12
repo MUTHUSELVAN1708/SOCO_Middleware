@@ -78,16 +78,12 @@ const adminService = {
                 upperCaseAlphabets: false,
             });
 
-            console.log("Generated OTP:", otp);
-
             const emailSent = await adminService.SendOTPEmail(email, otp);
-            console.log("Email sending status:", emailSent);
             const existingOtpRecord = await otpModel.findOne({ email });
             if (existingOtpRecord) {
                 const hashedOtp = await bcrypt.hash(otp, 10);
                 existingOtpRecord.reg_otp = hashedOtp;
                 await existingOtpRecord.save();
-                console.log("OTP updated for existing email");
                 return existingOtpRecord;
             } else {
                 const hashedOtp = await bcrypt.hash(otp, 10);
@@ -117,7 +113,6 @@ const adminService = {
             }
 
             const hashedOtp = await bcrypt.hash(reg_otp, 10);
-            console.log('Hashed OTP:', hashedOtp);
 
             const updatedUser = await registerModel.findOneAndUpdate(
                 { _id: user_id },
@@ -125,7 +120,6 @@ const adminService = {
                 { new: true }
             );
 
-            console.log('Updated User:', updatedUser);
             if (!updatedUser) {
                 throw new Error('User not found.');
             }
@@ -138,8 +132,6 @@ const adminService = {
 
     // ================
     SendOTPEmail: async (receiverMail, otp) => {
-        console.log(receiverMail, otp, "jsonw");
-
         try {
             const transporter = nodemailer.createTransport({
                 host: "smtp.gmail.com",
@@ -153,35 +145,35 @@ const adminService = {
                     rejectUnauthorized: false,
                 },
             });
+    
             const mailOptions = {
                 from: "soco.infobusiness@gmail.com",
                 to: receiverMail,
-                subject: "SOCO OTP Code for Verification",
-                text: `Dear User,
-            
-            Thank you for choosing soco!
-            
-            Your One-Time Password (OTP) for account registration is: ${otp}
-            
-            Please use this OTP to complete your registration within the next 10 minutes. For your security, do not share this OTP with anyone.
-            
-            If you did not initiate this request, please disregard this email. For assistance, feel free to contact our support team at support@soco.com.
-            
-            Thank you for trusting soco. We're excited to have you onboard!
-            
-            Best regards,  
-            The soco Team`
+                subject: "Soco Verification Code",
+                text: `Hello,
+    
+    Thank you for joining Soco, your hub for connecting with professionals and growing your business network.
+    
+    Your One-Time Password (OTP) is: ${otp}
+    
+    Use this code to verify your email and unlock access to the platform's features. For your security, please do not share this code with anyone.
+    
+    This OTP is valid for 10 minutes. If you did not request this code, please ignore this email or contact our support team at support@soco.com.
+    
+    Welcome to Soco! Let's build connections and create opportunities together.
+    
+    Best regards,  
+    The Soco Team`
             };
-
+    
             const info = await transporter.sendMail(mailOptions);
-            console.log("OTP email sent:", info.response);
-
             return info.response;
         } catch (error) {
             console.error("Error in sending OTP Email:", error);
-            throw new Error("Error in sending OTP Email")
+            throw new Error("Error in sending OTP Email");
         }
     },
+    
 
     //   ==========
     verifingOtp: async (data) => {
@@ -267,8 +259,25 @@ const adminService = {
                 educationLevel = "",
                 working = "",
                 important = false,
+                // Chat-related fields
+                onlineStatus = false,
+                isTyping = false,
+                lastOnline = null,
+                currentChatRoom = null,
+                unreadMessagesCount = 0,
+                bio, 
+                title, 
+                skills, 
+                hobbies, 
+                education, 
+                degree, 
+                field, 
+                institution, 
+                year, 
+                grade, 
+                achievements
             } = data;
-
+    
             // Validate required fields
             let errors = [];
             if (!full_Name) errors.push("Full name is required.");
@@ -277,29 +286,31 @@ const adminService = {
             if (!password) errors.push("Password is required.");
             if (!address) errors.push("Address is required.");
             if (!agree) errors.push("Agreement is required.");
-
+    
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-
-            // Check for existing users
+    
+            // Check for existing users and business name
             const existingUser = await Promise.all([
                 registerModel.findOne({ full_Name }),
                 registerModel.findOne({ phn_number }),
                 registerModel.findOne({ email }),
+                businessregisterModel.findOne({ businessName }), // Check for existing businessName
             ]);
-
+    
             if (existingUser[0]) errors.push("Name already exists. Name must be unique.");
             if (existingUser[1]) errors.push("Phone number already exists. Try a different one or log in.");
             if (existingUser[2]) errors.push("Email already exists. Try a different one or log in.");
-
+            if (existingUser[3]) errors.push("Business name already exists. Business name must be unique.");
+    
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-
+    
             // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
-
+    
             // Create user entry
             const register = await registerModel.create({
                 location_id,
@@ -321,30 +332,39 @@ const adminService = {
                 school,
                 educationLevel,
                 working,
+                onlineStatus,
+                isTyping,
+                lastOnline,
+                currentChatRoom,
+                unreadMessagesCount,
+                bio, 
+                title, 
+                skills, 
+                hobbies, 
+                education, 
+                degree, 
+                field, 
+                institution, 
+                year, 
+                grade, 
+                achievements,
             });
-
-            console.log("User registered:", register);
-
+        
             // Create the address
             const addressEntry = await locationModel.create({
                 user_id: register._id,
                 address,
             });
-
-            console.log("Address created:", addressEntry);
-
+        
             // Update user with address ID
             const updatedUser = await registerModel.findByIdAndUpdate(
                 register._id,
                 { location_id: addressEntry._id },
                 { new: true }
             );
-
-            console.log("Updated user:", updatedUser);
-
+        
             // Create business entry
             const business = await businessregisterModel.create({
-                // location_id: addressEntry._id,
                 user_id: register._id,
                 Brand_Name: Brand_Name || "",
                 org_name: org_name || "",
@@ -376,19 +396,92 @@ const adminService = {
                 natureOfBusiness: natureOfBusiness || "",
                 businessName: businessName || "",
                 important,
+    
+                // Chat-related fields
+                onlineStatus,
+                isTyping,
+                lastOnline,
+                currentChatRoom,
+                unreadMessagesCount,
             });
-
-            console.log("Business registered:", business);
-
+    
+    
             return { success: true, user: updatedUser, business };
-
+    
         } catch (error) {
             console.error("Error in registerUserWithBusiness:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
 
-
+    //   ========== Bio (Add & Update) ==========
+    addAndUpdateBio: async (data) => {
+        try {
+            const { 
+                userId, 
+                bio, 
+                title, 
+                skills, 
+                hobbies, 
+                education, 
+                degree, 
+                field, 
+                institution, 
+                year, 
+                grade, 
+                achievements 
+            } = data;
+    
+            if (!userId) {
+                throw { status: 400, message: "User ID is required." };
+            }
+    
+            // Find the user in the registerModel
+            const user = await registerModel.findById(userId);
+    
+            if (!user) {
+                throw { status: 404, message: "User not found." };
+            }
+    
+            // Update or add fields
+            user.bio = bio || user.bio;
+            user.title = title || user.title;
+            user.skills = skills || user.skills;
+            user.hobbies = hobbies || user.hobbies;
+            user.education = education || user.education;
+            user.degree = degree || user.degree;
+            user.field = field || user.field;
+            user.institution = institution || user.institution;
+            user.year = year || user.year;
+            user.grade = grade || user.grade;
+            user.achievements = achievements || user.achievements;
+    
+            // Save the updated user
+            await user.save();
+    
+            // Return only the updated fields
+            const updatedFields = {
+                bio: user.bio,
+                title: user.title,
+                skills: user.skills,
+                hobbies: user.hobbies,
+                education: user.education,
+                degree: user.degree,
+                field: user.field,
+                institution: user.institution,
+                year: user.year,
+                grade: user.grade,
+                achievements: user.achievements,
+            };
+    
+            return { success: true, updatedFields };
+        } catch (error) {
+            console.error("Error in addAndUpdateBio:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
+    
     // ==================================
     login: async (data) => {
         const { full_Name, email, phn_number, password } = data;
@@ -404,7 +497,6 @@ const adminService = {
                     lowerCaseAlphabets: false,
                     upperCaseAlphabets: false,
                 });
-                console.log(otp);
                 await adminService.storeOtp(user._id, otp);
                 await adminService.sendOtp(phn_number, otp);
 
@@ -496,7 +588,6 @@ const adminService = {
             }
 
             const hashedOtp = await bcrypt.hash(otp, 10);
-            console.log('Hashed OTP:', hashedOtp);
 
             const updatedUser = await registerModel.findOneAndUpdate(
                 { _id: user_id },
@@ -504,7 +595,6 @@ const adminService = {
                 { new: true }
             );
 
-            console.log('Updated User:', updatedUser);
             if (!updatedUser) {
                 throw new Error('User not found.');
             }
@@ -543,7 +633,6 @@ const adminService = {
                 from: "",
             });
 
-            console.log('OTP sent successfully:', response.sid);
         } catch (error) {
             if (error.code === 30447) {
                 console.error('Invalid "From" number. Please use a valid Twilio number.');
@@ -614,7 +703,6 @@ const adminService = {
     forgotPassword: async (data) => {
         const { email, password } = data;
 
-        console.log(data, "data");
 
         if (!email || !password) {
             throw new Error("email and password are required.");
@@ -644,7 +732,6 @@ const adminService = {
         const { isSameNumberBusiness, Brand_Name, org_name, PAN_NO, aadhar_img, pan_img, GST_NO, status, Name, address,
             location_id, brand_logo, cover_img, agree, type_of_service, category, sub_category } = data;
 
-        console.log(data, "Received Data");
 
         try {
             if (isSameNumberBusiness == true) {
@@ -687,7 +774,6 @@ const adminService = {
     },
     // =========================
     updateBusinessStatus: async (data) => {
-        console.log(data)
         try {
             const updateBusinessStatus = await businessregisterModel.findOneAndUpdate({ _id: data.business_id },
                 { status: data.status },
@@ -936,7 +1022,6 @@ const adminService = {
             };
     
             // Log the data to ensure it's correct
-            console.log("Final new post object:", newPost);
     
             // If the post is scheduled, handle scheduling logic
             if (isScheduled && scheduleDateTime) {
@@ -949,21 +1034,19 @@ const adminService = {
                         // Change the status of the post to 'published' when the scheduled time arrives
                         newPost.status = 'published';
                         await createPostModel.create(newPost); // Save the post as published
-                        console.log(`Post for user ${user_id} published at ${scheduleTime}`);
                     } catch (error) {
                         console.error('Error publishing scheduled post:', error);
                     }
                 });
     
                 // Log the scheduled time for verification
-                console.log(`Post scheduled for: ${scheduleTime}`);
+                // console.log(`Post scheduled for: ${scheduleTime}`);
             }
     
             // Directly create and save the new post without checking for existing ones
             const userPost = new createPostModel(newPost);
             await userPost.save();
     
-            console.log("Post saved successfully:", userPost);
             return userPost;
         } catch (error) {
             console.error("Error creating post:", error.message);
@@ -980,7 +1063,8 @@ const adminService = {
                 .sort({ timestamp: -1 })
                 .skip(skip)
                 .limit(limit)
-                .select('imageUrl caption likes tags timestamp');
+                .select('imageUrl caption likes tags timestamp isVideo thumbnailFile');
+
 
             // Count total results for pagination
             const totalResults = await postModel.countDocuments({ user_id });
@@ -1006,7 +1090,6 @@ const adminService = {
     followUser: async (user_id, follower_id) => {
         try {
             const verifyAcc = await registerModel.findOne({ _id: follower_id });
-            console.log(verifyAcc);
 
             if (!verifyAcc) {
                 throw new Error('User not found');
@@ -1073,6 +1156,77 @@ const adminService = {
     },
 
     // ============================
+
+     getTopFollowersById : async (user_id, business_id, page = 1, limit = 10) => { 
+        try {
+            const skip = (page - 1) * limit;
+            
+            if (!user_id && !business_id) {
+                throw new Error('Either user_id or business_id must be provided.');
+            }
+    
+            let query = { status: 'accepted' };
+    
+            if (user_id) {
+                query.user_id = user_id;
+            }
+    
+            if (business_id) {
+                query.business_id = business_id;
+            }
+    
+            const getFollowers = await followerModel
+                .find(query)
+                .populate('follower_id', 'full_Name profile_url postCount isBusinessAccount onlineStatus')
+                .populate('business_id', 'businessName postCount onlineStatus')
+                .skip(skip)
+                .limit(limit)
+                .exec();
+    
+    
+            for (const follower of getFollowers) {
+                // Ensure that follower.follower_id exists and is not null
+                const followerData = follower.follower_id;
+    
+                if (followerData) {
+                    if (followerData.isBusinessAccount) {
+                        const business = await businessregisterModel.findOne({ user_id: followerData._id });
+                        if (business) {
+                            follower.postCount = business.postCount;
+                        }
+                    } else {
+                        const user = await registerModel.findOne({ _id: followerData._id });
+                        if (user) {
+                            follower.postCount = user.postCount;
+                        }
+                    }
+                } else {
+                    console.log('No follower data found for', follower._id);
+                }
+            }
+    
+            const totalAcceptedFollowers = await followerModel.countDocuments(query);
+    
+            getFollowers.sort((a, b) => b.postCount - a.postCount);
+    
+            return {
+                followers: getFollowers,
+                totalFollowers: totalAcceptedFollowers,
+                pagination: {
+                    totalResults: totalAcceptedFollowers,
+                    totalPages: Math.ceil(totalAcceptedFollowers / limit),
+                    currentPage: page,
+                    limit,
+                    hasNextPage: page < Math.ceil(totalAcceptedFollowers / limit),
+                    hasPreviousPage: page > 1,
+                },
+            };
+        } catch (error) {
+            throw new Error('Unable to fetch followers: ' + error.message);
+        }
+    },
+    
+
     getFollowers: async (user_id, page = 1, limit = 10) => {
         try {
             // Calculate the number of documents to skip
@@ -1152,8 +1306,6 @@ const adminService = {
                 accountIsPublic: true,
             });
 
-            console.log(interestMatches, "int")
-
             const mutualFollowers = await registerModel.aggregate([
                 {
                     $lookup: {
@@ -1173,7 +1325,6 @@ const adminService = {
                 { $limit: 10 }
             ]);
 
-            console.log(mutualFollowers, "mu")
             const userLocation = await locationModel.findById(currentUser.location_id);
 
             if (!userLocation) {
@@ -1188,7 +1339,6 @@ const adminService = {
                 })
                 : [];
 
-            console.log(locationMatches, "lo")
             const suggestedUsers = [...new Set([...interestMatches, ...mutualFollowers, ...locationMatches])];
 
             return suggestedUsers;

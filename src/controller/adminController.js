@@ -346,6 +346,25 @@ const adminController = {
             next(error);  // Pass error to the next middleware for centralized error handling
         }
     },
+        // ==================
+        addAndUpdateBio : async (req, res, next) => {
+        
+            try {
+                const getPosts = await adminService.addAndUpdateBio(req.body);
+        
+                res.status(200).json({
+                    status: 200,
+                    data: getPosts,
+                });
+            } catch (error) {
+                console.error("Error fetching posts:", error.message);
+                error.statusCode = 400;
+                error.error = error.message;
+                console.error(error);
+                error.statuscode = 400;
+                next(error);
+            }
+        },
     // ==================
     getPosts: async (req, res, next) => {
         const { id } = req.params;
@@ -391,6 +410,16 @@ followUser: async (req, res) => {
   },
 
   // ============================
+  getTopFollowersById: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const followers = await adminService.getTopFollowersById(id);
+      res.status(200).json({ message: 'Followers fetched successfully', data: followers });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching followers', error: error.message });
+    }
+  },
+
   getFollowers: async (req, res) => {
     try {
       const { id } = req.params;

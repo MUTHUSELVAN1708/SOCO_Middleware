@@ -47,28 +47,64 @@ const registerSchema = new mongoose.Schema(
       companyName: { type: String, required: false },
       designation: { type: String, required: false },
     },
-    
-  highlights: [{
-        type: String,
-        required: false
-      }],
-      isAlreadyFriend: {
-            type: Boolean,
-            required: false
-          },
-          isVerified: {
-                type: Boolean,
-                required: false
-              },
-              posts: {
-                    type: Number,
-                    required: false
-                  },
+    highlights: [{
+      type: String,
+      required: false
+    }],
+    isAlreadyFriend: {
+      type: Boolean,
+      required: false
+    },
+    isVerified: {
+      type: Boolean,
+      required: false
+    },
+    posts: {
+      type: Number,
+      required: false
+    },
+    onlineStatus: { 
+      type: Boolean, 
+      default: false,  // Default to false, indicating the user is offline
+      required: false 
+    },
+    isTyping: { 
+      type: Boolean, 
+      default: false,  // Default to false, indicating the user is not typing
+      required: false 
+    },
+    lastOnline: { 
+      type: Date, 
+      default: null,  // Default to null, indicating the user hasn't been online yet
+      required: false 
+    },
+    currentChatRoom: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'ChatRoom',  // Reference to a ChatRoom model (optional)
+      required: false 
+    },
+    unreadMessagesCount: {
+      type: Number,
+      default: 0,  // Default to 0, indicating no unread messages
+      required: false
+    },
+
+    // bio Details
+    bio: { type: String, default: '', required: false },
+    title: { type: String, default: '', required: false },
+    skills: { type: String, default: '', required: false },
+    hobbies: { type: String, default: '', required: false },
+    education: { type: String, default: '', required: false },
+    degree: { type: String, default: '', required: false },
+    field: { type: String, default: '', required: false },
+    institution: { type: String, default: '', required: false },
+    year: { type: Number, default: 0, required: false },
+    grade: { type: Number, default: 0, required: false },
+    achievements: { type: String, default: '', required: false },
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );
-
 
 registerSchema.virtual("user_id").get(function () {
   return this._id.toString();
