@@ -204,4 +204,6 @@ router.get("/getFollowing/:id", adminController.getFollowing);
 router.put("/AcceptRequest", adminController.AcceptRequest);
 router.get("/suggestUsers/:id", adminController.suggestUsers);
 
+router.post("/addMention",adminController.addMention);
+
 export default router;

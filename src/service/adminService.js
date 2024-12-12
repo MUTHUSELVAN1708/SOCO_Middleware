@@ -15,6 +15,7 @@ import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
 import mongoose from "mongoose"
 import cron from "node-cron"
+import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 
@@ -789,8 +790,8 @@ const adminService = {
                     return score > 0
                         ? {
                             id: result._id,
-                            name: typeOfSearch === "Business" ? result.businessName : result.full_Name,
-                            type: typeOfSearch === "Business" ? "business" : "normal",
+                            businessName: typeOfSearch === "Business" ? result.businessName : result.Name,
+                            type: typeOfSearch === "Business" ? "business" : "User",
                             profile_url: result.profile_url || "",
                             email: typeOfSearch === "Business" ? result.businessEmail : undefined,
                             phone: typeOfSearch === "Business" ? result.businessPhone : undefined,
@@ -820,10 +821,18 @@ const adminService = {
             const currentPage = Math.max(1, Math.min(page, totalPages));
             const startIndex = (currentPage - 1) * limit;
             const paginatedResults = filteredResultsWithoutNulls.slice(startIndex, startIndex + limit);
-    
+    const fileterpaginatedResults=paginatedResults.map(items=>({
+        id:items.id,
+        businessName:items.businessName,
+        type:items.type,
+        profile_url:items.profile_url,
+        score:items.score
+
+        
+    }))
             return {
                 success: true,
-                data: paginatedResults,
+                data: fileterpaginatedResults,
                 pagination: {
                     totalResults,
                     totalPages,
@@ -1189,7 +1198,86 @@ const adminService = {
             throw new Error('Unable to fetch suggestions');
         }
     },
+// =================================
+addMention: async (data) => {
+    try {
+        // Validate input data
+        if (!data || typeof data !== 'object') {
+            return { success: false, message: "Invalid data provided" };
+        }
 
+        const { user_id, mentionType, mentionDetails } = data;
+
+        // Check required fields
+        if (!user_id || !mentionType) {
+            return { success: false, message: "user_id and mentionType are required" };
+        }
+
+        // Validate mentionDetails
+        if (mentionDetails && typeof mentionDetails !== 'object') {
+            return { success: false, message: "mentionDetails must be an object" };
+        }
+
+        if (mentionDetails && mentionDetails.friends) {
+            if (!Array.isArray(mentionDetails.friends)) {
+                return { success: false, message: "Friends must be an array of full_Name" };
+            }
+
+            // Validate each friend's full_Name
+            const validFriends = [];
+            for (const friendName of mentionDetails.friends) {
+                const friend = await registerModel.findOne({ full_Name: friendName }); // Query using `full_Name`
+                if (friend) {
+                    validFriends.push({
+                        friend_id: friend._id,
+                        full_Name: friend.full_Name,
+                    }); // Add valid friend with their ID and name
+                }
+            }
+
+            // If no valid friends are found
+            if (validFriends.length === 0) {
+                return { success: false, message: "No valid friends found for the provided names" };
+            }
+
+            // Update mentionDetails with valid friends
+            mentionDetails.friends = validFriends;
+        }
+
+        // Create the mention record
+        const result = await mentionModel.create({
+            user_id,
+            mentionType,
+            mentionDetails: mentionDetails || {},
+        });
+
+        // Return success response
+        return {
+            success: true,
+            message: "Mention added successfully",
+            data: result,
+        };
+    } catch (error) {
+        console.error("Error adding mention:", error);
+
+        // Return error response
+        return { success: false, message: "An error occurred while adding mention", error: error.message };
+    }
+},
+
+
+mention:cron.schedule("0 * * * *", async () => {
+    try {
+      const now = new Date();
+      await mentionModel.updateMany(
+        { mentionType: "story", expiresAt: { $lte: now }, status: "active" },
+        { $set: { status: "expired" } }
+      );
+      console.log("Expired story mentions updated");
+    } catch (error) {
+      console.error("Error updating expired mentions:", error.message);
+    }
+  })
 
 
 }

@@ -441,7 +441,21 @@ suggestUsers: async (req, res,next) => {
         next(error);
     }
 },
-
+// ===============
+addMention:async (req, res,next) => {
+   
+    try {
+        const addMention = await adminService.addMention(req.body);
+        res.status(200).json({
+            status:200,
+            addMention})
+    } catch (error) {
+        error.error = error.message;
+        console.error(error);
+        error.statuscode = 400;
+        next(error);
+    }
+},
 
 
 }
