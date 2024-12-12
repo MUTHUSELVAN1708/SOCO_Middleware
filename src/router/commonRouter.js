@@ -205,6 +205,7 @@ router.get("/getTopFollowersById/:id", adminController.getTopFollowersById);
 router.get("/getFollowing/:id", adminController.getFollowing);
 router.put("/AcceptRequest", adminController.AcceptRequest);
 router.get("/suggestUsers/:id", adminController.suggestUsers);
+router.get("/getMentionUser", adminController.getMentionUser);
 
 router.post("/addMention",adminController.addMention);
 
