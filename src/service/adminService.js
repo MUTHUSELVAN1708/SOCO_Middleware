@@ -144,34 +144,35 @@ const adminService = {
                     rejectUnauthorized: false,
                 },
             });
+    
             const mailOptions = {
                 from: "soco.infobusiness@gmail.com",
                 to: receiverMail,
-                subject: "SOCO OTP Code for Verification",
-                text: `Dear User,
-            
-            Thank you for choosing soco!
-            
-            Your One-Time Password (OTP) for account registration is: ${otp}
-            
-            Please use this OTP to complete your registration within the next 10 minutes. For your security, do not share this OTP with anyone.
-            
-            If you did not initiate this request, please disregard this email. For assistance, feel free to contact our support team at support@soco.com.
-            
-            Thank you for trusting soco. We're excited to have you onboard!
-            
-            Best regards,  
-            The soco Team`
+                subject: "Soco Verification Code",
+                text: `Hello,
+    
+    Thank you for joining Soco, your hub for connecting with professionals and growing your business network.
+    
+    Your One-Time Password (OTP) is: ${otp}
+    
+    Use this code to verify your email and unlock access to the platform's features. For your security, please do not share this code with anyone.
+    
+    This OTP is valid for 10 minutes. If you did not request this code, please ignore this email or contact our support team at support@soco.com.
+    
+    Welcome to Soco! Let's build connections and create opportunities together.
+    
+    Best regards,  
+    The Soco Team`
             };
-
+    
             const info = await transporter.sendMail(mailOptions);
-
             return info.response;
         } catch (error) {
             console.error("Error in sending OTP Email:", error);
-            throw new Error("Error in sending OTP Email")
+            throw new Error("Error in sending OTP Email");
         }
     },
+    
 
     //   ==========
     verifingOtp: async (data) => {
@@ -263,6 +264,17 @@ const adminService = {
                 lastOnline = null,
                 currentChatRoom = null,
                 unreadMessagesCount = 0,
+                bio, 
+                title, 
+                skills, 
+                hobbies, 
+                education, 
+                degree, 
+                field, 
+                institution, 
+                year, 
+                grade, 
+                achievements
             } = data;
     
             // Validate required fields
@@ -324,6 +336,17 @@ const adminService = {
                 lastOnline,
                 currentChatRoom,
                 unreadMessagesCount,
+                bio, 
+                title, 
+                skills, 
+                hobbies, 
+                education, 
+                degree, 
+                field, 
+                institution, 
+                year, 
+                grade, 
+                achievements,
             });
         
             // Create the address
@@ -389,9 +412,75 @@ const adminService = {
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
+
+    //   ========== Bio (Add & Update) ==========
+    addAndUpdateBio: async (data) => {
+        try {
+            const { 
+                userId, 
+                bio, 
+                title, 
+                skills, 
+                hobbies, 
+                education, 
+                degree, 
+                field, 
+                institution, 
+                year, 
+                grade, 
+                achievements 
+            } = data;
     
-
-
+            if (!userId) {
+                throw { status: 400, message: "User ID is required." };
+            }
+    
+            // Find the user in the registerModel
+            const user = await registerModel.findById(userId);
+    
+            if (!user) {
+                throw { status: 404, message: "User not found." };
+            }
+    
+            // Update or add fields
+            user.bio = bio || user.bio;
+            user.title = title || user.title;
+            user.skills = skills || user.skills;
+            user.hobbies = hobbies || user.hobbies;
+            user.education = education || user.education;
+            user.degree = degree || user.degree;
+            user.field = field || user.field;
+            user.institution = institution || user.institution;
+            user.year = year || user.year;
+            user.grade = grade || user.grade;
+            user.achievements = achievements || user.achievements;
+    
+            // Save the updated user
+            await user.save();
+    
+            // Return only the updated fields
+            const updatedFields = {
+                bio: user.bio,
+                title: user.title,
+                skills: user.skills,
+                hobbies: user.hobbies,
+                education: user.education,
+                degree: user.degree,
+                field: user.field,
+                institution: user.institution,
+                year: user.year,
+                grade: user.grade,
+                achievements: user.achievements,
+            };
+    
+            return { success: true, updatedFields };
+        } catch (error) {
+            console.error("Error in addAndUpdateBio:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
+    
     // ==================================
     login: async (data) => {
         const { full_Name, email, phn_number, password } = data;

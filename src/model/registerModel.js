@@ -190,13 +190,23 @@ const registerSchema = new mongoose.Schema(
       default: 0,  // Default to 0, indicating no unread messages
       required: false
     },
+
+    // bio Details
+    bio: { type: String, default: '', required: false },
+    title: { type: String, default: '', required: false },
+    skills: { type: String, default: '', required: false },
+    hobbies: { type: String, default: '', required: false },
+    education: { type: String, default: '', required: false },
+    degree: { type: String, default: '', required: false },
+    field: { type: String, default: '', required: false },
+    institution: { type: String, default: '', required: false },
+    year: { type: Number, default: 0, required: false },
+    grade: { type: Number, default: 0, required: false },
+    achievements: { type: String, default: '', required: false },
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }
 );
-
-
-
 
 registerSchema.virtual("user_id").get(function () {
   return this._id.toString();
