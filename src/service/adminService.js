@@ -902,15 +902,23 @@ const adminService = {
             let results;
     
             if (typeOfSearch === "Location") {
+                const conditions = [
+                    { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
+                    { 'address.city': { $regex: normalizedQuery, $options: 'i' } },
+                    { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
+                    { 'address.country': { $regex: normalizedQuery, $options: 'i' } }
+                ];
+                
+                // If the query is a number, add a condition for Pincode
+                if (!isNaN(query)) {
+                    conditions.push({ 'address.Pincode': Number(query) });
+                }
+                
                 const locationResults = await locationModel.find({
-                    $or: [
-                        { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
-                        { 'address.city': { $regex: normalizedQuery, $options: 'i' } },
-                        { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
-                        { 'address.country': { $regex: normalizedQuery, $options: 'i' } }
-                    ]
+                    $or: conditions
                 }).select('_id address');
-    
+                
+                
                 const locationIds = locationResults.map(location => location._id);
     
                 const userResults = await registerModel.find({
@@ -924,15 +932,21 @@ const adminService = {
                     profile_url: user.profile_url || "",
                     score: 1 // Assign a base score
                 }));
-    
+                const businessConditions = [
+                    { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
+                    { businessCity: { $regex: normalizedQuery, $options: 'i' } },
+                    { businessState: { $regex: normalizedQuery, $options: 'i' } }
+                ];
+                
+                // If the query is numeric, add a condition for businessPinCode
+                if (!isNaN(query)) {
+                    businessConditions.push({ businessPinCode: Number(query) });
+                }
+                
                 const businessResults = await businessregisterModel.find({
-                    $or: [
-                        { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
-                        { businessCity: { $regex: normalizedQuery, $options: 'i' } },
-                        { businessState: { $regex: normalizedQuery, $options: 'i' } },
-                        { businessPinCode: { $regex: normalizedQuery, $options: 'i' } }
-                    ]
+                    $or: businessConditions
                 }).select('_id businessName brand_logo');
+                
     
                 const formattedBusinessResults = businessResults.map(business => ({
                     _id: business._id,
