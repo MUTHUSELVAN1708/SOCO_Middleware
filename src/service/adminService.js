@@ -484,89 +484,46 @@ const adminService = {
     
     // ==================================
     login: async (data) => {
-        const { full_Name, email, phn_number, password } = data;
+        const { email, phn_number, password } = data;
         try {
+            let user;
+    
             if (phn_number) {
-                const user = await registerModel.findOne({ phn_number });
-                if (!user) {
-                    throw { msg: "User not found, please register" };
-                }
-                const otp = otpGenerator.generate(4, {
-                    digits: true,
-                    specialChars: false,
-                    lowerCaseAlphabets: false,
-                    upperCaseAlphabets: false,
-                });
-                await adminService.storeOtp(user._id, otp);
-                await adminService.sendOtp(phn_number, otp);
-
-                return {
-                    status: 200,
-                    msg: "Authentication successful",
-                    login: {
-                        user_id: user._id,
-                        full_Name: user.full_Name,
-                        email: user.email,
-                        phn_number: user.phn_number,
-                        location_id: user.location_id,
-                        dob: user.DOB,
-                        agree: user.agree,
-                        isSameNumberBusiness: user.isSameNumberBusiness,
-                        interest: user.interest,
-                        addNewInterest: user.addNewInterest,
-                        status: user.status,
-                        regOtpId: user.reg_otp_id,
-                        timestamp: user.timestamp,
-                    },
-                };
-            } else {
-                const user = await registerModel.findOne({ email });
-                if (!user) {
-                    return {
-                        status: 400,
-                        msg: "Invalid credentials",
-                        login: null,
-                    };
-                }
-
+                user = await registerModel.findOne({ phn_number });
+            } else if (email) {
+                user = await registerModel.findOne({ email });
+            }
+    
+            if (!user) {
+                throw { msg: "User not found, please register" };
+            }
+    
+            if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
-                    return {
-                        status: 400,
-                        msg: "Invalid credentials",
-                        login: null,
-                    };
+                    throw { msg: "Invalid credentials" };
                 }
-
-                const token = jwt.sign(
-                    { user_id: user._id },
-                    SECRET_KEY
-                );
-
-                return {
-                    status: 200,
-                    msg: "Login successful",
-                    login: {
-                        token,
-                        user: {
-                            id: user._id,
-                            full_Name: user.full_Name,
-                            email: user.email,
-                            phn_number: user.phn_number,
-                            location_id: user.location_id,
-                            dob: user.DOB,
-                            agree: user.agree,
-                            isSameNumberBusiness: user.isSameNumberBusiness,
-                            interest: user.interest,
-                            addNewInterest: user.addNewInterest,
-                            status: user.status,
-                            regOtpId: user.reg_otp_id,
-                            timestamp: user.timestamp,
-                        },
-                    },
-                };
             }
+    
+            const business = await businessregisterModel.findOne({ user_id: user._id });
+    
+            const token = jwt.sign(
+                { user_id: user._id },
+                SECRET_KEY,
+                { expiresIn: "7d" }
+            );
+    
+            return {
+                status: 200,
+                msg: "Login successful",
+                login: {
+                    token,
+                    user:user,
+                    business: business? business: null,
+                },
+            };
         } catch (error) {
+            console.error("Error in login:", error);
             return {
                 status: 500,
                 msg: error.msg || "Something went wrong",
@@ -574,6 +531,7 @@ const adminService = {
             };
         }
     },
+    
 
 
     // ===================
