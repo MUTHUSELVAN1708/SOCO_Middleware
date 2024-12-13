@@ -13,8 +13,9 @@ import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
-import mongoose from "mongoose"
-import cron from "node-cron"
+import levenshtein  from "fast-levenshtein";
+import mongoose from "mongoose";
+import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
@@ -1362,6 +1363,48 @@ const adminService = {
             throw error
         }
     },
+    //   =============================
+    getMentionUser : async (query) => {
+        try {
+            if (!query || typeof query !== 'string') {
+                throw new Error('Invalid query parameter. Expected a non-empty string.');
+            }
+    
+            const userSearchCondition = { full_Name: { $regex: query, $options: 'i' } };
+            const businessSearchCondition = { businessName: { $regex: query, $options: 'i' } };
+    
+            const [users, businesses] = await Promise.all([
+                registerModel.find(userSearchCondition).select('full_Name profile_url').limit(20),
+                businessregisterModel.find(businessSearchCondition).select('businessName brand_logo').limit(20)
+            ]);
+    
+            const userResults = users.map(user => ({
+                id: user._id,
+                name: user.full_Name,
+                imageUrl: user.profile_url,
+                score: levenshtein.get(query.toLowerCase(), user.full_Name.toLowerCase())
+            }));
+    
+            const businessResults = businesses.map(business => ({
+                id: business._id,
+                name: business.businessName,
+                imageUrl: business.brand_logo,
+                score: levenshtein.get(query.toLowerCase(), business.businessName.toLowerCase())
+            }));
+    
+            const allResults = [...userResults, ...businessResults];
+    
+            const sortedResults = allResults
+                .sort((a, b) => a.score - b.score) // Sort by score (lower is better)
+                .slice(0, 3); // Return top 3 results
+    
+            return sortedResults.map(({ id, name, imageUrl }) => ({ id, name, imageUrl }));
+        } catch (error) {
+            throw new Error('Unable to fetch mention users');
+        }
+    },
+    
+    
     //   =============================
     suggestUsers: async (user_id) => {
         try {

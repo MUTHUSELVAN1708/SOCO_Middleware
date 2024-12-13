@@ -365,6 +365,26 @@ const adminController = {
                 next(error);
             }
         },
+        // ==================
+        getMentionUser : async (req, res, next) => {
+            const query = req.query.query.trim();
+        
+            try {
+                const getPosts = await adminService.getMentionUser(query);
+        
+                res.status(200).json({
+                    status: 200,
+                    data: getPosts,
+                });
+            } catch (error) {
+                console.error("Error fetching posts:", error.message);
+                error.statusCode = 400;
+                error.error = error.message;
+                console.error(error);
+                error.statuscode = 400;
+                next(error);
+            }
+        },
     // ==================
     getPosts: async (req, res, next) => {
         const { id } = req.params;
