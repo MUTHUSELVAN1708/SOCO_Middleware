@@ -196,6 +196,7 @@ router.post(
 router.get("/searchRecommendation", adminController.searchRecommendation);
 router.post("/friendRequest", adminController.friendRequest);
 router.post("/createPost", adminController.createpost);
+router.post("/updateUserDetails/:id", adminController.updateUserDetails);
 router.post("/addAndUpdateBio/:id", adminController.addAndUpdateBio);
 router.get("/getPosts/:id", adminController.getPosts);
 router.post("/followUser", adminController.followUser);

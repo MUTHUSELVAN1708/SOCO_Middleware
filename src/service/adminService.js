@@ -250,6 +250,7 @@ const adminService = {
                 cover_img,
                 type_of_service,
                 category,
+                friendPermission = false,
                 sub_category,
                 businessAgree,
                 postCount = 0,
@@ -330,6 +331,7 @@ const adminService = {
                 followerCount,
                 followingCount,
                 needPermissionForFollowing,
+                friendPermission,
                 school,
                 educationLevel,
                 working,
@@ -383,6 +385,8 @@ const adminService = {
                 postCount,
                 followerCount,
                 followingCount,
+                needPermissionForFollowing,
+                friendPermission,
                 type_of_service: type_of_service || "",
                 category: category || "",
                 sub_category: sub_category || "",
@@ -415,7 +419,90 @@ const adminService = {
         }
     },
 
-    //   ========== Bio (Add & Update) ==========
+    //   ========== User (Add & Update) ==========
+    updateUserDetails: async (data) => {
+        try {
+            const {
+                userId,
+                name,
+                phone,
+                dob,
+                interests,
+                maritalStatus,
+                followingPermission,
+                friendPermission,
+            } = data;
+    
+            if (!userId) {
+                throw { status: 400, message: "User ID is required." };
+            }
+    
+            // Validate phone number
+            if (phone && (!/^\d{10}$/.test(phone))) {
+                throw { status: 400, message: "Phone number must be exactly 10 digits." };
+            }
+    
+            // Validate date of birth
+            if (dob && isNaN(new Date(dob).getTime())) {
+                throw { status: 400, message: "Invalid date of birth format." };
+            }
+
+            // Find the user in the registerModel
+            const user = await registerModel.findById(userId);
+            if (!user) {
+                throw { status: 404, message: "User not found." };
+            }
+    
+            // Check if the provided name is unique only if the name has been changed
+            if (name && name.trim() !== user.full_Name.trim()) {
+                const existingUser = await registerModel.findOne({
+                    full_Name: name.trim(),
+                });
+                if (existingUser) {
+                    throw { status: 400, message: "Name must be unique." };
+                }
+            }
+    
+            // Convert interests string to list
+            let interestsList = [];
+            if (interests) {
+                interestsList = interests
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter((item) => item); // Remove empty values
+            }
+    
+            // Update only the fields provided
+            user.full_Name = name;
+            user.phn_number = phone;
+            user.DOB = dob;
+            user.interest = interestsList;
+            user.maritalStatus = maritalStatus;
+            user.needPermissionForFollowing = followingPermission ;
+            user.friendPermission = friendPermission ;
+    
+            // Save the updated user
+            await user.save();
+    
+            // Return only the updated fields
+            const updatedFields = {
+                name: user.full_Name,
+                phone: user.phn_number,
+                dob: user.DOB,
+                interests: user.interest,
+                maritalStatus: user.maritalStatus,
+                followingPermission: user.needPermissionForFollowing,
+                friendPermission: user.friendPermission,
+            };
+    
+            return { success: true, updatedFields };
+        } catch (error) {
+            console.error("Error in updateUserDetails:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
+
     addAndUpdateBio: async (data) => {
         try {
             const { 

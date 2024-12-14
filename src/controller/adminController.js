@@ -90,7 +90,7 @@ const adminController = {
             res.status(200).json({
                 status: 200,
                 msg: "Successfully created",
-                register,
+                data:register,
             });
         } catch (error) {
             console.error(error);
@@ -117,7 +117,7 @@ const adminController = {
             res.status(200).json({
                 status: 200,
                 msg: "Logged in successfully",
-                login: loginResponse.login,
+                data: loginResponse.login,
             })
         } catch (error) {
             next({
@@ -347,6 +347,25 @@ const adminController = {
         }
     },
         // ==================
+        updateUserDetails : async (req, res, next) => {
+        
+            try {
+                const getPosts = await adminService.updateUserDetails(req.body);
+        
+                res.status(200).json({
+                    status: 200,
+                    data: getPosts,
+                });
+            } catch (error) {
+                console.error("Error fetching posts:", error.message);
+                error.statusCode = 400;
+                error.error = error.message;
+                console.error(error);
+                error.statuscode = 400;
+                next(error);
+            }
+        },
+        
         addAndUpdateBio : async (req, res, next) => {
         
             try {

@@ -34,10 +34,12 @@ const registerSchema = new mongoose.Schema(
     status: { type: String, required: true },
     otp: { type: String, required: false },
     reg_otp_id: { type: String, required: false },
+    maritalStatus: { type: String, required: false },
     postCount: { type: Number, default: 0 },
     followerCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
     needPermissionForFollowing: { type: Boolean, default: false },
+    friendPermission: { type: Boolean, default: false },
     accountIsPublic: { type: Boolean, default: false },
     schoolDetails: {
       name: { type: String, required: false },
