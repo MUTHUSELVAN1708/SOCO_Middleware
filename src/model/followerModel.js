@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const followerSchema = new mongoose.Schema(
   {
-    user_id: { type: String, ref: 'user', required: true }, // User being followed
-    follower_id: { type: String, ref: 'user', required: true }, // User who follows
+    user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true }, // User being followed
+    follower_id: {type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true }, // User who follows
     followedAt: { type: Date, default: Date.now }, // Follow timestamp
     status: { 
       type: String, 

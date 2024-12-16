@@ -13,14 +13,14 @@ import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
-import levenshtein  from "fast-levenshtein";
+import levenshtein from "fast-levenshtein";
 import mongoose from "mongoose";
 
 import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
-import  connectedUsers  from "../../socket.js"; 
+import connectedUsers from "../../socket.js";
 const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree } = data;
@@ -133,7 +133,7 @@ const adminService = {
     },
 
     // ================
-     SendOTPEmail : async (receiverMail, otp) => {
+    SendOTPEmail: async (receiverMail, otp) => {
         try {
             const transporter = nodemailer.createTransport({
                 host: "smtp.gmail.com",
@@ -147,7 +147,7 @@ const adminService = {
                     rejectUnauthorized: false,
                 },
             });
-    
+
             const mailOptions = {
                 from: "soco.infobusiness@gmail.com",
                 to: receiverMail,
@@ -195,7 +195,7 @@ const adminService = {
                     </div>
                 `
             };
-    
+
             const info = await transporter.sendMail(mailOptions);
             return info.response;
         } catch (error) {
@@ -203,7 +203,7 @@ const adminService = {
             throw new Error("Failed to send verification email. Please try again later.");
         }
     },
-    
+
 
     //   ==========
     verifingOtp: async (data) => {
@@ -296,19 +296,19 @@ const adminService = {
                 lastOnline = null,
                 currentChatRoom = null,
                 unreadMessagesCount = 0,
-                bio, 
-                title, 
-                skills, 
-                hobbies, 
-                education, 
-                degree, 
-                field, 
-                institution, 
-                year, 
-                grade, 
+                bio,
+                title,
+                skills,
+                hobbies,
+                education,
+                degree,
+                field,
+                institution,
+                year,
+                grade,
                 achievements
             } = data;
-    
+
             // Validate required fields
             let errors = [];
             if (!full_Name) errors.push("Full name is required.");
@@ -317,11 +317,11 @@ const adminService = {
             if (!password) errors.push("Password is required.");
             if (!address) errors.push("Address is required.");
             if (!agree) errors.push("Agreement is required.");
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Check for existing users and business name
             const existingUser = await Promise.all([
                 registerModel.findOne({ full_Name }),
@@ -329,19 +329,19 @@ const adminService = {
                 registerModel.findOne({ email }),
                 businessregisterModel.findOne({ businessName }), // Check for existing businessName
             ]);
-    
+
             if (existingUser[0]) errors.push("Name already exists. Name must be unique.");
             if (existingUser[1]) errors.push("Phone number already exists. Try a different one or log in.");
             if (existingUser[2]) errors.push("Email already exists. Try a different one or log in.");
             if (existingUser[3]) errors.push("Business name already exists. Business name must be unique.");
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
-    
+
             // Create user entry
             const register = await registerModel.create({
                 location_id,
@@ -369,32 +369,32 @@ const adminService = {
                 lastOnline,
                 currentChatRoom,
                 unreadMessagesCount,
-                bio, 
-                title, 
-                skills, 
-                hobbies, 
-                education, 
-                degree, 
-                field, 
-                institution, 
-                year, 
-                grade, 
+                bio,
+                title,
+                skills,
+                hobbies,
+                education,
+                degree,
+                field,
+                institution,
+                year,
+                grade,
                 achievements,
             });
-        
+
             // Create the address
             const addressEntry = await locationModel.create({
                 user_id: register._id,
                 address,
             });
-        
+
             // Update user with address ID
             const updatedUser = await registerModel.findByIdAndUpdate(
                 register._id,
                 { location_id: addressEntry._id },
                 { new: true }
             );
-        
+
             // Create business entry
             const business = await businessregisterModel.create({
                 user_id: register._id,
@@ -430,7 +430,7 @@ const adminService = {
                 natureOfBusiness: natureOfBusiness || "",
                 businessName: businessName || "",
                 important,
-    
+
                 // Chat-related fields
                 onlineStatus,
                 isTyping,
@@ -438,10 +438,10 @@ const adminService = {
                 currentChatRoom,
                 unreadMessagesCount,
             });
-    
-    
+
+
             return { success: true, user: updatedUser, business };
-    
+
         } catch (error) {
             console.error("Error in registerUserWithBusiness:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
@@ -461,16 +461,16 @@ const adminService = {
                 followingPermission,
                 friendPermission,
             } = data;
-    
+
             if (!userId) {
                 throw { status: 400, message: "User ID is required." };
             }
-    
+
             // Validate phone number
             if (phone && (!/^\d{10}$/.test(phone))) {
                 throw { status: 400, message: "Phone number must be exactly 10 digits." };
             }
-    
+
             // Validate date of birth
             if (dob && isNaN(new Date(dob).getTime())) {
                 throw { status: 400, message: "Invalid date of birth format." };
@@ -481,7 +481,7 @@ const adminService = {
             if (!user) {
                 throw { status: 404, message: "User not found." };
             }
-    
+
             // Check if the provided name is unique only if the name has been changed
             if (name && name.trim() !== user.full_Name.trim()) {
                 const existingUser = await registerModel.findOne({
@@ -491,7 +491,7 @@ const adminService = {
                     throw { status: 400, message: "Name must be unique." };
                 }
             }
-    
+
             // Convert interests string to list
             let interestsList = [];
             if (interests) {
@@ -500,19 +500,19 @@ const adminService = {
                     .map((item) => item.trim())
                     .filter((item) => item); // Remove empty values
             }
-    
+
             // Update only the fields provided
             user.full_Name = name;
             user.phn_number = phone;
             user.DOB = dob;
             user.interest = interestsList;
             user.maritalStatus = maritalStatus;
-            user.needPermissionForFollowing = followingPermission ;
-            user.friendPermission = friendPermission ;
-    
+            user.needPermissionForFollowing = followingPermission;
+            user.friendPermission = friendPermission;
+
             // Save the updated user
             await user.save();
-    
+
             // Return only the updated fields
             const updatedFields = {
                 name: user.full_Name,
@@ -523,43 +523,43 @@ const adminService = {
                 followingPermission: user.needPermissionForFollowing,
                 friendPermission: user.friendPermission,
             };
-    
+
             return { success: true, updatedFields };
         } catch (error) {
             console.error("Error in updateUserDetails:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
+
 
     addAndUpdateBio: async (data) => {
         try {
-            const { 
-                userId, 
-                bio, 
-                title, 
-                skills, 
-                hobbies, 
-                education, 
-                degree, 
-                field, 
-                institution, 
-                year, 
-                grade, 
-                achievements 
+            const {
+                userId,
+                bio,
+                title,
+                skills,
+                hobbies,
+                education,
+                degree,
+                field,
+                institution,
+                year,
+                grade,
+                achievements
             } = data;
-    
+
             if (!userId) {
                 throw { status: 400, message: "User ID is required." };
             }
-    
+
             // Find the user in the registerModel
             const user = await registerModel.findById(userId);
-    
+
             if (!user) {
                 throw { status: 404, message: "User not found." };
             }
-    
+
             // Update or add fields
             user.bio = bio || user.bio;
             user.title = title || user.title;
@@ -572,10 +572,10 @@ const adminService = {
             user.year = year || user.year;
             user.grade = grade || user.grade;
             user.achievements = achievements || user.achievements;
-    
+
             // Save the updated user
             await user.save();
-    
+
             // Return only the updated fields
             const updatedFields = {
                 bio: user.bio,
@@ -590,53 +590,53 @@ const adminService = {
                 grade: user.grade,
                 achievements: user.achievements,
             };
-    
+
             return { success: true, updatedFields };
         } catch (error) {
             console.error("Error in addAndUpdateBio:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
-    
+
+
     // ==================================
     login: async (data) => {
         const { email, phn_number, password } = data;
         try {
             let user;
-    
+
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-    
+
             if (!user) {
                 throw { msg: "User not found, please register" };
             }
-    
+
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     throw { msg: "Invalid credentials" };
                 }
             }
-    
+
             const business = await businessregisterModel.findOne({ user_id: user._id });
-    
+
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-    
+
             return {
                 status: 200,
                 msg: "Login successful",
                 login: {
                     token,
-                    user:user,
-                    business: business? business: null,
+                    user: user,
+                    business: business ? business : null,
                 },
             };
         } catch (error) {
@@ -648,7 +648,7 @@ const adminService = {
             };
         }
     },
-    
+
 
 
     // ===================
@@ -865,12 +865,12 @@ const adminService = {
     //         if (!query || typeof query !== 'string' || !query.trim()) {
     //             return { success: false, message: "Invalid or missing query parameter" };
     //         }
-    
+
     //         const normalizedQuery = query.toLowerCase();
     //         let results;
-    
+
     //         const isNumericQuery = !isNaN(normalizedQuery);
-    
+
     //         // Handle search for different types
     //         if (typeOfSearch === "Location") {
     //             const locationResults = await locationModel.find({
@@ -882,11 +882,11 @@ const adminService = {
     //                     ...(isNumericQuery ? [{ 'address.Pincode': { $eq: Number(normalizedQuery) } }] : [])
     //                 ]
     //             }).select('_id address');
-    
+
     //             if (locationResults.length === 0) {
     //                 return { success: false, message: "No matching locations found" };
     //             }
-    
+
     //             const locationIds = locationResults.map(location => location._id);
     //             results = await registerModel.find({
     //                 location_id: { $in: locationIds }
@@ -896,7 +896,7 @@ const adminService = {
     //                 .select('_id full_Name profile_url location_id')
     //                 .populate('location_id', 'address');
     //         } else if (typeOfSearch === "Business") {
-               
+
     //             results = await businessregisterModel.find({
     //                 $or: [
     //                     { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
@@ -909,12 +909,12 @@ const adminService = {
     //         } else {
     //             return { success: false, message: "Invalid TypeOfSearch parameter" };
     //         }
-    
-          
+
+
     //         const filteredResults = await Promise.all(
     //             results.map(async (result) => {
     //                 let score = -1;
-    
+
     //                 if (typeOfSearch === "Name") {
     //                     const fullNameLower = result.full_Name.toLowerCase();
     //                     if (fullNameLower.startsWith(normalizedQuery)) {
@@ -925,13 +925,13 @@ const adminService = {
     //                 } else if (typeOfSearch === "Location" && result.location_id) {
     //                     const locationAddress = await locationModel.findById(result.location_id);
     //                     if (!locationAddress) return null;
-    
+
     //                     const { street, city, district, country, Pincode } = locationAddress.address || {};
-    
+
     //                     const locationFields = [street, city, district, country].map(field =>
     //                         field ? field.toString().toLowerCase() : ''
     //                     );
-    
+
     //                     if (locationFields.some(field => field.includes(normalizedQuery))) {
     //                         score = 100;
     //                     } else if (Pincode && Pincode.toString().includes(normalizedQuery)) {
@@ -942,12 +942,12 @@ const adminService = {
     //                     const businessFields = [businessName, businessCity, businessState, businessPinCode].map(field =>
     //                         field ? field.toString().toLowerCase() : ''
     //                     );
-    
+
     //                     if (businessFields.some(field => field.includes(normalizedQuery))) {
     //                         score = 100;
     //                     }
     //                 }
-    
+
     //                 return score > 0
     //                     ? {
     //                         id: result._id,
@@ -969,14 +969,14 @@ const adminService = {
     //                     : null;
     //             })
     //         );
-    
+
     //         const filteredResultsWithoutNulls = filteredResults.filter(item => item !== null);
     //         filteredResultsWithoutNulls.sort((a, b) => b.score - a.score);
-    
+
     //         if (filteredResultsWithoutNulls.length === 0) {
     //             return { success: false, message: "No matching results found" };
     //         }
-    
+
     //         const totalResults = filteredResultsWithoutNulls.length;
     //         const totalPages = Math.ceil(totalResults / limit);
     //         const currentPage = Math.max(1, Math.min(page, totalPages));
@@ -989,7 +989,7 @@ const adminService = {
     //     profile_url:items.profile_url,
     //     score:items.score
 
-        
+
     // }))
     //         return {
     //             success: true,
@@ -1003,7 +1003,7 @@ const adminService = {
     //                 hasPreviousPage: currentPage > 1
     //             }
     //         };
-    
+
     //     } catch (error) {
     //         return { success: false, message: error.message };
     //     }
@@ -1013,10 +1013,10 @@ const adminService = {
             if (!query || typeof query !== 'string' || !query.trim()) {
                 return { success: false, message: "Invalid or missing query parameter" };
             }
-    
+
             const normalizedQuery = query.toLowerCase();
             let results;
-    
+
             if (typeOfSearch === "Location") {
                 const conditions = [
                     { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
@@ -1024,23 +1024,23 @@ const adminService = {
                     { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
                     { 'address.country': { $regex: normalizedQuery, $options: 'i' } }
                 ];
-                
+
                 // If the query is a number, add a condition for Pincode
                 if (!isNaN(query)) {
                     conditions.push({ 'address.Pincode': Number(query) });
                 }
-                
+
                 const locationResults = await locationModel.find({
                     $or: conditions
                 }).select('_id address');
-                
-                
+
+
                 const locationIds = locationResults.map(location => location._id);
-    
+
                 const userResults = await registerModel.find({
                     location_id: { $in: locationIds }
                 }).select('_id full_Name profile_url');
-    
+
                 const formattedUserResults = userResults.map(user => ({
                     _id: user._id,
                     full_Name: user.full_Name,
@@ -1053,16 +1053,16 @@ const adminService = {
                     { businessCity: { $regex: normalizedQuery, $options: 'i' } },
                     { businessState: { $regex: normalizedQuery, $options: 'i' } }
                 ];
-                
+
                 if (!isNaN(query)) {
                     businessConditions.push({ businessPinCode: Number(query) });
                 }
-                
+
                 const businessResults = await businessregisterModel.find({
                     $or: businessConditions
                 }).select('_id businessName brand_logo');
-                
-    
+
+
                 const formattedBusinessResults = businessResults.map(business => ({
                     _id: business._id,
                     name: business.businessName,
@@ -1070,17 +1070,17 @@ const adminService = {
                     profile_url: business.brand_logo || "",
                     score: 1 // Assign a base score
                 }));
-    
+
                 results = [...formattedUserResults, ...formattedBusinessResults];
             } else if (typeOfSearch === "Name") {
                 const userResults = await registerModel.find({
                     full_Name: { $regex: normalizedQuery, $options: 'i' }
                 }).select('_id full_Name profile_url');
-    
+
                 const businessResults = await businessregisterModel.find({
                     businessName: { $regex: normalizedQuery, $options: 'i' }
                 }).select('_id businessName brand_logo');
-    
+
                 results = [
                     ...userResults.map(user => ({
                         _id: user._id,
@@ -1100,21 +1100,21 @@ const adminService = {
             } else {
                 return { success: false, message: "Invalid TypeOfSearch parameter" };
             }
-    
+
             if (results.length === 0) {
                 return { success: false, message: "No matching results found" };
             }
-    
+
             // Sort results by score (highest first)
             results.sort((a, b) => b.score - a.score);
-    
+
             // Pagination
             const totalResults = results.length;
             const totalPages = Math.ceil(totalResults / limit);
             const currentPage = Math.max(1, Math.min(page, totalPages));
             const startIndex = (currentPage - 1) * limit;
             const paginatedResults = results.slice(startIndex, startIndex + limit);
-    
+
             return {
                 success: true,
                 data: paginatedResults,
@@ -1131,9 +1131,9 @@ const adminService = {
             return { success: false, message: error.message };
         }
     },
-    
-    
-    
+
+
+
     // =================
     friendRequest: async (data) => {
         const { user_id, username, profileImageUrl, isFollowing } = data;
@@ -1155,7 +1155,7 @@ const adminService = {
         }
     },
     //=========
-    createPost: async (data) => {    
+    createPost: async (data) => {
         const {
             user_id,
             imageUrl,
@@ -1183,14 +1183,14 @@ const adminService = {
             visibility,
             aspectRatio,
         } = data;
-    
+
         try {
             // Validate the user
             const user = await registerModel.findById(user_id);
             if (!user) {
                 throw new Error("User not found");
             }
-    
+
             // Create the post object with all fields
             let newPost = {
                 user_id,
@@ -1220,14 +1220,14 @@ const adminService = {
                 aspectRatio,
                 status: isScheduled ? "scheduled" : "published", // Set status based on scheduling
             };
-    
+
             // Log the data to ensure it's correct
-    
+
             // If the post is scheduled, handle scheduling logic
             if (isScheduled && scheduleDateTime) {
                 // Use moment to format the schedule time correctly
                 const scheduleTime = moment(scheduleDateTime).toDate();
-    
+
                 // Schedule the post to be updated when the time comes
                 cron.schedule(scheduleTime, async () => {
                     try {
@@ -1238,15 +1238,15 @@ const adminService = {
                         console.error('Error publishing scheduled post:', error);
                     }
                 });
-    
+
                 // Log the scheduled time for verification
                 // console.log(`Post scheduled for: ${scheduleTime}`);
             }
-    
+
             // Directly create and save the new post without checking for existing ones
             const userPost = new createPostModel(newPost);
             await userPost.save();
-    
+
             return userPost;
         } catch (error) {
             console.error("Error creating post:", error.message);
@@ -1357,24 +1357,24 @@ const adminService = {
 
     // ============================
 
-     getTopFollowersById : async (user_id, business_id, page = 1, limit = 10) => { 
+    getTopFollowersById: async (user_id, business_id, page = 1, limit = 10) => {
         try {
             const skip = (page - 1) * limit;
-            
+
             if (!user_id && !business_id) {
                 throw new Error('Either user_id or business_id must be provided.');
             }
-    
+
             let query = { status: 'accepted' };
-    
+
             if (user_id) {
                 query.user_id = user_id;
             }
-    
+
             if (business_id) {
                 query.business_id = business_id;
             }
-    
+
             const getFollowers = await followerModel
                 .find(query)
                 .populate('follower_id', 'full_Name profile_url postCount isBusinessAccount onlineStatus')
@@ -1382,12 +1382,12 @@ const adminService = {
                 .skip(skip)
                 .limit(limit)
                 .exec();
-    
-    
+
+
             for (const follower of getFollowers) {
                 // Ensure that follower.follower_id exists and is not null
                 const followerData = follower.follower_id;
-    
+
                 if (followerData) {
                     if (followerData.isBusinessAccount) {
                         const business = await businessregisterModel.findOne({ user_id: followerData._id });
@@ -1404,11 +1404,11 @@ const adminService = {
                     console.log('No follower data found for', follower._id);
                 }
             }
-    
+
             const totalAcceptedFollowers = await followerModel.countDocuments(query);
-    
+
             getFollowers.sort((a, b) => b.postCount - a.postCount);
-    
+
             return {
                 followers: getFollowers,
                 totalFollowers: totalAcceptedFollowers,
@@ -1425,13 +1425,13 @@ const adminService = {
             throw new Error('Unable to fetch followers: ' + error.message);
         }
     },
-    
+
 
     getFollowers: async (user_id, page = 1, limit = 10) => {
         try {
             // Calculate the number of documents to skip
             const skip = (page - 1) * limit;
-    
+
             // Fetch followers with pagination
             const getFollowers = await followerModel
                 .find({ user_id })
@@ -1439,10 +1439,10 @@ const adminService = {
                 .skip(skip) // Skip documents for previous pages
                 .limit(limit) // Limit the number of documents to fetch
                 .exec();
-    
+
             // Get the total count of followers for the given user
             const totalFollowers = await followerModel.countDocuments({ user_id });
-    
+
             return {
                 followers: getFollowers,
                 totalFollowers,
@@ -1453,7 +1453,7 @@ const adminService = {
             throw new Error('Unable to fetch followers: ' + error.message);
         }
     },
-    
+
 
     // ============================
     getFollowing: async (follower_id, page = 1, limit = 10) => {
@@ -1463,12 +1463,12 @@ const adminService = {
             const getFollowing = await followerModel
                 .find({ follower_id })
                 .populate('user_id', 'full_Name profile_url')
-                .skip(skip) 
+                .skip(skip)
                 .limit(limit)
                 .exec();
-    
+
             const totalFollowing = await followerModel.countDocuments({ follower_id });
-    
+
             return {
                 following: getFollowing,
                 totalFollowing,
@@ -1479,7 +1479,7 @@ const adminService = {
             throw new Error('Unable to fetch following: ' + error.message);
         }
     },
-    
+
     //   ====================
     AcceptRequest: async (data) => {
         const { follow_id, status } = data
@@ -1493,47 +1493,101 @@ const adminService = {
         }
     },
     //   =============================
-    getMentionUser : async (query) => {
+    // getMentionUser : async (query) => {
+    //     try {
+    //         if (!query || typeof query !== 'string') {
+    //             throw new Error('Invalid query parameter. Expected a non-empty string.');
+    //         }
+
+    //         const userSearchCondition = { full_Name: { $regex: query, $options: 'i' } };
+    //         const businessSearchCondition = { businessName: { $regex: query, $options: 'i' } };
+
+    //         const [users, businesses] = await Promise.all([
+    //             registerModel.find(userSearchCondition).select('full_Name profile_url').limit(20),
+    //             businessregisterModel.find(businessSearchCondition).select('businessName brand_logo').limit(20)
+    //         ]);
+
+    //         const userResults = users.map(user => ({
+    //             id: user._id,
+    //             name: user.full_Name,
+    //             imageUrl: user.profile_url,
+    //             score: levenshtein.get(query.toLowerCase(), user.full_Name.toLowerCase())
+    //         }));
+
+    //         const businessResults = businesses.map(business => ({
+    //             id: business._id,
+    //             name: business.businessName,
+    //             imageUrl: business.brand_logo,
+    //             score: levenshtein.get(query.toLowerCase(), business.businessName.toLowerCase())
+    //         }));
+
+    //         const allResults = [...userResults, ...businessResults];
+
+    //         const sortedResults = allResults
+    //             .sort((a, b) => a.score - b.score) // Sort by score (lower is better)
+    //             .slice(0, 3); // Return top 3 results
+
+    //         return sortedResults.map(({ id, name, imageUrl }) => ({ id, name, imageUrl }));
+    //     } catch (error) {
+    //         throw new Error('Unable to fetch mention users');
+    //     }
+    // },
+
+    getMentionUser: async (query) => {
         try {
             if (!query || typeof query !== 'string') {
                 throw new Error('Invalid query parameter. Expected a non-empty string.');
             }
     
-            const userSearchCondition = { full_Name: { $regex: query, $options: 'i' } };
-            const businessSearchCondition = { businessName: { $regex: query, $options: 'i' } };
+            const followers = await followerModel.find({
+                status: "accepted",
+                isBlocked: false,
+                isMuted: false
+            }).select('follower_id');
     
-            const [users, businesses] = await Promise.all([
-                registerModel.find(userSearchCondition).select('full_Name profile_url').limit(20),
-                businessregisterModel.find(businessSearchCondition).select('businessName brand_logo').limit(20)
-            ]);
+            if (followers.length === 0) return []; // No followers found
     
-            const userResults = users.map(user => ({
-                id: user._id,
-                name: user.full_Name,
-                imageUrl: user.profile_url,
-                score: levenshtein.get(query.toLowerCase(), user.full_Name.toLowerCase())
-            }));
+            const followerIds = followers.map(follower => follower.follower_id);
     
-            const businessResults = businesses.map(business => ({
-                id: business._id,
-                name: business.businessName,
-                imageUrl: business.brand_logo,
-                score: levenshtein.get(query.toLowerCase(), business.businessName.toLowerCase())
-            }));
+            const matchingUsers = await registerModel.find({
+                _id: { $in: followerIds },
+                full_Name: { $regex: query, $options: 'i' }
+            }).select('_id full_Name profile_url');
     
-            const allResults = [...userResults, ...businessResults];
+            const matchingBusinesses = await businessregisterModel.find({
+                businessName: { $regex: query, $options: 'i' }
+            }).select('_id businessName brand_logo');
     
-            const sortedResults = allResults
-                .sort((a, b) => a.score - b.score) // Sort by score (lower is better)
-                .slice(0, 3); // Return top 3 results
+            const results = [
+                ...matchingUsers.map(user => ({
+                    id: user._id,
+                    name: user.full_Name,
+                    imageUrl: user.profile_url,
+                    type: 'user'
+                })),
+                ...matchingBusinesses.map(business => ({
+                    id: business._id,
+                    name: business.businessName,
+                    imageUrl: business.brand_logo,
+                    type: 'business'
+                }))
+            ];
     
-            return sortedResults.map(({ id, name, imageUrl }) => ({ id, name, imageUrl }));
+            return results
+                .sort((a, b) => a.score - b.score) // Sort by score
+                .slice(0, 3)                      // Return top 3
+                .map(({ id, name, imageUrl }) => ({ id, name, imageUrl })); // Simplified output
         } catch (error) {
+            console.error(error);
             throw new Error('Unable to fetch mention users');
         }
     },
     
     
+    
+    
+
+
     //   =============================
     suggestUsers: async (user_id) => {
         try {
@@ -1590,87 +1644,87 @@ const adminService = {
             throw new Error('Unable to fetch suggestions');
         }
     },
-// =================================
-addMention: async (data) => {
-    try {
-        // Validate input data
-        if (!data || typeof data !== 'object') {
-            return { success: false, message: "Invalid data provided" };
-        }
-
-        const { user_id, mentionType, mentionDetails } = data;
-
-        // Check required fields
-        if (!user_id || !mentionType) {
-            return { success: false, message: "user_id and mentionType are required" };
-        }
-
-        // Validate mentionDetails
-        if (mentionDetails && typeof mentionDetails !== 'object') {
-            return { success: false, message: "mentionDetails must be an object" };
-        }
-
-        if (mentionDetails && mentionDetails.friends) {
-            if (!Array.isArray(mentionDetails.friends)) {
-                return { success: false, message: "Friends must be an array of full_Name" };
+    // =================================
+    addMention: async (data) => {
+        try {
+            // Validate input data
+            if (!data || typeof data !== 'object') {
+                return { success: false, message: "Invalid data provided" };
             }
 
-            // Validate each friend's full_Name
-            const validFriends = [];
-            for (const friendName of mentionDetails.friends) {
-                const friend = await registerModel.findOne({ full_Name: friendName }); // Query using `full_Name`
-                if (friend) {
-                    validFriends.push({
-                        friend_id: friend._id,
-                        full_Name: friend.full_Name,
-                    }); // Add valid friend with their ID and name
+            const { user_id, mentionType, mentionDetails } = data;
+
+            // Check required fields
+            if (!user_id || !mentionType) {
+                return { success: false, message: "user_id and mentionType are required" };
+            }
+
+            // Validate mentionDetails
+            if (mentionDetails && typeof mentionDetails !== 'object') {
+                return { success: false, message: "mentionDetails must be an object" };
+            }
+
+            if (mentionDetails && mentionDetails.friends) {
+                if (!Array.isArray(mentionDetails.friends)) {
+                    return { success: false, message: "Friends must be an array of full_Name" };
                 }
+
+                // Validate each friend's full_Name
+                const validFriends = [];
+                for (const friendName of mentionDetails.friends) {
+                    const friend = await registerModel.findOne({ full_Name: friendName }); // Query using `full_Name`
+                    if (friend) {
+                        validFriends.push({
+                            friend_id: friend._id,
+                            full_Name: friend.full_Name,
+                        }); // Add valid friend with their ID and name
+                    }
+                }
+
+                // If no valid friends are found
+                if (validFriends.length === 0) {
+                    return { success: false, message: "No valid friends found for the provided names" };
+                }
+
+                // Update mentionDetails with valid friends
+                mentionDetails.friends = validFriends;
             }
 
-            // If no valid friends are found
-            if (validFriends.length === 0) {
-                return { success: false, message: "No valid friends found for the provided names" };
-            }
+            // Create the mention record
+            const result = await mentionModel.create({
+                user_id,
+                mentionType,
+                mentionDetails: mentionDetails || {},
+            });
 
-            // Update mentionDetails with valid friends
-            mentionDetails.friends = validFriends;
+            // Return success response
+            return {
+                success: true,
+                message: "Mention added successfully",
+                data: result,
+            };
+        } catch (error) {
+            console.error("Error adding mention:", error);
+
+            // Return error response
+            return { success: false, message: "An error occurred while adding mention", error: error.message };
         }
-
-        // Create the mention record
-        const result = await mentionModel.create({
-            user_id,
-            mentionType,
-            mentionDetails: mentionDetails || {},
-        });
-
-        // Return success response
-        return {
-            success: true,
-            message: "Mention added successfully",
-            data: result,
-        };
-    } catch (error) {
-        console.error("Error adding mention:", error);
-
-        // Return error response
-        return { success: false, message: "An error occurred while adding mention", error: error.message };
-    }
-},
+    },
 
 
 
-mention:cron.schedule("0 * * * *", async () => {
-    try {
-      const now = new Date();
-      await mentionModel.updateMany(
-        { mentionType: "story", expiresAt: { $lte: now }, status: "active" },
-        { $set: { status: "expired" } }
-      );
-      console.log("Expired story mentions updated");
-    } catch (error) {
-      console.error("Error updating expired mentions:", error.message);
-    }
-  })
+    mention: cron.schedule("0 * * * *", async () => {
+        try {
+            const now = new Date();
+            await mentionModel.updateMany(
+                { mentionType: "story", expiresAt: { $lte: now }, status: "active" },
+                { $set: { status: "expired" } }
+            );
+            console.log("Expired story mentions updated");
+        } catch (error) {
+            console.error("Error updating expired mentions:", error.message);
+        }
+    })
 
 
 }

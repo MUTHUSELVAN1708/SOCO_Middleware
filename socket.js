@@ -31,13 +31,11 @@ const initializeSocket = (server) => {
         
             try {
                 const result = await adminService.addMention(data);
-        
-                // Emit the result back to the client
+        console.log(result,"result")
                 socket.emit("addMentionResult", result);
             } catch (error) {
                 console.error("Error in addMention event:", error.message);
         
-                // Emit error response back to the client
                 socket.emit("addMentionResult", {
                     success: false,
                     message: "An error occurred while adding mention",
@@ -48,10 +46,10 @@ const initializeSocket = (server) => {
         
 
         socket.on("getPendingStatus", async () => {
-            console.log("Received getPendingStatus event"); // Debug log
+            console.log("Received getPendingStatus event"); 
             try {
                 const result = await adminService.getPendingStatus();
-                console.log("Fetched pending status:", result); // Debug log
+                console.log("Fetched pending status:", result); 
                 socket.emit("pendingStatusResult", { success: true, data: result });
             } catch (error) {
                 console.error("Error in getPendingStatus event:", error.message);
