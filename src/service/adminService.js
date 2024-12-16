@@ -133,7 +133,7 @@ const adminService = {
     },
 
     // ================
-    SendOTPEmail: async (receiverMail, otp) => {
+     SendOTPEmail : async (receiverMail, otp) => {
         try {
             const transporter = nodemailer.createTransport({
                 host: "smtp.gmail.com",
@@ -151,28 +151,56 @@ const adminService = {
             const mailOptions = {
                 from: "soco.infobusiness@gmail.com",
                 to: receiverMail,
-                subject: "Soco Verification Code",
-                text: `Hello,
-    
-    Thank you for joining Soco, your hub for connecting with professionals and growing your business network.
-    
-    Your One-Time Password (OTP) is: ${otp}
-    
-    Use this code to verify your email and unlock access to the platform's features. For your security, please do not share this code with anyone.
-    
-    This OTP is valid for 10 minutes. If you did not request this code, please ignore this email or contact our support team at support@soco.com.
-    
-    Welcome to Soco! Let's build connections and create opportunities together.
-    
-    Best regards,  
-    The Soco Team`
+                subject: "Verify Your Soco Account",
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background-color: #0066cc; padding: 20px; text-align: center;">
+                            <h1 style="color: white; margin: 0;">Welcome to Soco</h1>
+                        </div>
+                        
+                        <div style="padding: 20px; background-color: #ffffff;">
+                            <h2 style="color: #333333;">Verify Your Email</h2>
+                            
+                            <p>Hello,</p>
+                            
+                            <p>Welcome to Soco – where professionals connect, collaborate, and grow together. We're excited to have you join our community of entrepreneurs, business leaders, and innovators.</p>
+                            
+                            <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; text-align: center; border-radius: 5px;">
+                                <h2 style="color: #0066cc; margin: 0;">Your Verification Code</h2>
+                                <div style="font-size: 32px; font-weight: bold; color: #333333; margin: 10px 0;">${otp}</div>
+                            </div>
+                            
+                            <p><strong>What's next?</strong></p>
+                            <ul style="padding-left: 20px;">
+                                <li>Enter this code on the verification page</li>
+                                <li>Complete your professional profile</li>
+                                <li>Start connecting with industry leaders</li>
+                                <li>Explore business opportunities</li>
+                            </ul>
+                            
+                            <p style="color: #666666; font-size: 12px; margin-top: 20px;">For your security, please don't share this code with anyone. If you didn't request this verification, please ignore this email or contact our support team.</p>
+                        </div>
+                        
+                        <div style="background-color: #f5f5f5; padding: 20px; text-align: center;">
+                            <p style="margin: 0; color: #666666;">
+                                Connect with us on
+                                <a href="#" style="color: #0066cc; text-decoration: none;">LinkedIn</a> |
+                                <a href="#" style="color: #0066cc; text-decoration: none;">Twitter</a> |
+                                <a href="#" style="color: #0066cc; text-decoration: none;">Instagram</a>
+                            </p>
+                            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666666;">
+                                © ${new Date().getFullYear()} Soco. All rights reserved.
+                            </p>
+                        </div>
+                    </div>
+                `
             };
     
             const info = await transporter.sendMail(mailOptions);
             return info.response;
         } catch (error) {
-            console.error("Error in sending OTP Email:", error);
-            throw new Error("Error in sending OTP Email");
+            console.error("Error in sending verification email:", error);
+            throw new Error("Failed to send verification email. Please try again later.");
         }
     },
     
@@ -251,6 +279,7 @@ const adminService = {
                 cover_img,
                 type_of_service,
                 category,
+                friendPermission = false,
                 sub_category,
                 businessAgree,
                 postCount = 0,
@@ -331,6 +360,7 @@ const adminService = {
                 followerCount,
                 followingCount,
                 needPermissionForFollowing,
+                friendPermission,
                 school,
                 educationLevel,
                 working,
@@ -384,6 +414,8 @@ const adminService = {
                 postCount,
                 followerCount,
                 followingCount,
+                needPermissionForFollowing,
+                friendPermission,
                 type_of_service: type_of_service || "",
                 category: category || "",
                 sub_category: sub_category || "",
@@ -416,7 +448,90 @@ const adminService = {
         }
     },
 
-    //   ========== Bio (Add & Update) ==========
+    //   ========== User (Add & Update) ==========
+    updateUserDetails: async (data) => {
+        try {
+            const {
+                userId,
+                name,
+                phone,
+                dob,
+                interests,
+                maritalStatus,
+                followingPermission,
+                friendPermission,
+            } = data;
+    
+            if (!userId) {
+                throw { status: 400, message: "User ID is required." };
+            }
+    
+            // Validate phone number
+            if (phone && (!/^\d{10}$/.test(phone))) {
+                throw { status: 400, message: "Phone number must be exactly 10 digits." };
+            }
+    
+            // Validate date of birth
+            if (dob && isNaN(new Date(dob).getTime())) {
+                throw { status: 400, message: "Invalid date of birth format." };
+            }
+
+            // Find the user in the registerModel
+            const user = await registerModel.findById(userId);
+            if (!user) {
+                throw { status: 404, message: "User not found." };
+            }
+    
+            // Check if the provided name is unique only if the name has been changed
+            if (name && name.trim() !== user.full_Name.trim()) {
+                const existingUser = await registerModel.findOne({
+                    full_Name: name.trim(),
+                });
+                if (existingUser) {
+                    throw { status: 400, message: "Name must be unique." };
+                }
+            }
+    
+            // Convert interests string to list
+            let interestsList = [];
+            if (interests) {
+                interestsList = interests
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter((item) => item); // Remove empty values
+            }
+    
+            // Update only the fields provided
+            user.full_Name = name;
+            user.phn_number = phone;
+            user.DOB = dob;
+            user.interest = interestsList;
+            user.maritalStatus = maritalStatus;
+            user.needPermissionForFollowing = followingPermission ;
+            user.friendPermission = friendPermission ;
+    
+            // Save the updated user
+            await user.save();
+    
+            // Return only the updated fields
+            const updatedFields = {
+                name: user.full_Name,
+                phone: user.phn_number,
+                dob: user.DOB,
+                interests: user.interest,
+                maritalStatus: user.maritalStatus,
+                followingPermission: user.needPermissionForFollowing,
+                friendPermission: user.friendPermission,
+            };
+    
+            return { success: true, updatedFields };
+        } catch (error) {
+            console.error("Error in updateUserDetails:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
+
     addAndUpdateBio: async (data) => {
         try {
             const { 
