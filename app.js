@@ -9,6 +9,7 @@ import "./src/db/db.js"; // Ensure the database connection is properly handled
 import adminRouter from "./src/router/adminRouter.js";
 import commonRouter from "./src/router/commonRouter.js";
 import errorHandling from "./errorHandling.js";
+import  initializeSocket from "./socket.js";
 
 const app = express();
 
@@ -30,10 +31,13 @@ app.use("/common", commonRouter);
 // Error Handling
 app.use(errorHandling);
 
+
 // Server
 const PORT = process.env.port || 3000;
 const server = http.createServer(app);
 
+
+const io = initializeSocket(server);
 server.listen(PORT, () => {
     console.log(`Server is running on ${PORT}`);
 });

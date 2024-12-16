@@ -77,6 +77,8 @@ router.put("/forgotPassword", adminController.forgotPassword);
 router.post("/BusinessRegister", adminController.BusinessRegister);
 router.post("/registerUserWithBusiness", adminController.registerUserWithBusiness);
 
+
+
 // Image Upload Route
 router.post(
     "/imgUpload",

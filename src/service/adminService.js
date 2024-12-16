@@ -15,11 +15,12 @@ import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
 import levenshtein  from "fast-levenshtein";
 import mongoose from "mongoose";
+
 import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
-
+import  connectedUsers  from "../../socket.js"; 
 const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree } = data;
@@ -725,7 +726,7 @@ const adminService = {
     // ========================
     getPendingStatus: async () => {
         try {
-            const getStatus = await businessregisterModel.find({ status: "Pending" });
+            const getStatus = await businessregisterModel.find({ status: "Inactive" });
             return getStatus
         } catch (error) {
             throw error
@@ -938,7 +939,6 @@ const adminService = {
                     { businessState: { $regex: normalizedQuery, $options: 'i' } }
                 ];
                 
-                // If the query is numeric, add a condition for businessPinCode
                 if (!isNaN(query)) {
                     businessConditions.push({ businessPinCode: Number(query) });
                 }
@@ -1541,6 +1541,7 @@ addMention: async (data) => {
         return { success: false, message: "An error occurred while adding mention", error: error.message };
     }
 },
+
 
 
 mention:cron.schedule("0 * * * *", async () => {
