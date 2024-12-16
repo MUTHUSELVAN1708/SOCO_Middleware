@@ -1182,11 +1182,19 @@ const adminService = {
             quality,
             visibility,
             aspectRatio,
+            typeOfAccount, 
         } = data;
     
         try {
-            // Validate the user
-            const user = await registerModel.findById(user_id);
+            let user;
+    
+            // Validate the user based on TypeOfAccount
+            if (typeOfAccount === "business") {
+                user = await businessregisterModel.findById(user_id);
+            }else{
+                user = await registerModel.findById(user_id);
+            }
+    
             if (!user) {
                 throw new Error("User not found");
             }
@@ -1218,32 +1226,24 @@ const adminService = {
                 quality,
                 visibility,
                 aspectRatio,
-                status: isScheduled ? "scheduled" : "published", // Set status based on scheduling
+                status: isScheduled ? "scheduled" : "published",
             };
-    
-            // Log the data to ensure it's correct
     
             // If the post is scheduled, handle scheduling logic
             if (isScheduled && scheduleDateTime) {
-                // Use moment to format the schedule time correctly
                 const scheduleTime = moment(scheduleDateTime).toDate();
     
-                // Schedule the post to be updated when the time comes
                 cron.schedule(scheduleTime, async () => {
                     try {
-                        // Change the status of the post to 'published' when the scheduled time arrives
                         newPost.status = 'published';
-                        await createPostModel.create(newPost); // Save the post as published
+                        await createPostModel.create(newPost);
                     } catch (error) {
                         console.error('Error publishing scheduled post:', error);
                     }
                 });
-    
-                // Log the scheduled time for verification
-                // console.log(`Post scheduled for: ${scheduleTime}`);
             }
     
-            // Directly create and save the new post without checking for existing ones
+            // Directly create and save the new post
             const userPost = new createPostModel(newPost);
             await userPost.save();
     
