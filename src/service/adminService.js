@@ -440,7 +440,7 @@ const adminService = {
             });
 
 
-            return { success: true, user: updatedUser, business };
+            return { success: true, user: updatedUser,business:  business };
 
         } catch (error) {
             console.error("Error in registerUserWithBusiness:", error);
@@ -448,6 +448,118 @@ const adminService = {
         }
     },
 
+    updateBusinessProfile: async (data) => {
+        try {
+            const {
+                businessId,
+                businessName,
+                email,
+                phn_number,
+                Brand_Name,
+                PAN_NO,
+                aadharNo,
+                GST_NO,
+                businessAgree,
+                aadhar_img,
+                pan_img,
+                brand_logo,
+                cover_img,
+                ownerName,
+                businessAddress,
+                busCity,
+                busState,
+                busPinCode,
+                busEmail,
+                busPhone,
+                businessType,
+                natureOfBusiness,
+            } = data;
+    
+            let errors = [];
+            if (!businessId) errors.push("Business ID is required.");
+            if (errors.length > 0) {
+                throw { status: 400, message: errors.join(" ") };
+            }
+    
+            // Fetch the existing business profile using businessId
+            const existingBusiness = await businessregisterModel.findById(businessId);
+            if (!existingBusiness) {
+                throw { status: 404, message: "Business profile not found for the given business ID." };
+            }
+    
+            const userId = existingBusiness.user_id;
+    
+            // Fetch the user document using the userId found in businessregisterModel
+            const existingUser = await registerModel.findById(userId);
+            if (!existingUser) {
+                throw { status: 404, message: "User not found for the given user ID in business profile." };
+            }
+    
+            // Check for duplicate businessName (case-insensitive, trimmed), phone, or email
+            const duplicateCheck = await businessregisterModel.findOne({
+                $or: [
+                    { businessName: { $regex: `^${businessName.trim()}$`, $options: "i" } },
+                    { businessPhone: phn_number },
+                    { businessEmail: email }
+                ],
+                _id: { $ne: businessId }, // Exclude the current document
+            });
+    
+            if (duplicateCheck) {
+                if (duplicateCheck.businessName.toLowerCase().trim() === businessName.toLowerCase().trim()) {
+                    errors.push("Business name already exists.");
+                }
+                if (duplicateCheck.businessPhone === phn_number) {
+                    errors.push("Phone number already exists.");
+                }
+                if (duplicateCheck.businessEmail === email) {
+                    errors.push("Email already exists.");
+                }
+            }
+    
+            if (errors.length > 0) {
+                throw { status: 400, message: errors.join(" ") };
+            }
+    
+            // Prepare updated business fields
+            const updatedBusinessFields = {
+                ...(businessName && { businessName: businessName.trim() }),
+                ...(phn_number && { businessPhone: phn_number }),
+                ...(email && { businessEmail: email }),
+                ...(Brand_Name && { Brand_Name }),
+                ...(PAN_NO && { PAN_NO }),
+                ...(aadharNo && { aadharNo }),
+                ...(GST_NO && { GST_NO }),
+                ...(businessAgree !== undefined && { businessAgree }),
+                ...(aadhar_img && { aadhar_img }),
+                ...(pan_img && { pan_img }),
+                ...(brand_logo && { brand_logo }),
+                ...(cover_img && { cover_img }),
+                ...(ownerName && { ownerName }),
+                ...(businessAddress && { businessAddress }),
+                ...(busCity && { businessCity: busCity }),
+                ...(busState && { businessState: busState }),
+                ...(busPinCode && { businessPinCode: busPinCode }),
+                ...(busEmail && { businessEmail: busEmail }),
+                ...(busPhone && { businessPhone: busPhone }),
+                ...(businessType && { businessType }),
+                ...(natureOfBusiness && { natureOfBusiness }),
+            };
+    
+            // Update the business profile
+            const updatedBusiness = await businessregisterModel.findByIdAndUpdate(
+                existingBusiness._id,
+                { $set: updatedBusinessFields },
+                { new: true }
+            );
+    
+            return { success: true, user: existingUser, business: updatedBusiness };
+        } catch (error) {
+            console.error("Error in updateBusinessProfile:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
     //   ========== User (Add & Update) ==========
     updateUserDetails: async (data) => {
         try {
@@ -472,9 +584,9 @@ const adminService = {
             }
 
             // Validate date of birth
-            if (dob && isNaN(new Date(dob).getTime())) {
-                throw { status: 400, message: "Invalid date of birth format." };
-            }
+            // if (dob && isNaN(new Date(dob).getTime())) {
+            //     throw { status: 400, message: "Invalid date of birth format." };
+            // }
 
             // Find the user in the registerModel
             const user = await registerModel.findById(userId);
@@ -530,7 +642,6 @@ const adminService = {
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-
 
     addAndUpdateBio: async (data) => {
         try {
