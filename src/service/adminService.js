@@ -15,7 +15,7 @@ import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
 import levenshtein from "fast-levenshtein";
 import mongoose from "mongoose";
-
+import moment from "moment";
 import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
@@ -1155,7 +1155,142 @@ const adminService = {
         }
     },
     //=========
+    // createPost: async (data) => {
+    //     console.log("Received data for creating post:", data);
+
+    //     const {
+    //         user_id,
+    //         imageUrl,
+    //         caption,
+    //         isScheduled,
+    //         scheduleDateTime,
+    //         likes,
+    //         comments,
+    //         tags,
+    //         description,
+    //         isVideo,
+    //         location,
+    //         mediaFile,
+    //         thumbnailFile,
+    //         videoDuration,
+    //         enableComments,
+    //         enableFavorites,
+    //         ageGroup,
+    //         uploadProgress,
+    //         isProcessing,
+    //         isTrimming,
+    //         mentions,
+    //         filters,
+    //         quality,
+    //         visibility,
+    //         aspectRatio,
+    //     } = data;
+
+    //     try {
+    //         // Validate the user
+    //         const user = await registerModel.findById(user_id);
+    //         if (!user) {
+    //             throw new Error("User not found");
+    //         }
+
+    //         // Create the post object
+    //         let newPost = {
+    //             imageUrl,
+    //             caption,
+    //             isScheduled,
+    //             likes,
+    //             comments,
+    //             tags,
+    //             description,
+    //             isVideo,
+    //             location,
+    //             mediaFile,
+    //             thumbnailFile,
+    //             videoDuration,
+    //             enableComments,
+    //             enableFavorites,
+    //             ageGroup,
+    //             uploadProgress,
+    //             isProcessing,
+    //             isTrimming,
+    //             mentions,
+    //             filters,
+    //             quality,
+    //             visibility,
+    //             aspectRatio,
+    //             status: isScheduled ? "scheduled" : "published",
+    //         };
+
+    //         if (isScheduled) {
+    //             if (!scheduleDateTime) {
+    //                 throw new Error("Scheduled date and time must be provided for scheduled posts.");
+    //             }
+
+    //             const scheduledTime = new Date(scheduleDateTime);
+    //             console.log(scheduledTime, "scheduledTime");
+
+    //             if (isNaN(scheduledTime.getTime())) {
+    //                 throw new Error("Invalid scheduleDateTime provided.");
+    //             }
+
+    //             const now = new Date();
+    //             const delay = scheduledTime.getTime() - now.getTime();
+
+    //             if (delay > 0) {
+    //                 console.log(`Post will be stored after ${delay} ms`);
+
+    //                 setTimeout(async () => {
+    //                     try {
+    //                         newPost.scheduleDateTime = scheduledTime;
+
+    //                         // Change the status to "published" before saving
+    //                         newPost.status = "published";
+
+    //                         let userPost = await postModel.findOne({ user_id });
+
+    //                         if (!userPost) {
+    //                             userPost = await postModel.create({ user_id, posts: [newPost] });
+    //                         } else {
+    //                             userPost.posts.push(newPost);
+    //                             await userPost.save();
+    //                         }
+    //                         console.log("Post saved successfully at the scheduled time:", userPost);
+    //                     } catch (error) {
+    //                         console.error("Error storing scheduled post:", error.message);
+    //                     }
+    //                 }, delay);
+
+    //                 return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
+    //             } else {
+    //                 throw new Error("Scheduled time is in the past. Please provide a future date and time.");
+    //             }
+    //         } else {
+    //             newPost.status = "published";
+
+    //             let userPost = await createPostModel.findOne({ user_id });
+
+    //             if (!userPost) {
+    //                 userPost = await createPostModel.create({ user_id, posts: [newPost] });
+    //             } else {
+    //                  // Ensure that posts is an array before calling push
+
+    //                 userPost.posts.push(newPost);
+    //                 await userPost.save();
+    //             }
+
+    //             console.log("Post saved successfully:", userPost);
+    //             return userPost;
+    //         }
+    //     } catch (error) {
+    //         console.error("Error creating post:", error.message);
+    //         throw new Error("Failed to create the post.");
+    //     }
+    // },
+
+
     createPost: async (data) => {
+        console.log("Received data for creating post:", data);
+    
         const {
             user_id,
             imageUrl,
@@ -1182,33 +1317,25 @@ const adminService = {
             quality,
             visibility,
             aspectRatio,
-            typeOfAccount, 
         } = data;
-
+    
         try {
-            let user;
-    
-            // Validate the user based on TypeOfAccount
-            if (typeOfAccount === "business") {
-                user = await businessregisterModel.findById(user_id);
-            }else{
-                user = await registerModel.findById(user_id);
-            }
-    
+            // Validate the user
+            const user = await registerModel.findById(user_id);
             if (!user) {
                 throw new Error("User not found");
             }
-
-            // Create the post object with all fields
+    
+            // Create the post object
             let newPost = {
                 user_id,
                 imageUrl,
                 caption,
                 isScheduled,
-                scheduleDateTime,
-                likes,
-                comments,
-                tags,
+                scheduleDateTime: isScheduled ? new Date(scheduleDateTime) : null,
+                likes: likes || 0,
+                comments: comments || 0,
+                tags: tags || [],
                 description,
                 isVideo,
                 location,
@@ -1221,39 +1348,64 @@ const adminService = {
                 uploadProgress,
                 isProcessing,
                 isTrimming,
-                mentions,
-                filters,
+                mentions: mentions || [],
+                filters: filters || [],
                 quality,
                 visibility,
                 aspectRatio,
                 status: isScheduled ? "scheduled" : "published",
+                timestamp: new Date(), // Add current timestamp
             };
-
-            // If the post is scheduled, handle scheduling logic
-            if (isScheduled && scheduleDateTime) {
-                const scheduleTime = moment(scheduleDateTime).toDate();
-
-                cron.schedule(scheduleTime, async () => {
-                    try {
-                        // Change the status of the post to 'published' when the scheduled time arrives
-                        newPost.status = 'published';
-                        await createPostModel.create(newPost);
-                    } catch (error) {
-                        console.error('Error publishing scheduled post:', error);
-                    }
-                });
+    
+            if (isScheduled) {
+                if (!scheduleDateTime) {
+                    throw new Error("Scheduled date and time must be provided for scheduled posts.");
+                }
+    
+                const scheduledTime = new Date(scheduleDateTime);
+                console.log(scheduledTime, "scheduledTime");
+    
+                if (isNaN(scheduledTime.getTime())) {
+                    throw new Error("Invalid scheduleDateTime provided.");
+                }
+    
+                const now = new Date();
+                const delay = scheduledTime.getTime() - now.getTime();
+    
+                if (delay > 0) {
+                    console.log(`Post will be stored after ${delay} ms`);
+    
+                    setTimeout(async () => {
+                        try {
+                            newPost.status = "published"; // Update status to published after delay
+    
+                            // Save post directly as a new document
+                            const savedPost = await createPostModel.create(newPost);
+                            console.log("Post saved successfully at the scheduled time:", savedPost);
+                        } catch (error) {
+                            console.error("Error storing scheduled post:", error.message);
+                        }
+                    }, delay);
+    
+                    return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
+                } else {
+                    throw new Error("Scheduled time is in the past. Please provide a future date and time.");
+                }
+            } else {
+                newPost.status = "published";
+    
+                // Save post as a new document (no array)
+                const savedPost = await createPostModel.create(newPost);
+                console.log("Post saved successfully:", savedPost);
+    
+                return savedPost;
             }
-
-            // Directly create and save the new post
-            const userPost = new createPostModel(newPost);
-            await userPost.save();
-
-            return userPost;
         } catch (error) {
             console.error("Error creating post:", error.message);
             throw new Error("Failed to create the post.");
         }
     },
+    
     //   ==================
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
@@ -1539,26 +1691,26 @@ const adminService = {
             if (!query || typeof query !== 'string') {
                 throw new Error('Invalid query parameter. Expected a non-empty string.');
             }
-    
+
             const followers = await followerModel.find({
                 status: "accepted",
                 isBlocked: false,
                 isMuted: false
             }).select('follower_id');
-    
+
             if (followers.length === 0) return []; // No followers found
-    
+
             const followerIds = followers.map(follower => follower.follower_id);
-    
+
             const matchingUsers = await registerModel.find({
                 _id: { $in: followerIds },
                 full_Name: { $regex: query, $options: 'i' }
             }).select('_id full_Name profile_url');
-    
+
             const matchingBusinesses = await businessregisterModel.find({
                 businessName: { $regex: query, $options: 'i' }
             }).select('_id businessName brand_logo');
-    
+
             const results = [
                 ...matchingUsers.map(user => ({
                     id: user._id,
@@ -1573,7 +1725,7 @@ const adminService = {
                     type: 'business'
                 }))
             ];
-    
+
             return results
                 .sort((a, b) => a.score - b.score) // Sort by score
                 .slice(0, 3)                      // Return top 3
@@ -1583,10 +1735,10 @@ const adminService = {
             throw new Error('Unable to fetch mention users');
         }
     },
-    
-    
-    
-    
+
+
+
+
 
 
     //   =============================
@@ -1725,7 +1877,103 @@ const adminService = {
         } catch (error) {
             console.error("Error updating expired mentions:", error.message);
         }
-    })
+    }),
+
+    getDynamicFollowers: async (user_id) => {
+        console.log(user_id, "uuuu")
+        try {
+            // Fetch followers dynamically, filtering out muted or blocked ones
+            const followers = await followerModel.find({
+                user_id: user_id,
+                status: 'accepted',
+                isBlocked: false,
+                isMuted: false
+            }).select('follower_id'); // Only retrieve follower IDs
+
+            return followers.map(f => f.follower_id); // Extract follower IDs dynamically
+        } catch (error) {
+            console.error('Error fetching followers:', error);
+            return [];
+        }
+    },
+
+    // ================================
+    getDynamicFeed: async (user_id, visibility, tags, startDate, endDate, page = 1, limit = 10) => {
+        console.log("Fetching dynamic feed:", user_id, visibility, tags, startDate, endDate, page, limit);
+
+        try {
+            // Fetch dynamic list of followers
+            const followerIds = await adminService.getDynamicFollowers(user_id);
+            console.log(followerIds, "followerIds");
+
+            if (!followerIds.length) {
+                return []; // No followers, return an empty feed
+            }
+
+            // Build dynamic filters
+            const query = {
+                user_id: { $in: followerIds }, // Posts by followed users
+                status: "published", // Only published posts
+            };
+            console.log(query, "query");
+
+            // Apply dynamic filters
+            if (visibility) query.visibility = visibility; // Add visibility filter
+            console.log(visibility, "visibility");
+
+            if (tags && tags.length > 0) query.tags = { $in: tags }; // Add tags filter
+            console.log(tags, "tags");
+
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                if (!isNaN(start) && !isNaN(end)) {
+                    query.timestamp = { $gte: start, $lte: end }; // Add date range filter
+                }
+            }
+
+            // Fetch posts dynamically
+            const posts = await createPostModel
+                .find(query)
+                .sort({ timestamp: -1 }) // Sort by timestamp descending
+                .skip((page - 1) * limit) // Pagination
+                .limit(limit) // Limit number of posts per page
+                .populate("user_id", "full_Name profile_url"); // Populate user details
+            console.log(posts, "posts");
+
+            // Fetch user details for each post
+            const postsWithUserDetails = await Promise.all(posts.map(async (post) => {
+                console.log(post.user_id,"kj")
+                const userDetails = await registerModel.findById(post.user_id);
+                console.log(userDetails, "userDetails");
+                // console.log(post, "postsssssssssssssssssss")
+                return {
+                    id: post._id,
+                    user_id: post.user_id._id,
+                    userName: userDetails ? userDetails.full_Name : 'Unknown User', // Handle case where userDetails might be null
+                    profileUrl: userDetails ? userDetails.profile_url : '', // Handle case where userDetails might be null
+                    mediaFile:post.mediaFile,
+                    imageUrl:post.imageUrl,
+                    caption: post.caption,
+                    likes: post.likes,
+                    comments: post.comments,
+                    tags: post.tags,
+                    location: post.location,
+                    description: post.description,
+                    visibility: post.visibility,
+                    createdAt: post.timestamp.toISOString(), // Format timestamp
+                };
+            }));
+
+            // Return posts with user details
+            return postsWithUserDetails;
+
+        } catch (error) {
+            console.error("Error fetching feed:", error);
+            throw new Error("Unable to fetch the feed.");
+        }
+    },
+
 
 
 }

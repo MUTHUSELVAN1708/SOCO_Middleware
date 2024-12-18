@@ -90,7 +90,7 @@ const adminController = {
             res.status(200).json({
                 status: 200,
                 msg: "Successfully created",
-                data:register,
+                data: register,
             });
         } catch (error) {
             console.error(error);
@@ -278,27 +278,27 @@ const adminController = {
         }
     },
     // ==================
-    searchRecommendation: async (req,res, next) => {
+    searchRecommendation: async (req, res, next) => {
         try {
             // const {query,typeOfSearch}=req.params;
-            const query = req.query.query.trim(); 
+            const query = req.query.query.trim();
             const typeOfSearch = req.query.typeOfSearch.trim();
-            const page =  1; 
+            const page = 1;
             const limit = 25;
-    
+
             if (!query) {
                 return res.status(400).json({ message: "Query parameter is required" });
             }
-    
+
             const search = await adminService.searchRecommendation(query, typeOfSearch || "Name", parseInt(page) || 1, parseInt(limit) || 25);
-    
+
             if (!search.success) {
                 return res.status(404).json({
                     status: 404,
                     message: search.message || "No matching results found",
                 });
             }
-    
+
             return res.status(200).json({
                 status: 200,
                 message: "Fetched successfully",
@@ -312,14 +312,15 @@ const adminController = {
             next(error);
         }
     },
-       
+
     // ====================
-    friendRequest: async (req, res,next) => {
+    friendRequest: async (req, res, next) => {
         try {
             const friendRequest = await adminService.friendRequest(req.body);
             res.status(200).json({
-                status:200,
-                friendRequest})
+                status: 200,
+                friendRequest
+            })
         } catch (error) {
             error.error = error.message;
             console.error(error);
@@ -331,10 +332,10 @@ const adminController = {
     createpost: async (req, res, next) => {
         try {
             console.log("Received request to create post:", req.body);
-            
+
             // Pass the request body to the service for processing
             const post = await adminService.createPost(req.body);
-    
+
             // Respond with the status and created post
             res.status(200).json({
                 status: 200,
@@ -346,73 +347,12 @@ const adminController = {
             next(error);  // Pass error to the next middleware for centralized error handling
         }
     },
-        // ==================
-        updateUserDetails : async (req, res, next) => {
-        
-            try {
-                const getPosts = await adminService.updateUserDetails(req.body);
-        
-                res.status(200).json({
-                    status: 200,
-                    data: getPosts,
-                });
-            } catch (error) {
-                console.error("Error fetching posts:", error.message);
-                error.statusCode = 400;
-                error.error = error.message;
-                console.error(error);
-                error.statuscode = 400;
-                next(error);
-            }
-        },
-        
-        addAndUpdateBio : async (req, res, next) => {
-        
-            try {
-                const getPosts = await adminService.addAndUpdateBio(req.body);
-        
-                res.status(200).json({
-                    status: 200,
-                    data: getPosts,
-                });
-            } catch (error) {
-                console.error("Error fetching posts:", error.message);
-                error.statusCode = 400;
-                error.error = error.message;
-                console.error(error);
-                error.statuscode = 400;
-                next(error);
-            }
-        },
-        // ==================
-        getMentionUser : async (req, res, next) => {
-            const query = req.query.query.trim();
-        
-            try {
-                const getPosts = await adminService.getMentionUser(query);
-        
-                res.status(200).json({
-                    status: 200,
-                    data: getPosts,
-                });
-            } catch (error) {
-                console.error("Error fetching posts:", error.message);
-                error.statusCode = 400;
-                error.error = error.message;
-                console.error(error);
-                error.statuscode = 400;
-                next(error);
-            }
-        },
     // ==================
-    getPosts: async (req, res, next) => {
-        const { id } = req.params;
-        const page = parseInt(req.query.page, 10) || 1; 
-        const limit = parseInt(req.query.limit, 10) || 25;
-    
+    updateUserDetails: async (req, res, next) => {
+
         try {
-            const getPosts = await adminService.getPosts(id, page, limit);
-    
+            const getPosts = await adminService.updateUserDetails(req.body);
+
             res.status(200).json({
                 status: 200,
                 data: getPosts,
@@ -426,106 +366,212 @@ const adminController = {
             next(error);
         }
     },
-// ==================
-followUser: async (req, res) => {
-    try {
-      const { user_id, follower_id } = req.body;
-      const follow = await adminService.followUser(user_id, follower_id);
-      res.status(200).json({ message: 'User followed successfully', data: follow });
-    } catch (error) {
-      res.status(500).json({ message: 'Error following user', error: error.message });
-    }
-  },
 
-  // =========================
-  unfollowUser: async (req, res) => {
-    try {
-      const { user_id, follower_id } = req.body;
-      await adminService.unfollowUser(user_id, follower_id);
-      res.status(200).json({ message: 'User unfollowed successfully' });
-    } catch (error) {
-      res.status(500).json({ message: 'Error unfollowing user', error: error.message });
-    }
-  },
+    addAndUpdateBio: async (req, res, next) => {
 
-  // ============================
-  getTopFollowersById: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const followers = await adminService.getTopFollowersById(id);
-      res.status(200).json({ message: 'Followers fetched successfully', data: followers });
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching followers', error: error.message });
-    }
-  },
+        try {
+            const getPosts = await adminService.addAndUpdateBio(req.body);
 
-  getFollowers: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const followers = await adminService.getFollowers(id);
-      res.status(200).json({ message: 'Followers fetched successfully', data: followers });
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching followers', error: error.message });
-    }
-  },
+            res.status(200).json({
+                status: 200,
+                data: getPosts,
+            });
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ==================
+    getMentionUser: async (req, res, next) => {
+        const query = req.query.query.trim();
 
-  //===========================
-  getFollowing: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const following = await adminService.getFollowing(id);
-      res.status(200).json({ message: 'Following fetched successfully', data: following });
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching following', error: error.message });
-    }
-  },
-    
-//   ========================
-AcceptRequest: async (req, res,next) => {
-    try {
-        const AcceptRequest = await adminService.AcceptRequest(req.body);
-        res.status(200).json({
-            status:200,
-            AcceptRequest})
-    } catch (error) {
-        error.error = error.message;
-        console.error(error);
-        error.statuscode = 400;
-        next(error);
-    }
-},
-//   =========================
-suggestUsers: async (req, res,next) => {
-    const{id}=req.params;
-    try {
-        const suggestUsers = await adminService.suggestUsers(id);
-        res.status(200).json({
-            status:200,
-            suggestUsers})
-    } catch (error) {
-        error.error = error.message;
-        console.error(error);
-        error.statuscode = 400;
-        next(error);
-    }
-},
-// ===============
-addMention:async (req, res,next) => {
-   
-    try {
-        const addMention = await adminService.addMention(req.body);
-        res.status(200).json({
-            status:200,
-            addMention})
-    } catch (error) {
-        error.error = error.message;
-        console.error(error);
-        error.statuscode = 400;
-        next(error);
-    }
-},
+        try {
+            const getPosts = await adminService.getMentionUser(query);
 
+            res.status(200).json({
+                status: 200,
+                data: getPosts,
+            });
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ==================
+    getPosts: async (req, res, next) => {
+        const { id } = req.params;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 25;
 
+        try {
+            const getPosts = await adminService.getPosts(id, page, limit);
+
+            res.status(200).json({
+                status: 200,
+                data: getPosts,
+            });
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ==================
+    followUser: async (req, res) => {
+        try {
+            const { user_id, follower_id } = req.body;
+            const follow = await adminService.followUser(user_id, follower_id);
+            res.status(200).json({ message: 'User followed successfully', data: follow });
+        } catch (error) {
+            res.status(500).json({ message: 'Error following user', error: error.message });
+        }
+    },
+
+    // =========================
+    unfollowUser: async (req, res) => {
+        try {
+            const { user_id, follower_id } = req.body;
+            await adminService.unfollowUser(user_id, follower_id);
+            res.status(200).json({ message: 'User unfollowed successfully' });
+        } catch (error) {
+            res.status(500).json({ message: 'Error unfollowing user', error: error.message });
+        }
+    },
+
+    // ============================
+    getTopFollowersById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const followers = await adminService.getTopFollowersById(id);
+            res.status(200).json({ message: 'Followers fetched successfully', data: followers });
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching followers', error: error.message });
+        }
+    },
+
+    getFollowers: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const followers = await adminService.getFollowers(id);
+            res.status(200).json({ message: 'Followers fetched successfully', data: followers });
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching followers', error: error.message });
+        }
+    },
+
+    //===========================
+    getFollowing: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const following = await adminService.getFollowing(id);
+            res.status(200).json({ message: 'Following fetched successfully', data: following });
+        } catch (error) {
+            res.status(500).json({ message: 'Error fetching following', error: error.message });
+        }
+    },
+
+    //   ========================
+    AcceptRequest: async (req, res, next) => {
+        try {
+            const AcceptRequest = await adminService.AcceptRequest(req.body);
+            res.status(200).json({
+                status: 200,
+                AcceptRequest
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    //   =========================
+    suggestUsers: async (req, res, next) => {
+        const { id } = req.params;
+        try {
+            const suggestUsers = await adminService.suggestUsers(id);
+            res.status(200).json({
+                status: 200,
+                suggestUsers
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ===============
+    addMention: async (req, res, next) => {
+
+        try {
+            const addMention = await adminService.addMention(req.body);
+            res.status(200).json({
+                status: 200,
+                addMention
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    // ======================
+    getDynamicFollowers: async (req, res, next) => {
+        const { id } = req.params;
+        try {
+            const getDynamicFollowers = await adminService.getDynamicFollowers(id);
+            res.status(200).json({
+                status: 200,
+                getDynamicFollowers
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    // =================
+    getDynamicFeed: async (req, res, next) => {
+        const user_id = req.query.user_id;
+       
+        const visibility = req.query.visibility; // Extract visibility filter
+        const tags = req.query.tags ? req.query.tags.split(",") : []; // Parse tags as an array
+        const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
+        const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
+        const page = parseInt(req.query.page) || 1; // Default to 1
+        const limit = parseInt(req.query.limit) || 10; // Default to 10
+
+       
+
+        try {
+            const getDynamicFeed = await adminService.getDynamicFeed(user_id, visibility,tags,startDate,endDate,page, limit);
+            res.status(200).json({
+                status: 200,
+                getDynamicFeed
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
 }
 
 

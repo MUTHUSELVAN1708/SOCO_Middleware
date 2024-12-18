@@ -200,7 +200,7 @@ router.post("/friendRequest", adminController.friendRequest);
 router.post("/createPost", adminController.createpost);
 router.post("/updateUserDetails/:id", adminController.updateUserDetails);
 router.post("/addAndUpdateBio/:id", adminController.addAndUpdateBio);
-router.get("/getPosts/:id", adminController.getPosts);
+router.get("/getPosts/:id", adminController.getPosts);//for self post
 router.post("/followUser", adminController.followUser);
 router.post("/unfollowUser", adminController.unfollowUser);
 router.get("/getFollowers/:id", adminController.getFollowers);
@@ -211,5 +211,31 @@ router.get("/suggestUsers/:id", adminController.suggestUsers);
 router.get("/getMentionUser", adminController.getMentionUser);
 
 router.post("/addMention",adminController.addMention);
+
+router.get("/getDynamicFollowers/:id",adminController.getDynamicFollowers);
+
+router.get("/getDynamicFeed",adminController.getDynamicFeed)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export default router;
