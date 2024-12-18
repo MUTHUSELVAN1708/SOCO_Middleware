@@ -440,7 +440,7 @@ const adminService = {
             });
 
 
-            return { success: true, user: updatedUser,business:  business };
+            return { success: true, user: updatedUser, business: business };
 
         } catch (error) {
             console.error("Error in registerUserWithBusiness:", error);
@@ -474,27 +474,27 @@ const adminService = {
                 businessType,
                 natureOfBusiness,
             } = data;
-    
+
             let errors = [];
             if (!businessId) errors.push("Business ID is required.");
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Fetch the existing business profile using businessId
             const existingBusiness = await businessregisterModel.findById(businessId);
             if (!existingBusiness) {
                 throw { status: 404, message: "Business profile not found for the given business ID." };
             }
-    
+
             const userId = existingBusiness.user_id;
-    
+
             // Fetch the user document using the userId found in businessregisterModel
             const existingUser = await registerModel.findById(userId);
             if (!existingUser) {
                 throw { status: 404, message: "User not found for the given user ID in business profile." };
             }
-    
+
             // Check for duplicate businessName (case-insensitive, trimmed), phone, or email
             const duplicateCheck = await businessregisterModel.findOne({
                 $or: [
@@ -504,7 +504,7 @@ const adminService = {
                 ],
                 _id: { $ne: businessId }, // Exclude the current document
             });
-    
+
             if (duplicateCheck) {
                 if (duplicateCheck.businessName.toLowerCase().trim() === businessName.toLowerCase().trim()) {
                     errors.push("Business name already exists.");
@@ -516,11 +516,11 @@ const adminService = {
                     errors.push("Email already exists.");
                 }
             }
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Prepare updated business fields
             const updatedBusinessFields = {
                 ...(businessName && { businessName: businessName.trim() }),
@@ -545,21 +545,21 @@ const adminService = {
                 ...(businessType && { businessType }),
                 ...(natureOfBusiness && { natureOfBusiness }),
             };
-    
+
             // Update the business profile
             const updatedBusiness = await businessregisterModel.findByIdAndUpdate(
                 existingBusiness._id,
                 { $set: updatedBusinessFields },
                 { new: true }
             );
-    
+
             return { success: true, user: existingUser, business: updatedBusiness };
         } catch (error) {
             console.error("Error in updateBusinessProfile:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
+
     //   ========== User (Add & Update) ==========
     updateUserDetails: async (data) => {
         try {
@@ -1401,7 +1401,7 @@ const adminService = {
 
     createPost: async (data) => {
         console.log("Received data for creating post:", data);
-    
+
         const {
             user_id,
             imageUrl,
@@ -1429,14 +1429,14 @@ const adminService = {
             visibility,
             aspectRatio,
         } = data;
-    
+
         try {
             // Validate the user
             const user = await registerModel.findById(user_id);
             if (!user) {
                 throw new Error("User not found");
             }
-    
+
             // Create the post object
             let newPost = {
                 user_id,
@@ -1467,29 +1467,29 @@ const adminService = {
                 status: isScheduled ? "scheduled" : "published",
                 timestamp: new Date(), // Add current timestamp
             };
-    
+
             if (isScheduled) {
                 if (!scheduleDateTime) {
                     throw new Error("Scheduled date and time must be provided for scheduled posts.");
                 }
-    
+
                 const scheduledTime = new Date(scheduleDateTime);
                 console.log(scheduledTime, "scheduledTime");
-    
+
                 if (isNaN(scheduledTime.getTime())) {
                     throw new Error("Invalid scheduleDateTime provided.");
                 }
-    
+
                 const now = new Date();
                 const delay = scheduledTime.getTime() - now.getTime();
-    
+
                 if (delay > 0) {
                     console.log(`Post will be stored after ${delay} ms`);
-    
+
                     setTimeout(async () => {
                         try {
                             newPost.status = "published"; // Update status to published after delay
-    
+
                             // Save post directly as a new document
                             const savedPost = await createPostModel.create(newPost);
                             console.log("Post saved successfully at the scheduled time:", savedPost);
@@ -1497,18 +1497,18 @@ const adminService = {
                             console.error("Error storing scheduled post:", error.message);
                         }
                     }, delay);
-    
+
                     return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
                 } else {
                     throw new Error("Scheduled time is in the past. Please provide a future date and time.");
                 }
             } else {
                 newPost.status = "published";
-    
+
                 // Save post as a new document (no array)
                 const savedPost = await createPostModel.create(newPost);
                 console.log("Post saved successfully:", savedPost);
-    
+
                 return savedPost;
             }
         } catch (error) {
@@ -1516,7 +1516,7 @@ const adminService = {
             throw new Error("Failed to create the post.");
         }
     },
-    
+
     //   ==================
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
@@ -1799,29 +1799,36 @@ const adminService = {
 
     getMentionUser: async (query) => {
         try {
-            if (!query || typeof query !== 'string') {
+            if (!query || typeof query !== 'string' || query.trim() === '') {
                 throw new Error('Invalid query parameter. Expected a non-empty string.');
             }
-
+    
             const followers = await followerModel.find({
                 status: "accepted",
                 isBlocked: false,
                 isMuted: false
             }).select('follower_id');
+    
+            let matchingUsers = [];
 
-            if (followers.length === 0) return []; // No followers found
-
+        if (followers.length > 0) {
             const followerIds = followers.map(follower => follower.follower_id);
-
-            const matchingUsers = await registerModel.find({
+            matchingUsers = await registerModel.find({
                 _id: { $in: followerIds },
                 full_Name: { $regex: query, $options: 'i' }
             }).select('_id full_Name profile_url');
+        }
+
+        if (matchingUsers.length === 0) {
+            matchingUsers = await registerModel.find({
+                full_Name: { $regex: query, $options: 'i' }
+            }).select('_id full_Name profile_url');
+        }
 
             const matchingBusinesses = await businessregisterModel.find({
                 businessName: { $regex: query, $options: 'i' }
             }).select('_id businessName brand_logo');
-
+    
             const results = [
                 ...matchingUsers.map(user => ({
                     id: user._id,
@@ -1836,16 +1843,16 @@ const adminService = {
                     type: 'business'
                 }))
             ];
-
-            return results
-                .sort((a, b) => a.score - b.score) // Sort by score
-                .slice(0, 3)                      // Return top 3
-                .map(({ id, name, imageUrl }) => ({ id, name, imageUrl })); // Simplified output
+    
+            const sortedResults = results.sort((a, b) => a.name.localeCompare(b.name));
+    
+            return sortedResults.slice(0, 5);
         } catch (error) {
-            console.error(error);
+            console.error('Error in getMentionUser:', error);
             throw new Error('Unable to fetch mention users');
         }
     },
+    
 
 
 
@@ -2054,7 +2061,7 @@ const adminService = {
 
             // Fetch user details for each post
             const postsWithUserDetails = await Promise.all(posts.map(async (post) => {
-                console.log(post.user_id,"kj")
+                console.log(post.user_id, "kj")
                 const userDetails = await registerModel.findById(post.user_id);
                 console.log(userDetails, "userDetails");
                 // console.log(post, "postsssssssssssssssssss")
@@ -2063,8 +2070,8 @@ const adminService = {
                     user_id: post.user_id._id,
                     userName: userDetails ? userDetails.full_Name : 'Unknown User', // Handle case where userDetails might be null
                     profileUrl: userDetails ? userDetails.profile_url : '', // Handle case where userDetails might be null
-                    mediaFile:post.mediaFile,
-                    imageUrl:post.imageUrl,
+                    mediaFile: post.mediaFile,
+                    imageUrl: post.imageUrl,
                     caption: post.caption,
                     likes: post.likes,
                     comments: post.comments,
