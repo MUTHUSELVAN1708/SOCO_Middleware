@@ -76,6 +76,7 @@ router.put('/updateRegister', adminController.updateRegister);
 router.put("/forgotPassword", adminController.forgotPassword);
 router.post("/BusinessRegister", adminController.BusinessRegister);
 router.post("/registerUserWithBusiness", adminController.registerUserWithBusiness);
+router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 
 
 
