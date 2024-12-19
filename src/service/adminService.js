@@ -21,6 +21,7 @@ import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 import connectedUsers from "../../socket.js";
+import productModel from "../model/productModel.js";
 const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree } = data;
@@ -1802,33 +1803,33 @@ const adminService = {
             if (!query || typeof query !== 'string' || query.trim() === '') {
                 throw new Error('Invalid query parameter. Expected a non-empty string.');
             }
-    
+
             const followers = await followerModel.find({
                 status: "accepted",
                 isBlocked: false,
                 isMuted: false
             }).select('follower_id');
-    
+
             let matchingUsers = [];
 
-        if (followers.length > 0) {
-            const followerIds = followers.map(follower => follower.follower_id);
-            matchingUsers = await registerModel.find({
-                _id: { $in: followerIds },
-                full_Name: { $regex: query, $options: 'i' }
-            }).select('_id full_Name profile_url');
-        }
+            if (followers.length > 0) {
+                const followerIds = followers.map(follower => follower.follower_id);
+                matchingUsers = await registerModel.find({
+                    _id: { $in: followerIds },
+                    full_Name: { $regex: query, $options: 'i' }
+                }).select('_id full_Name profile_url');
+            }
 
-        if (matchingUsers.length === 0) {
-            matchingUsers = await registerModel.find({
-                full_Name: { $regex: query, $options: 'i' }
-            }).select('_id full_Name profile_url');
-        }
+            if (matchingUsers.length === 0) {
+                matchingUsers = await registerModel.find({
+                    full_Name: { $regex: query, $options: 'i' }
+                }).select('_id full_Name profile_url');
+            }
 
             const matchingBusinesses = await businessregisterModel.find({
                 businessName: { $regex: query, $options: 'i' }
             }).select('_id businessName brand_logo');
-    
+
             const results = [
                 ...matchingUsers.map(user => ({
                     id: user._id,
@@ -1843,16 +1844,16 @@ const adminService = {
                     type: 'business'
                 }))
             ];
-    
+
             const sortedResults = results.sort((a, b) => a.name.localeCompare(b.name));
-    
+
             return sortedResults.slice(0, 5);
         } catch (error) {
             console.error('Error in getMentionUser:', error);
             throw new Error('Unable to fetch mention users');
         }
     },
-    
+
 
 
 
@@ -2092,7 +2093,187 @@ const adminService = {
         }
     },
 
-
+    // ==================================
+    createProduct: async (data) => {
+        const { 
+            productName,
+            business_id,
+            category,
+            subCategory,
+            productDescription,
+            brand,
+            price,
+            originalPrice,
+            discountPercentage,
+            quantityAvailable,
+            unitsSold,
+            SKU,
+            images,
+            videos,
+            size,
+            colors,
+            weight,
+            dimensions,
+            length,
+            width,
+            height,
+            ratings,
+            average,
+            totalRatings,
+            reviewsCount,
+            isActive,
+            isFeatured,
+            tags
+        } = data
+      
+        try {
+            if (!productName || !business_id || !category || !price || !quantityAvailable) {
+                throw new Error("Missing required fields: productName, business_id, category, price, quantityAvailable");
+            }
+          
+            const product = await productModel.create({
+                productName,
+                business_id,
+                category,
+                subCategory,
+                productDescription,
+                brand,
+                price,
+                originalPrice,
+                discountPercentage,
+                quantityAvailable,
+                unitsSold,
+                SKU,
+                images,
+                videos,
+                size,
+                colors,
+                weight,
+                dimensions,
+                length,
+                width,
+                height,
+                ratings,
+                average,
+                totalRatings,
+                reviewsCount,
+                isActive,
+                isFeatured,
+                tags,
+                
+            })
+            return product
+        } catch (error) {
+            throw error
+        }
+    },
+    // ============================
+    getproduct: async () => {
+        try {
+            const getproduct = await productModel.find();
+            return getproduct
+        } catch (error) {
+            throw error
+        }
+    },
+    // ============================
+    updateProduct: async (data) => {
+        const {
+            product_id,
+            productName,
+            business_id,
+            category,
+            subCategory,
+            productDescription,
+            brand,
+            price,
+            originalPrice,
+            discountPercentage,
+            quantityAvailable,
+            unitsSold,
+            SKU,
+            images,
+            videos,
+            size,
+            colors,
+            weight,
+            dimensions,
+            length,
+            width,
+            height,
+            ratings,
+            average,
+            totalRatings,
+            reviewsCount,
+            isActive,
+            isFeatured,
+            tags,
+             } = data
+        try {
+            if (!product_id || !productName || !business_id || !category || !price || !quantityAvailable) {
+                throw new Error("Missing required fields:product_id, productName, business_id, category, price, quantityAvailable");
+            }
+            const updateProduct = await productModel.findByIdAndUpdate(product_id,
+                { productName,
+                    business_id,
+                    category,
+                    subCategory,
+                    productDescription,
+                    brand,
+                    price,
+                    originalPrice,
+                    discountPercentage,
+                    quantityAvailable,
+                    unitsSold,
+                    SKU,
+                    images,
+                    videos,
+                    size,
+                    colors,
+                    weight,
+                    dimensions,
+                    length,
+                    width,
+                    height,
+                    ratings,
+                    average,
+                    totalRatings,
+                    reviewsCount,
+                    isActive,
+                    isFeatured,
+                    tags,
+                    
+                },
+                { new: true });
+            return updateProduct
+        } catch (error) {
+            throw error
+        }
+    },
+    // =====================
+ deleteProduct : async (product) => {
+        try {
+            const { product_id } = product;
+    
+            if (!product_id) {
+                throw new Error("Product ID is required.");
+            }
+    
+          
+            const deletedProduct = await productModel.findOneAndDelete({ _id: product_id });
+    
+            if (!deletedProduct) {
+                throw new Error(`Product with ID ${product_id} not found.`);
+            }
+    
+            console.log(`Product deleted successfully: ${deletedProduct}`);
+            return "Product deleted successfully";
+        } catch (error) {
+            console.error(`Error deleting product: ${error.message}`);
+            throw new Error("Unable to delete product. Please try again.");
+        }
+    },
+    
 
 }
 

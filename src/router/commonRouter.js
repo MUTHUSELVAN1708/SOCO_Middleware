@@ -11,6 +11,7 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname),
+  
 });
 // Media Multer Storage Configuration
 const mediaStorage = multer.diskStorage({
@@ -29,7 +30,9 @@ const mediaStorage = multer.diskStorage({
 
 // File Upload Configuration (Images and Videos)
 const uploadMedia = multer({
-  storage: mediaStorage, // Fix here
+  storage: mediaStorage,
+  limits: { fileSize: 1024 * 1024 * 5 },
+   // Fix here
   fileFilter: (req, file, cb) => {
     const allowedMimeTypes = [
       'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
@@ -149,6 +152,33 @@ router.post(
             res.status(500).json({ message: error.message });
         }
     }
+);
+
+//for multiple files
+router.post(
+  "/filesUpload",
+  uploadFiles.array('files', 10),
+  (req, res) => {
+    try {
+      console.log(req.files); 
+      
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded!' });
+      }
+
+      const fileUrls = req.files.map(file =>
+        `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
+      );
+
+      res.status(200).json({
+        message: 'Files uploaded successfully!',
+        fileUrls
+      });
+    } catch (error) {
+      console.error(error); 
+      res.status(500).json({ message: error.message });
+    }
+  }
 );
 
 // Media Upload Route (Images and Videos)

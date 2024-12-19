@@ -109,7 +109,7 @@ const adminController = {
             res.status(200).json({
                 status: 200,
                 msg: "Successfully created",
-                data:register,
+                data: register,
             });
         } catch (error) {
             console.error(error);
@@ -567,7 +567,7 @@ const adminController = {
     // =================
     getDynamicFeed: async (req, res, next) => {
         const user_id = req.query.user_id;
-       
+
         const visibility = req.query.visibility; // Extract visibility filter
         const tags = req.query.tags ? req.query.tags.split(",") : []; // Parse tags as an array
         const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
@@ -575,10 +575,10 @@ const adminController = {
         const page = parseInt(req.query.page) || 1; // Default to 1
         const limit = parseInt(req.query.limit) || 10; // Default to 10
 
-       
+
 
         try {
-            const getDynamicFeed = await adminService.getDynamicFeed(user_id, visibility,tags,startDate,endDate,page, limit);
+            const getDynamicFeed = await adminService.getDynamicFeed(user_id, visibility, tags, startDate, endDate, page, limit);
             res.status(200).json({
                 status: 200,
                 getDynamicFeed
@@ -590,6 +590,71 @@ const adminController = {
             next(error);
         }
     },
+    // =========================
+    createProduct: async (req, res, next) => {
+
+        try {
+            const createProduct = await adminService.createProduct(req.body);
+            res.status(200).json({
+                status: 200,
+                createProduct
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ===============
+    getproduct: async(req,res,next)=> {
+        try {
+            const getproduct = await adminService.getproduct();
+            res.status(200).json({
+                status: 200,
+                getproduct
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    // =======================
+    updateProduct: async(req,res,next)=> {
+        try {
+            const updateProduct = await adminService.updateProduct(req.body);
+            res.status(200).json({
+                status: 200,
+                updateProduct
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    // ================
+    deleteProduct:async(req,res,next)=> {
+      
+        try {
+            const deleteProduct = await adminService.deleteProduct(req.body);
+            res.status(200).json({
+                status: 200,
+                deleteProduct
+            })
+        } catch (error) {
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
 }
 
 
