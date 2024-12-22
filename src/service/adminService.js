@@ -310,6 +310,8 @@ const adminService = {
                 achievements
             } = data;
 
+            
+
             // Validate required fields
             let errors = [];
             if (!full_Name) errors.push("Full name is required.");
@@ -322,23 +324,48 @@ const adminService = {
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-
+            console.log('businessName');
+            console.log(businessregisterModel.findOne({ businessName }));
             // Check for existing users and business name
-            const existingUser = await Promise.all([
-                registerModel.findOne({ full_Name }),
-                registerModel.findOne({ phn_number }),
-                registerModel.findOne({ email }),
-                businessregisterModel.findOne({ businessName }), // Check for existing businessName
-            ]);
+            const queries = [];
 
-            if (existingUser[0]) errors.push("Name already exists. Name must be unique.");
-            if (existingUser[1]) errors.push("Phone number already exists. Try a different one or log in.");
-            if (existingUser[2]) errors.push("Email already exists. Try a different one or log in.");
-            if (existingUser[3]) errors.push("Business name already exists. Business name must be unique.");
+            if (full_Name) {
+                queries.push(registerModel.findOne({ full_Name }));
+            } else {
+                errors.push("Name is required.");
+            }
 
+            if (phn_number) {
+                queries.push(registerModel.findOne({ phn_number }));
+            } else {
+                errors.push("Phone number is required.");
+            }
+
+            if (email) {
+                queries.push(registerModel.findOne({ email }));
+            } else {
+                errors.push("Email is required.");
+            }
+
+            if (businessName) {
+                queries.push(businessregisterModel.findOne({ businessName })); // Check for existing businessName
+            }
+
+            // Execute queries only if no initial validation errors
+            if (errors.length === 0) {
+                const existingUser = await Promise.all(queries);
+
+                if (existingUser[0]) errors.push("Name already exists. Name must be unique.");
+                if (existingUser[1]) errors.push("Phone number already exists. Try a different one or log in.");
+                if (existingUser[2]) errors.push("Email already exists. Try a different one or log in.");
+                if (existingUser[3]) errors.push("Business name already exists. Business name must be unique.");
+            }
+
+            // If any errors were found, throw them
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
+
 
             // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -716,32 +743,32 @@ const adminService = {
         const { email, phn_number, password } = data;
         try {
             let user;
-
+    
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-
+    
             if (!user) {
-                throw { msg: "User not found, please register" };
+                throw { msg: "Account not found. Please register to continue." };
             }
-
+    
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
-                    throw { msg: "Invalid credentials" };
+                    throw { msg: "Invalid credentials. Please try again or reset your password." };
                 }
             }
-
+    
             const business = await businessregisterModel.findOne({ user_id: user._id });
-
+    
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-
+    
             return {
                 status: 200,
                 msg: "Login successful",
@@ -752,16 +779,13 @@ const adminService = {
                 },
             };
         } catch (error) {
-            console.error("Error in login:", error);
             return {
                 status: 500,
-                msg: error.msg || "Something went wrong",
+                msg: error.msg || "An error occurred during login. Please try again.",
                 login: null,
             };
         }
     },
-
-
 
     // ===================
     storeOtp: async (user_id, otp) => {
@@ -889,6 +913,7 @@ const adminService = {
 
     forgotPassword: async (data) => {
         const { email, password } = data;
+    console.log(data);
 
 
         if (!email || !password) {
@@ -1399,10 +1424,7 @@ const adminService = {
     //     }
     // },
 
-
-    createPost: async (data) => {
-        console.log("Received data for creating post:", data);
-
+    createPost: async (data) => {    
         const {
             user_id,
             imageUrl,
@@ -1429,25 +1451,34 @@ const adminService = {
             quality,
             visibility,
             aspectRatio,
+            typeOfAccount, 
         } = data;
-
+    
         try {
-            // Validate the user
-            const user = await registerModel.findById(user_id);
+            let user;
+                    console.log("scheduleDateTime value:", scheduleDateTime);
+
+            if (typeOfAccount === "business") {
+                user = await businessregisterModel.findById(user_id);
+            } else {
+                user = await registerModel.findById(user_id);
+            }
+    
             if (!user) {
                 throw new Error("User not found");
             }
-
-            // Create the post object
+    
+            const filtersArray = Array.isArray(filters) ? filters : [];
+    
             let newPost = {
                 user_id,
                 imageUrl,
                 caption,
                 isScheduled,
-                scheduleDateTime: isScheduled ? new Date(scheduleDateTime) : null,
-                likes: likes || 0,
-                comments: comments || 0,
-                tags: tags || [],
+                scheduleDateTime,
+                likes,
+                comments,
+                tags,
                 description,
                 isVideo,
                 location,
@@ -1460,63 +1491,163 @@ const adminService = {
                 uploadProgress,
                 isProcessing,
                 isTrimming,
-                mentions: mentions || [],
-                filters: filters || [],
+                mentions,
+                filters: filtersArray,
                 quality,
                 visibility,
                 aspectRatio,
                 status: isScheduled ? "scheduled" : "published",
-                timestamp: new Date(), // Add current timestamp
             };
-
-            if (isScheduled) {
-                if (!scheduleDateTime) {
-                    throw new Error("Scheduled date and time must be provided for scheduled posts.");
-                }
-
-                const scheduledTime = new Date(scheduleDateTime);
-                console.log(scheduledTime, "scheduledTime");
-
-                if (isNaN(scheduledTime.getTime())) {
-                    throw new Error("Invalid scheduleDateTime provided.");
-                }
-
-                const now = new Date();
-                const delay = scheduledTime.getTime() - now.getTime();
-
-                if (delay > 0) {
-                    console.log(`Post will be stored after ${delay} ms`);
-
-                    setTimeout(async () => {
+    
+            if (isScheduled && scheduleDateTime) {
+            
+                const scheduleTime = moment(scheduleDateTime).toDate();
+            
+                const cronExpression = `${scheduleTime.getMinutes()} ${scheduleTime.getHours()} ${scheduleTime.getDate()} ${scheduleTime.getMonth() + 1} *`;
+            
+            
+                if (cron.validate(cronExpression)) {
+                    cron.schedule(cronExpression, async () => {
                         try {
-                            newPost.status = "published"; // Update status to published after delay
-
-                            // Save post directly as a new document
-                            const savedPost = await createPostModel.create(newPost);
-                            console.log("Post saved successfully at the scheduled time:", savedPost);
+                            newPost.status = "published";
+                            await createPostModel.create(newPost);
                         } catch (error) {
-                            console.error("Error storing scheduled post:", error.message);
+                            console.error("Error publishing scheduled post:", error);
                         }
-                    }, delay);
-
-                    return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
+                    });
                 } else {
-                    throw new Error("Scheduled time is in the past. Please provide a future date and time.");
+                    throw new Error("Failed to schedule the post due to invalid cron expression.");
                 }
-            } else {
-                newPost.status = "published";
-
-                // Save post as a new document (no array)
-                const savedPost = await createPostModel.create(newPost);
-                console.log("Post saved successfully:", savedPost);
-
-                return savedPost;
             }
+            
+    
+            const userPost = new createPostModel(newPost);
+            await userPost.save();
+    
+            return userPost;
         } catch (error) {
-            console.error("Error creating post:", error.message);
             throw new Error("Failed to create the post.");
         }
     },
+    
+
+    // createPost: async (data) => {
+    //     console.log("Received data for creating post:", data);
+
+    //     const {
+    //         user_id,
+    //         imageUrl,
+    //         caption,
+    //         isScheduled,
+    //         scheduleDateTime,
+    //         likes,
+    //         comments,
+    //         tags,
+    //         description,
+    //         isVideo,
+    //         location,
+    //         mediaFile,
+    //         thumbnailFile,
+    //         videoDuration,
+    //         enableComments,
+    //         enableFavorites,
+    //         ageGroup,
+    //         uploadProgress,
+    //         isProcessing,
+    //         isTrimming,
+    //         mentions,
+    //         filters,
+    //         quality,
+    //         visibility,
+    //         aspectRatio,
+    //     } = data;
+
+    //     try {
+    //         // Validate the user
+    //         const user = await registerModel.findById(user_id);
+    //         if (!user) {
+    //             throw new Error("User not found");
+    //         }
+
+    //         // Create the post object
+    //         let newPost = {
+    //             user_id,
+    //             imageUrl,
+    //             caption,
+    //             isScheduled,
+    //             scheduleDateTime: isScheduled ? new Date(scheduleDateTime) : null,
+    //             likes: likes || 0,
+    //             comments: comments || 0,
+    //             tags: tags || [],
+    //             description,
+    //             isVideo,
+    //             location,
+    //             mediaFile,
+    //             thumbnailFile,
+    //             videoDuration,
+    //             enableComments,
+    //             enableFavorites,
+    //             ageGroup,
+    //             uploadProgress,
+    //             isProcessing,
+    //             isTrimming,
+    //             mentions: mentions || [],
+    //             filters: filters || [],
+    //             quality,
+    //             visibility,
+    //             aspectRatio,
+    //             status: isScheduled ? "scheduled" : "published",
+    //             timestamp: new Date(), // Add current timestamp
+    //         };
+
+    //         if (isScheduled) {
+    //             if (!scheduleDateTime) {
+    //                 throw new Error("Scheduled date and time must be provided for scheduled posts.");
+    //             }
+
+    //             const scheduledTime = new Date(scheduleDateTime);
+    //             console.log(scheduledTime, "scheduledTime");
+
+    //             if (isNaN(scheduledTime.getTime())) {
+    //                 throw new Error("Invalid scheduleDateTime provided.");
+    //             }
+
+    //             const now = new Date();
+    //             const delay = scheduledTime.getTime() - now.getTime();
+
+    //             if (delay > 0) {
+    //                 console.log(`Post will be stored after ${delay} ms`);
+
+    //                 setTimeout(async () => {
+    //                     try {
+    //                         newPost.status = "published"; // Update status to published after delay
+
+    //                         // Save post directly as a new document
+    //                         const savedPost = await createPostModel.create(newPost);
+    //                         console.log("Post saved successfully at the scheduled time:", savedPost);
+    //                     } catch (error) {
+    //                         console.error("Error storing scheduled post:", error.message);
+    //                     }
+    //                 }, delay);
+
+    //                 return { message: "Post scheduled successfully", status: "scheduled" }; // Respond immediately
+    //             } else {
+    //                 throw new Error("Scheduled time is in the past. Please provide a future date and time.");
+    //             }
+    //         } else {
+    //             newPost.status = "published";
+
+    //             // Save post as a new document (no array)
+    //             const savedPost = await createPostModel.create(newPost);
+    //             console.log("Post saved successfully:", savedPost);
+
+    //             return savedPost;
+    //         }
+    //     } catch (error) {
+    //         console.error("Error creating post:", error.message);
+    //         throw new Error("Failed to create the post.");
+    //     }
+    // },
 
     //   ==================
     getPosts: async (user_id, page = 1, limit = 25) => {
