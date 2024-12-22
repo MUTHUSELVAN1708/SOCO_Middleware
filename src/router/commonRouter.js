@@ -76,7 +76,7 @@ router.post("/verifyOtp", adminController.verifyOtp);
 router.post("/login", adminController.login);
 router.post("/otpValidation", adminController.otpValidation);
 router.put('/updateRegister', adminController.updateRegister);
-router.put("/forgotPassword", adminController.forgotPassword);
+router.post("/forgotPassword", adminController.forgotPassword);
 router.post("/BusinessRegister", adminController.BusinessRegister);
 router.post("/registerUserWithBusiness", adminController.registerUserWithBusiness);
 router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
@@ -106,14 +106,16 @@ router.post(
     async (req, res) => {
         try {
             const { accountType, id, fieldName } = req.body;
+            console.log(accountType); 
+            console.log(id); 
+            console.log(fieldName); 
 
             if (!req.file) return res.status(422).json({ message: 'No file uploaded!' });
             if (!accountType || !id || !fieldName) return res.status(400).json({ message: 'Missing required parameters!' });
             if (!allowedAccountTypes.includes(accountType)) return res.status(400).json({ message: 'Invalid account type!' });
-            if (!allowedFields.includes(fieldName)) return res.status(400).json({ message: `Invalid field name: ${fieldName}` });
-
+            // if (!allowedFields.includes(fieldName)) return res.status(400).json({ message: `Invalid field name: ${fieldName}` });
             const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-
+             console.log(id);      
             if (accountType === 'user') {
                 const user = await registerModel.findById(id);
                 if (!user) return res.status(404).json({ message: 'User not found!' });
@@ -124,6 +126,7 @@ router.post(
 
             if (accountType === 'business') {
                 const business = await businessRegisterModel.findById(id);
+                console.log(business);
                 if (!business) return res.status(404).json({ message: 'Business not found!' });
                 business[fieldName] = fileUrl;
                 await business.save();

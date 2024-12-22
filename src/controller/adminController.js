@@ -187,17 +187,17 @@ const adminController = {
             const forgotPassword = await adminService.forgotPassword(req.body);
             res.status(200).json({
                 status: 200,
-                msg: "updated successfully",
+                msg: "Password updated successfully. Please log in with the updated password.",
                 forgotPassword
-            })
+            });
         } catch (error) {
             error.error = error.message;
             console.error(error);
             error.statuscode = 400;
             next(error);
         }
-
     },
+    
     // ==================
     BusinessRegister: async (req, res, next) => {
         try {
