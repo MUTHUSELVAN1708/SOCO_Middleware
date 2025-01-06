@@ -103,6 +103,7 @@ const registerSchema = new mongoose.Schema(
     year: { type: Number, default: 0, required: false },
     grade: { type: Number, default: 0, required: false },
     achievements: { type: String, default: '', required: false },
+    deviceToken:{type:[String], required:false},
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }

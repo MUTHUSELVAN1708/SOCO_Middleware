@@ -1,126 +1,131 @@
 import mongoose from "mongoose";
 
-const productSchema = new mongoose.Schema(
-    {
-      productName: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-      business_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Business', // Referencing the business collection
-        required: true,
-      },
-      category: {
-        type: String,
-        required: true,
-      },
-      subCategory: {
-        type: String,
-        required: true,
-      },
-      productDescription: {
-        type: String,
-        trim: true,
-      },
-      brand: {
-        type: String,
-        trim: true,
-      },
-      price: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-      originalPrice: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-      discountPercentage: {
-        type: Number,
-        default: 0,
-        min: 0,
-        max: 100,
-      },
-      quantityAvailable: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-      unitsSold: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      SKU: {
-        type: String,
-        unique: true,
-        required: true,
-      },
-      images: [
-        {
-          type: String,
-          required: true,
+const productSchema = new mongoose.Schema({
+       
+          productTitle: { type: String, required: true },
+          brand: { type: String, required: true },
+          categories: [{ type: String }],
+          tags: [{ type: String }],
+          seoTitle: { type: String },
+          seoDescription: { type: String },
+          seoKeywords: [{ type: String }],
+          searchMetadata: {
+            synonyms: [{ type: String }],
+            alternateSpellings: [{ type: String }]
+          },
+        images: [{ type: String }],
+        descriptionHighlights: {
+          description: { type: String },
+          highlights: [{ type: String }]
         },
-      ],
-      videos: [
-        {
-          type: String,
+        pricing: {
+          regularPrice: { type: Number, required: true },
+          salePrice: { type: Number },
+          discount: { type: String },
+          currency: { type: String, required: true },
+          gstDetails: {
+            gstIncluded: { type: Boolean },
+            gstPercentage: { type: Number }
+          }
         },
-      ],
-      size: [
-        {
-          type: String,
+        availability: {
+          inStock: { type: Boolean },
+          stockQuantity: { type: Number },
+          deliveryTime: { type: String },
+          availabilityRegions: [{ type: String }],
+          codAvailable: { type: Boolean },
+          returnPolicy: {
+            returnApplicable: { type: Boolean },
+            returnWindow: { type: Number },
+            returnFees: { type: Number }
+          }
         },
-      ],
-      colors: [
-        {
-          type: String,
+        variants: [
+          {
+            id: { type: String },
+            color: { type: String },
+            variant: { type: String },
+            quantity: { type: Number },
+            sku: {
+              type: String,
+              unique: true, 
+              required: true,
+            },
+            variantImages: [{ type: String }]
+          }
+        ],
+        specifications: [
+          {
+            key: { type: String },
+            value: { type: String }
+          }
+        ],
+        deliveryConfig: {
+          type: { type: String },
+          fixedCharge: { type: Number },
+          isFreeShipping: { type: Boolean },
+          minOrderForFreeShipping: { type: Number },
+          maxDeliveryDistance: { type: Number },
+          deliveryPinCodes: [{ type: Number }],
+          deliveryPartner: { type: String },
+          isReturnApplicable: { type: Boolean },
+          returnWindow: { type: Number },
+          returnPolicyFees: { type: Number }
         },
-      ],
-      weight: {
-        type: String,
-      },
-      dimensions: {
-        length: { type: String },
-        width: { type: String },
-        height: { type: String },
-      },
-      ratings: {
-        average: {
-          type: Number,
-          default: 0,
-          min: 0,
-          max: 5,
+        ratings: {
+          averageRating: { type: Number },
+          totalReviews: { type: Number },
+          reviewHighlights: [
+            {
+              rating: { type: Number },
+              review: { type: String }
+            }
+          ]
         },
-        totalRatings: {
-          type: Number,
-          default: 0,
-          min: 0,
+        careInstructions: { type: String },
+        materials: [
+          {
+            material: { type: String },
+            percentage: { type: String }
+          }
+        ],
+        policySection: {
+          isChecked: { type: Boolean },
+          isTermsVisible: { type: Boolean }
         },
-        reviewsCount: {
-          type: Number,
-          default: 0,
-          min: 0,
+        localization: {
+          supportedLanguages: [{ type: String }],
+          defaultLanguage: { type: String },
+          regionalCurrency: { type: String },
+          priceInRegionalCurrency: { type: Boolean }
         },
-      },
-      isActive: {
-        type: Boolean,
-        default: true,
-      },
-      isFeatured: {
-        type: Boolean,
-        default: false,
-      },
-      tags: [
-        {
-          type: String,
+        paymentMethods: {
+          onlinePayment: { type: Boolean },
+          cod: { type: Boolean },
+          upi: { type: Boolean },
+          wallets: [{ type: String }]
         },
-      ],
-    },
-    { timestamps: true },{ versionKey: false });
+        crossSellProducts: [
+          {
+            productId: { type: String },
+            productTitle: { type: String },
+            price: { type: Number },
+            currency: { type: String }
+          }
+        ],
+        festivalOffers: {
+          diwaliOffer: {
+            discount: { type: String },
+            offerDescription: { type: String }
+          },
+          holiOffer: {
+            discount: { type: String },
+            offerDescription: { type: String }
+          }
+        }
+      }, { versionKey:false,timestamps: true });
+      
+ 
 
 productSchema.virtual("product_id").get(function () {
     return this._id.toString();

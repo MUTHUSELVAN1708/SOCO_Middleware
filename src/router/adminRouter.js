@@ -12,4 +12,9 @@ router.post("/createProduct",adminController.createProduct);
 router.get("/getproduct",adminController.getproduct);
 router.put("/updateProduct",adminController.updateProduct);
 router.delete("/deleteProduct",adminController.deleteProduct);
+
+
+
+
+
 export default router

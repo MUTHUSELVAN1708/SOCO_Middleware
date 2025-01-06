@@ -4,6 +4,7 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid"; 
 import registerModel from '../model/registerModel.js';
 import businessRegisterModel from '../model/BusinessModel.js';
+import playerController from "../controller/playerController.js";
 
 const router = express.Router();
 
@@ -251,11 +252,22 @@ router.get("/getDynamicFollowers/:id",adminController.getDynamicFollowers);
 router.get("/getDynamicFeed",adminController.getDynamicFeed)
 
 
+router.post("/notifyuser",adminController.notifyuser)
+
+router.post("/cart",adminController.cart);
+
+router.delete("/removeFromCart",adminController.removeFromCart);
+
+router.get("/getCart/:id",adminController.getCart);
 
 
 
 
+router.get("/getPlayers", playerController.getAllPlayers);
 
+// Route to get a player by ID
+router.get("/getPlayer/:playerId", playerController.getPlayerById);
+// router.post("/")
 
 
 

@@ -591,9 +591,8 @@ const adminController = {
         }
     },
     // =========================
-    createProduct: async (req, res, next) => {
-
-        try {
+createProduct: async (req, res, next) => {
+    try {
             const createProduct = await adminService.createProduct(req.body);
             res.status(200).json({
                 status: 200,
@@ -654,6 +653,80 @@ const adminController = {
             next(error);
         }
     },
+
+// ===============
+notifyuser:async (req, res) => {
+    const {user_id, message, } = req.body; 
+  console.log(req.body,"req.body")
+    try {
+      if (!message || !user_id) {
+        return res.status(400).json({
+          success: false,
+          message: "Message  are required!",
+        });
+      }
+  
+      const response = await adminService.notifyUser(req.body);
+      res.status(200).json({
+        success: true,
+        message: "Notification sent successfully!",
+        data: response,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to send notification",
+        error: error.message,
+      });
+    }
+  },
+
+// ====
+cart:async(req,res,next)=>{
+    try{
+        const cart = await adminService.cart(req.body);
+        res.status(200).json({
+            status: 200,
+            cart
+        })
+    }catch(error){
+        error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+    }
+},
+// =======================
+removeFromCart:async(req,res,next)=>{
+    try{
+        const removeFromCart = await adminService.removeFromCart(req.body);
+        res.status(200).json({
+            status: 200,
+            removeFromCart
+        })
+    }catch(error){
+        error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+    }
+},
+// ================================
+getCart:async(req,res,next)=>{
+    try{
+        const{id}=req.params;
+        const getCart = await adminService.getCart(id);
+        res.status(200).json({
+            status: 200,
+            getCart
+        })
+    }catch(error){
+        error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+    }
+},
 
 }
 

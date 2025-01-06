@@ -22,9 +22,11 @@ const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 import connectedUsers from "../../socket.js";
 import productModel from "../model/productModel.js";
+import pushnotofication from "../pushNotification.js"
+import cartModel from "../model/cartModel.js";
 const adminService = {
     register: async (data) => {
-        const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree } = data;
+        const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree, deviceToken } = data;
         try {
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
@@ -44,6 +46,7 @@ const adminService = {
                     phn_number,
                     password: hashedpassword,
                     email,
+                    deviceToken,
                     status,
                     reg_otp_id,
                     DOB,
@@ -250,6 +253,7 @@ const adminService = {
                 phn_number,
                 email,
                 DOB,
+                deviceToken,
                 location_id,
                 reg_otp_id,
                 password,
@@ -310,7 +314,7 @@ const adminService = {
                 achievements
             } = data;
 
-            
+
 
             // Validate required fields
             let errors = [];
@@ -373,6 +377,7 @@ const adminService = {
             // Create user entry
             const register = await registerModel.create({
                 location_id,
+                deviceToken,
                 full_Name,
                 phn_number,
                 password: hashedPassword,
@@ -736,49 +741,62 @@ const adminService = {
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-
-
     // ==================================
     login: async (data) => {
-        const { email, phn_number, password } = data;
+        const { email, phn_number, password, deviceToken } = data;
         try {
             let user;
-    
+
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-    
+
             if (!user) {
                 throw { msg: "Account not found. Please register to continue." };
             }
-    
+
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     throw { msg: "Invalid credentials. Please try again or reset your password." };
                 }
             }
-    
+
+            console.log("User ID:", user._id, "Device Token:", deviceToken);
+
+            const updatedUser = await registerModel.findOneAndUpdate(
+                { _id: user._id },
+                { $addToSet: { deviceToken: deviceToken } },
+                { new: true }
+            );
+
+            if (updatedUser) {
+                console.log("Device tokens updated successfully:", updatedUser.deviceToken);
+            } else {
+                console.error("Failed to update device tokens.");
+            }
+
             const business = await businessregisterModel.findOne({ user_id: user._id });
-    
+
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-    
+
             return {
                 status: 200,
                 msg: "Login successful",
                 login: {
                     token,
-                    user: user,
+                    user: updatedUser,
                     business: business ? business : null,
                 },
             };
         } catch (error) {
+            console.error("Login error:", error);
             return {
                 status: 500,
                 msg: error.msg || "An error occurred during login. Please try again.",
@@ -913,7 +931,7 @@ const adminService = {
 
     forgotPassword: async (data) => {
         const { email, password } = data;
-    console.log(data);
+        console.log(data);
 
 
         if (!email || !password) {
@@ -1424,7 +1442,7 @@ const adminService = {
     //     }
     // },
 
-    createPost: async (data) => {    
+    createPost: async (data) => {
         const {
             user_id,
             imageUrl,
@@ -1451,25 +1469,25 @@ const adminService = {
             quality,
             visibility,
             aspectRatio,
-            typeOfAccount, 
+            typeOfAccount,
         } = data;
-    
+
         try {
             let user;
-                    console.log("scheduleDateTime value:", scheduleDateTime);
+            console.log("scheduleDateTime value:", scheduleDateTime);
 
             if (typeOfAccount === "business") {
                 user = await businessregisterModel.findById(user_id);
             } else {
                 user = await registerModel.findById(user_id);
             }
-    
+
             if (!user) {
                 throw new Error("User not found");
             }
-    
+
             const filtersArray = Array.isArray(filters) ? filters : [];
-    
+
             let newPost = {
                 user_id,
                 imageUrl,
@@ -1498,14 +1516,14 @@ const adminService = {
                 aspectRatio,
                 status: isScheduled ? "scheduled" : "published",
             };
-    
+
             if (isScheduled && scheduleDateTime) {
-            
+
                 const scheduleTime = moment(scheduleDateTime).toDate();
-            
+
                 const cronExpression = `${scheduleTime.getMinutes()} ${scheduleTime.getHours()} ${scheduleTime.getDate()} ${scheduleTime.getMonth() + 1} *`;
-            
-            
+
+
                 if (cron.validate(cronExpression)) {
                     cron.schedule(cronExpression, async () => {
                         try {
@@ -1519,17 +1537,17 @@ const adminService = {
                     throw new Error("Failed to schedule the post due to invalid cron expression.");
                 }
             }
-            
-    
+
+
             const userPost = new createPostModel(newPost);
             await userPost.save();
-    
+
             return userPost;
         } catch (error) {
             throw new Error("Failed to create the post.");
         }
     },
-    
+
 
     // createPost: async (data) => {
     //     console.log("Received data for creating post:", data);
@@ -2050,19 +2068,16 @@ const adminService = {
     // =================================
     addMention: async (data) => {
         try {
-            // Validate input data
             if (!data || typeof data !== 'object') {
                 return { success: false, message: "Invalid data provided" };
             }
 
             const { user_id, mentionType, mentionDetails } = data;
 
-            // Check required fields
             if (!user_id || !mentionType) {
                 return { success: false, message: "user_id and mentionType are required" };
             }
 
-            // Validate mentionDetails
             if (mentionDetails && typeof mentionDetails !== 'object') {
                 return { success: false, message: "mentionDetails must be an object" };
             }
@@ -2072,35 +2087,30 @@ const adminService = {
                     return { success: false, message: "Friends must be an array of full_Name" };
                 }
 
-                // Validate each friend's full_Name
                 const validFriends = [];
                 for (const friendName of mentionDetails.friends) {
-                    const friend = await registerModel.findOne({ full_Name: friendName }); // Query using `full_Name`
+                    const friend = await registerModel.findOne({ full_Name: friendName }); 
                     if (friend) {
                         validFriends.push({
                             friend_id: friend._id,
                             full_Name: friend.full_Name,
-                        }); // Add valid friend with their ID and name
+                        }); 
                     }
                 }
 
-                // If no valid friends are found
                 if (validFriends.length === 0) {
                     return { success: false, message: "No valid friends found for the provided names" };
                 }
 
-                // Update mentionDetails with valid friends
                 mentionDetails.friends = validFriends;
             }
 
-            // Create the mention record
             const result = await mentionModel.create({
                 user_id,
                 mentionType,
                 mentionDetails: mentionDetails || {},
             });
 
-            // Return success response
             return {
                 success: true,
                 message: "Mention added successfully",
@@ -2109,7 +2119,6 @@ const adminService = {
         } catch (error) {
             console.error("Error adding mention:", error);
 
-            // Return error response
             return { success: false, message: "An error occurred while adding mention", error: error.message };
         }
     },
@@ -2132,15 +2141,14 @@ const adminService = {
     getDynamicFollowers: async (user_id) => {
         console.log(user_id, "uuuu")
         try {
-            // Fetch followers dynamically, filtering out muted or blocked ones
             const followers = await followerModel.find({
                 user_id: user_id,
                 status: 'accepted',
                 isBlocked: false,
                 isMuted: false
-            }).select('follower_id'); // Only retrieve follower IDs
+            }).select('follower_id'); 
 
-            return followers.map(f => f.follower_id); // Extract follower IDs dynamically
+            return followers.map(f => f.follower_id);
         } catch (error) {
             console.error('Error fetching followers:', error);
             return [];
@@ -2152,56 +2160,51 @@ const adminService = {
         console.log("Fetching dynamic feed:", user_id, visibility, tags, startDate, endDate, page, limit);
 
         try {
-            // Fetch dynamic list of followers
             const followerIds = await adminService.getDynamicFollowers(user_id);
             console.log(followerIds, "followerIds");
 
             if (!followerIds.length) {
-                return []; // No followers, return an empty feed
+                return []; 
             }
 
-            // Build dynamic filters
+
             const query = {
-                user_id: { $in: followerIds }, // Posts by followed users
-                status: "published", // Only published posts
+                user_id: { $in: followerIds }, 
+                status: "published", 
             };
             console.log(query, "query");
 
-            // Apply dynamic filters
-            if (visibility) query.visibility = visibility; // Add visibility filter
+            if (visibility) query.visibility = visibility; 
             console.log(visibility, "visibility");
 
-            if (tags && tags.length > 0) query.tags = { $in: tags }; // Add tags filter
+            if (tags && tags.length > 0) query.tags = { $in: tags }; 
             console.log(tags, "tags");
 
             if (startDate && endDate) {
                 const start = new Date(startDate);
                 const end = new Date(endDate);
                 if (!isNaN(start) && !isNaN(end)) {
-                    query.timestamp = { $gte: start, $lte: end }; // Add date range filter
+                    query.timestamp = { $gte: start, $lte: end }; 
                 }
             }
 
-            // Fetch posts dynamically
             const posts = await createPostModel
                 .find(query)
-                .sort({ timestamp: -1 }) // Sort by timestamp descending
-                .skip((page - 1) * limit) // Pagination
-                .limit(limit) // Limit number of posts per page
-                .populate("user_id", "full_Name profile_url"); // Populate user details
+                .sort({ timestamp: -1 }) 
+                .skip((page - 1) * limit) 
+                .limit(limit) 
+                .populate("user_id", "full_Name profile_url"); 
             console.log(posts, "posts");
 
-            // Fetch user details for each post
             const postsWithUserDetails = await Promise.all(posts.map(async (post) => {
                 console.log(post.user_id, "kj")
                 const userDetails = await registerModel.findById(post.user_id);
                 console.log(userDetails, "userDetails");
-                // console.log(post, "postsssssssssssssssssss")
                 return {
                     id: post._id,
                     user_id: post.user_id._id,
-                    userName: userDetails ? userDetails.full_Name : 'Unknown User', // Handle case where userDetails might be null
-                    profileUrl: userDetails ? userDetails.profile_url : '', // Handle case where userDetails might be null
+                    userName: userDetails ? userDetails.full_Name : 'Unknown User', 
+                    profileUrl: userDetails ? userDetails.profile_url : '', 
                     mediaFile: post.mediaFile,
                     imageUrl: post.imageUrl,
                     caption: post.caption,
@@ -2226,78 +2229,133 @@ const adminService = {
 
     // ==================================
     createProduct: async (data) => {
-        const { 
-            productName,
-            business_id,
-            category,
-            subCategory,
-            productDescription,
-            brand,
-            price,
-            originalPrice,
-            discountPercentage,
-            quantityAvailable,
-            unitsSold,
-            SKU,
-            images,
-            videos,
-            size,
-            colors,
-            weight,
-            dimensions,
-            length,
-            width,
-            height,
-            ratings,
-            average,
-            totalRatings,
-            reviewsCount,
-            isActive,
-            isFeatured,
-            tags
-        } = data
+        const {
+          productTitle,
+          brand,
+          categories,
+          tags,
+          seoTitle,
+          seoDescription,
+          seoKeywords,
+          searchMetadata,
+          images,
+          description,
+          highlights,
+          pricing,
+          availability,
+          variants,
+          specifications,
+          deliveryConfig,
+          ratings,
+          careInstructions,
+          materials,
+          policySection,
+          localization,
+          paymentMethods,
+          crossSellProducts,
+          festivalOffers,
+        } = data;
+      
+        if (!Array.isArray(data.variants)) {
+          throw new Error("Variants should be an array.");
+        }
+      
+        const existingProduct = await productModel.findOne({
+          'variants.sku': { $in: data.variants.map((variant) => variant.sku) },
+        });
+        if (existingProduct) {
+          throw new Error("SKU already exists. Please use unique SKUs.");
+        }
       
         try {
-            if (!productName || !business_id || !category || !price || !quantityAvailable) {
-                throw new Error("Missing required fields: productName, business_id, category, price, quantityAvailable");
-            }
-          
-            const product = await productModel.create({
-                productName,
-                business_id,
-                category,
-                subCategory,
-                productDescription,
-                brand,
-                price,
-                originalPrice,
-                discountPercentage,
-                quantityAvailable,
-                unitsSold,
-                SKU,
-                images,
-                videos,
-                size,
-                colors,
-                weight,
-                dimensions,
-                length,
-                width,
-                height,
-                ratings,
-                average,
-                totalRatings,
-                reviewsCount,
-                isActive,
-                isFeatured,
-                tags,
-                
-            })
-            return product
+          const product = await productModel.create({
+            productTitle: productTitle || "",
+            brand: brand || "",
+            categories: categories || [],
+            tags: tags || [],
+            seoTitle: seoTitle || "",
+            seoDescription: seoDescription || "",
+            seoKeywords: seoKeywords || [],
+            searchMetadata: {
+              synonyms: searchMetadata?.synonyms || [],
+              alternateSpellings: searchMetadata?.alternateSpellings || [],
+            },
+            images: images || [],
+            descriptionHighlights: {
+              description: description || "",
+              highlights: highlights || [],
+            },
+            pricing: {
+              regularPrice: pricing?.regularPrice || null,
+              salePrice: pricing?.salePrice || null,
+              discount: pricing?.discount || "",
+              currency: pricing?.currency || "",
+              gstDetails: {
+                gstIncluded: pricing?.gstIncluded || null,
+                gstPercentage: pricing?.gstPercentage || null,
+              },
+            },
+            availability: {
+              inStock: availability?.inStock || null,
+              stockQuantity: availability?.stockQuantity || null,
+              deliveryTime: availability?.deliveryTime || "",
+              availabilityRegions: availability?.availabilityRegions || [],
+              codAvailable: availability?.codAvailable || null,
+              returnPolicy: {
+                returnApplicable: availability?.returnPolicy?.returnApplicable || null,
+                returnWindow: availability?.returnPolicy?.returnWindow || null,
+                returnFees: availability?.returnPolicy?.returnFees || null,
+              },
+            },
+            variants: variants.map((variant) => ({
+              id: variant.id || "",
+              color: variant.color || "",
+              variant: variant.variant || "",
+              quantity: variant.quantity || null,
+              sku: variant.sku || "",
+              variantImages: variant.variantImages || [],
+            })),
+            specifications: specifications || [],
+            deliveryConfig: {
+              type: deliveryConfig?.type || "",
+              fixedCharge: deliveryConfig?.fixedCharge || null,
+              isFreeShipping: deliveryConfig?.isFreeShipping || null,
+              minOrderForFreeShipping: deliveryConfig?.minOrderForFreeShipping || null,
+              maxDeliveryDistance: deliveryConfig?.maxDeliveryDistance || null,
+              deliveryPinCodes: deliveryConfig?.deliveryPinCodes || [],
+              deliveryPartner: deliveryConfig?.deliveryPartner || "",
+              isReturnApplicable: deliveryConfig?.isReturnApplicable || null,
+              returnWindow: deliveryConfig?.returnWindow || null,
+              returnPolicyFees: deliveryConfig?.returnPolicyFees || null,
+            },
+            ratings: {
+              averageRating: ratings?.averageRating || null,
+              totalReviews: ratings?.totalReviews || null,
+              ratingDistribution: ratings?.ratingDistribution || {},
+              reviews: ratings?.reviews || [],
+            },
+            careInstructions: careInstructions || "",
+            materials: materials || [],
+            policySection: policySection || [],
+            localization: localization || {},
+            paymentMethods: paymentMethods || [],
+            crossSellProducts: crossSellProducts?.map((product) => ({
+              productId: product.productId || "",
+              productTitle: product.productTitle || "",
+              price: product.price || "",
+              currency: product.currency || "",
+            })) || [],
+            festivalOffers: festivalOffers || [],
+          });
+      
+          return product;
         } catch (error) {
-            throw error
+          console.error("Error creating product:", error);
+          throw new Error("Failed to create product. Please try again.");
         }
-    },
+      },
+      
+      
     // ============================
     getproduct: async () => {
         try {
@@ -2311,69 +2369,62 @@ const adminService = {
     updateProduct: async (data) => {
         const {
             product_id,
-            productName,
-            business_id,
-            category,
-            subCategory,
-            productDescription,
+            productTitle,
             brand,
-            price,
-            originalPrice,
-            discountPercentage,
-            quantityAvailable,
-            unitsSold,
-            SKU,
-            images,
-            videos,
-            size,
-            colors,
-            weight,
-            dimensions,
-            length,
-            width,
-            height,
-            ratings,
-            average,
-            totalRatings,
-            reviewsCount,
-            isActive,
-            isFeatured,
+            categories,
             tags,
-             } = data
+            seoTitle,
+            seoDescription,
+            seoKeywords,
+            searchMetadata,
+            images,
+            description,
+            highlights,
+            pricing,
+            availability,
+            variants,
+            specifications,
+            deliveryConfig,
+            ratings,
+            careInstructions,
+            materials,
+            policySection,
+            localization,
+            paymentMethods,
+            crossSellProducts,
+            festivalOffers,
+          } = data;
+        
         try {
-            if (!product_id || !productName || !business_id || !category || !price || !quantityAvailable) {
-                throw new Error("Missing required fields:product_id, productName, business_id, category, price, quantityAvailable");
+            if (!product_id || !productTitle  || !categories || !pricing || !availability) {
+                throw new Error("Missing required fields:product_id, productTitle, categories, pricing, availability");
             }
             const updateProduct = await productModel.findByIdAndUpdate(product_id,
-                { productName,
-                    business_id,
-                    category,
-                    subCategory,
-                    productDescription,
+                {
+                    productTitle,
                     brand,
-                    price,
-                    originalPrice,
-                    discountPercentage,
-                    quantityAvailable,
-                    unitsSold,
-                    SKU,
-                    images,
-                    videos,
-                    size,
-                    colors,
-                    weight,
-                    dimensions,
-                    length,
-                    width,
-                    height,
-                    ratings,
-                    average,
-                    totalRatings,
-                    reviewsCount,
-                    isActive,
-                    isFeatured,
+                    categories,
                     tags,
-                    
+                    seoTitle,
+                    seoDescription,
+                    seoKeywords,
+                    searchMetadata,
+                    images,
+                    description,
+                    highlights,
+                    pricing,
+                    availability,
+                    variants,
+                    specifications,
+                    deliveryConfig,
+                    ratings,
+                    careInstructions,
+                    materials,
+                    policySection,
+                    localization,
+                    paymentMethods,
+                    crossSellProducts,
+                    festivalOffers,
                 },
                 { new: true });
             return updateProduct
@@ -2382,29 +2433,182 @@ const adminService = {
         }
     },
     // =====================
- deleteProduct : async (product) => {
+    deleteProduct: async (product) => {
         try {
             const { product_id } = product;
-    
+
             if (!product_id) {
-                throw new Error("Product ID is required.");
+                throw new Error("product_id is required.");
             }
-    
-          
             const deletedProduct = await productModel.findOneAndDelete({ _id: product_id });
-    
+
             if (!deletedProduct) {
                 throw new Error(`Product with ID ${product_id} not found.`);
             }
-    
-            console.log(`Product deleted successfully: ${deletedProduct}`);
             return "Product deleted successfully";
         } catch (error) {
             console.error(`Error deleting product: ${error.message}`);
             throw new Error("Unable to delete product. Please try again.");
         }
     },
-    
+
+    // ==========
+    notifyUser: async (data) => {
+        const { user_id, message, } = data;
+        console.log(data, "data")
+
+        try {
+            const user = await registerModel.findById(user_id);
+
+            if (!user) {
+                throw new Error("User not found");
+            }
+
+            if (!user.deviceToken || user.deviceToken.length === 0) {
+                throw new Error("User has no registered device tokens.");
+            }
+
+            const deviceIds = user.deviceToken;
+            console.log(deviceIds, "juii")
+            const response = await pushnotofication.sendNotificationToDevice(message, deviceIds);
+
+            return response;
+        } catch (error) {
+            console.error("Error in notifyUser service:", error);
+            throw error;
+        }
+    },
+    // =================
+    cart: async (data) => {
+        const {
+            user_id,
+            product_id,
+            images,
+            colors,
+            size,
+            quantity,
+            productName,
+            category,
+            unit,
+            price,
+
+        } = data;
+
+        try {
+            const user = await registerModel.findById(user_id);
+            if (!user) {
+                throw new Error("User not found");
+            }
+
+            const product = await productModel.findById(product_id);
+            if (!product) {
+                throw new Error("Product not found");
+            }
+
+            if (quantity <= 0) {
+                throw new Error("Invalid initial quantity");
+            }
+
+            let cartItem = await cartModel.findOne({
+                user_id,
+                product_id,
+            });
+
+            if (cartItem) {
+                cartItem.quantity += Number(quantity);
+                cartItem.unit = unit;
+                cartItem.productName = productName || product.productName;
+                cartItem.size = size || product.size;
+                cartItem.images = images || product.images;
+                cartItem.category = category || product.category;
+
+            } else {
+                cartItem = await cartModel.create({
+                    user_id,
+                    product_id,
+                    productName: productName || product.productName,
+                    size: size || product.size,
+                    unit: unit,
+                    images: images || product.images,
+
+                    category: category || product.category,
+                    quantity: Number(quantity),
+                    price: product.price,
+                    colors: colors || product.colors,
+                });
+            }
+
+            let totalPrice = 0;
+            if (unit === "gram" || unit === "piece") {
+                totalPrice = cartItem.quantity * product.price;
+            } else {
+                throw new Error("Invalid unit specified");
+            }
+
+            cartItem.price = totalPrice;
+            await cartItem.save();
+
+            return cartItem;
+        } catch (error) {
+            console.error("Error storing in cart:", error);
+            throw {
+                error: "something wrong",
+            };
+        }
+    },
+
+    // =======================
+    removeFromCart: async (data) => {
+        const { user_id, cart_id } = data;
+
+        try {
+            const cartItem = await cartModel.findById(cart_id);
+            if (!cartItem) {
+                throw {
+                    error: "Cart item not found",
+                };
+            }
+
+            if (cartItem.user_id.toString() !== user_id) {
+                throw {
+                    error: "Unauthorized action",
+                };
+            }
+
+            const deletedItem = await cartModel.findByIdAndDelete(cart_id);
+            if (!deletedItem) {
+                throw {
+                    error: "Failed to delete item from cart",
+                };
+            }
+
+            console.log("Deleted item:", deletedItem);
+
+            return {
+                message: "Product removed from cart successfully",
+            };
+        } catch (error) {
+            console.error("Error removing from cart:", error);
+            throw {
+                error: "Something went wrong",
+            };
+        }
+    },
+    //   ===========================
+    getCart: async (user_id) => {
+        try {
+            console.log("user", user_id);
+
+            const getCart = await cartModel.find({
+                user_id: user_id,
+            });
+            return getCart;
+        } catch (error) {
+            throw {
+                error: "something wrong",
+            };
+        }
+    },
 
 }
 
