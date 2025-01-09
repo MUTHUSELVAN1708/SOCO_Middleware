@@ -28,12 +28,10 @@ const productSchema = new mongoose.Schema({
   basicInfo: {
     productTitle: { type: String, required: false, trim: false },
     brand: { type: String, required: false },
-    categories: [
-      {
-        key: { type: String}, 
-        values: [{ type: String }] 
-      }
-    ],
+    categories: {
+      type: Map,
+      of: [String]  
+    },
     tags: [String],
     seoTitle: String,
     seoDescription: String,
