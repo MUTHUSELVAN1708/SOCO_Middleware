@@ -8,10 +8,10 @@ router.put("/updateBusinessStatus",adminController.updateBusinessStatus);//for a
 
 
 
-router.post("/createProduct",adminController.createProduct);
-router.get("/getproduct",adminController.getproduct);
-router.put("/updateProduct",adminController.updateProduct);
-router.delete("/deleteProduct",adminController.deleteProduct);
+// router.post("/createProduct",adminController.createProduct);
+// router.get("/getproduct",adminController.getproduct);
+// router.put("/updateProduct",adminController.updateProduct);
+// router.delete("/deleteProduct",adminController.deleteProduct);
 
 
 
