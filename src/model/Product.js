@@ -1,23 +1,23 @@
 import mongoose from "mongoose";
 
 const reviewReplySchema = new mongoose.Schema({
-  id: { type: String, required: true },
-  userName: { type: String, required: true },
+  id: { type: String, required: false },
+  userName: { type: String, required: false },
   userAvatar: String,
-  reply: { type: String, required: true },
-  datePosted: { type: Date, required: true },
+  reply: { type: String, required: false },
+  datePosted: { type: Date, required: false },
   isSellerResponse: { type: Boolean, default: false },
   isEdited: { type: Boolean, default: false }
 });
 
 const reviewSchema = new mongoose.Schema({
-  id: { type: String, required: true },
-  userName: { type: String, required: true },
+  id: { type: String, required: false },
+  userName: { type: String, required: false },
   userAvatar: String,
-  rating: { type: Number, required: true },
-  review: { type: String, required: true },
-  datePosted: { type: Date, required: true },
-  isVerifiedPurchase: { type: Boolean, required: true },
+  rating: { type: Number, required: false },
+  review: { type: String, required: false },
+  datePosted: { type: Date, required: false },
+  isVerifiedPurchase: { type: Boolean, required: false },
   reviewImages: [String],
   replies: [reviewReplySchema],
   helpfulCount: { type: Number, default: 0 },
@@ -26,9 +26,14 @@ const reviewSchema = new mongoose.Schema({
 
 const productSchema = new mongoose.Schema({
   basicInfo: {
-    productTitle: { type: String, required: true, trim: true },
-    brand: { type: String, required: true },
-    categories: [{ type: String, required: true }],
+    productTitle: { type: String, required: false, trim: false },
+    brand: { type: String, required: false },
+    categories: [
+      {
+        key: { type: String}, 
+        values: [{ type: String }] 
+      }
+    ],
     tags: [String],
     seoTitle: String,
     seoDescription: String,
@@ -40,23 +45,28 @@ const productSchema = new mongoose.Schema({
   },
   images: [String],
   descriptionHighlights: {
-    description: { type: String, required: true },
+    description: { type: String, required: false },
     highlights: [String]
   },
   pricing: {
-    regularPrice: { type: Number, required: true },
-    salePrice: Number,
+    regularPrice: { type: String, required: false },
+    salePrice: { type: String, required: false },
     discount: String,
     currency: { type: String, default: 'INR' },
     gstDetails: {
-      gstIncluded: { type: Boolean, default: true },
+      gstIncluded: { type: Boolean, default: false },
       gstPercentage: { type: Number, default: 18 }
     },
-    tax: Number
+    additionalTaxes: [
+      {
+        name: { type: String },
+        percentage: { type: Number},
+      },
+    ],
   },
   availability: {
-    inStock: { type: Boolean, default: true },
-    stockQuantity: { type: Number, required: true },
+    inStock: { type: Boolean, default: false },
+    stockQuantity: { type: Number, required: false },
     deliveryTime: String,
     availabilityRegions: [String],
     codAvailable: Boolean,
@@ -67,11 +77,13 @@ const productSchema = new mongoose.Schema({
     }
   },
   variants: [{
-    id: { type: String, required: true },
     color: String,
     variant: String,
-    quantity: { type: Number, required: true },
-    sku: { type: String, required: true },
+    quantity: Number,
+    sku: { 
+      type: String,
+      required: true  // Make SKU required
+    },
     variantImages: [String]
   }],
   specifications: [{
@@ -113,18 +125,18 @@ const productSchema = new mongoose.Schema({
   }],
   policySection: {
     isChecked: { type: Boolean, default: false },
-    isTermsVisible: { type: Boolean, default: true }
+    isTermsVisible: { type: Boolean, default: false }
   },
   localization: {
     supportedLanguages: [String],
     defaultLanguage: { type: String, default: 'en' },
     regionalCurrency: { type: String, default: 'INR' },
-    priceInRegionalCurrency: { type: Boolean, default: true }
+    priceInRegionalCurrency: { type: Boolean, default: false }
   },
   paymentMethods: {
-    onlinePayment: { type: Boolean, default: true },
-    cod: { type: Boolean, default: true },
-    upi: { type: Boolean, default: true },
+    onlinePayment: { type: Boolean, default: false },
+    cod: { type: Boolean, default: false },
+    upi: { type: Boolean, default: false },
     wallets: [String]
   },
   crossSellProducts: [{
@@ -148,7 +160,7 @@ const productSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   }
 }, {
   timestamps: true,
@@ -159,6 +171,8 @@ productSchema.index({ 'basicInfo.productTitle': 'text', 'basicInfo.tags': 'text'
 productSchema.index({ 'pricing.regularPrice': 1 });
 productSchema.index({ 'availability.inStock': 1 });
 productSchema.index({ 'ratings.averageRating': 1 });
+productSchema.index({ 'variants.sku': 1 }, { unique: true, sparse: true });
+
 
 const Product = mongoose.model('Product', productSchema);
 export default Product;

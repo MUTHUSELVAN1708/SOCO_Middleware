@@ -44,7 +44,7 @@ const formatResponse = (success, message, data = null, errors = null) => {
 };
 
 
-export const getProductDetail = async (req, res) => {
+ export const getProductDetail = async (req, res) => {
     try {
       const { productId } = req.params;
   
@@ -160,7 +160,7 @@ export const getProductDetail = async (req, res) => {
     }
   };
 
-export const createAndUpdateProduct = async (req, res) => {
+  export const createAndUpdateProduct = async (req, res) => {
     try {
       const { productId } = req.params;
       const productData = req.body;
@@ -173,10 +173,12 @@ export const createAndUpdateProduct = async (req, res) => {
         );
       }
   
-      if (!userId) {
-        return res.status(401).json(
-          formatResponse(false, ERROR_MESSAGES.AUTH.INVALID_USER)
-        );
+      // Normalize SKUs to lowercase to prevent case-sensitive duplicates
+      if (productData.variants) {
+        productData.variants = productData.variants.map(variant => ({
+          ...variant,
+          sku: variant.sku.toLowerCase()
+        }));
       }
   
       const defaultRatings = {
@@ -197,89 +199,69 @@ export const createAndUpdateProduct = async (req, res) => {
   
       if (productId) {
         product = await Product.findOne({ _id: productId });
-        
-        if (!product) {
-          return res.status(404).json(
-            formatResponse(false, ERROR_MESSAGES.PRODUCT.NOT_FOUND)
-          );
+        if (!product) return res.status(404).json(formatResponse(false, 'Product not found'));
+  
+        // Check for duplicate SKUs before updating
+        if (productData.variants) {
+          const skus = productData.variants.map(v => v.sku);
+          const existingSku = await Product.findOne({
+            _id: { $ne: productId },
+            'variants.sku': { $in: skus }
+          });
+          
+          if (existingSku) {
+            return res.status(409).json(
+              formatResponse(false, `Duplicate SKU found in another product`)
+            );
+          }
         }
   
-        if (product.createdBy.toString() !== userId.toString()) {
-          return res.status(403).json(
-            formatResponse(false, ERROR_MESSAGES.AUTH.ACCESS_DENIED)
-          );
-        }
-  
-        const existingRatings = product.ratings || defaultRatings;
-        
         product = await Product.findOneAndUpdate(
           { _id: productId },
-          { 
-            $set: {
-              ...productData,
-              ratings: productData.ratings || existingRatings,
-              updatedAt: new Date()
-            }
-          },
-          { 
-            new: true,
-            runValidators: true
-          }
+          { $set: productData },
+          { new: true, runValidators: true }
         );
-  
-        responseMessage = ERROR_MESSAGES.PRODUCT.UPDATE_SUCCESS;
+        responseMessage = 'Product updated successfully';
       } else {
+        // Check for duplicate SKUs before creating
+        if (productData.variants) {
+          const skus = productData.variants.map(v => v.sku);
+          console.log(skus);
+          const existingSku = await Product.findOne({
+            'variants.sku': { $in: skus }
+          });
+          console.log(existingSku);
+          if (existingSku) {
+            console.log('running without sku');
+            return res.status(409).json(
+              formatResponse(false, `Duplicate SKU found in another product`)
+            );
+          }
+        }
+
+  
         product = await Product.create({
           ...productData,
-          ratings: productData.ratings || defaultRatings,
-          createdBy: userId
+          ratings: defaultRatings,
+          createdBy: userId,
         });
-  
-        responseMessage = ERROR_MESSAGES.PRODUCT.CREATE_SUCCESS;
+        responseMessage = 'Product created successfully';
       }
   
-      return res.status(200).json(
-        formatResponse(true, responseMessage, {
-          productId: product._id
-        })
-      );
-  
+      return res.status(200).json(formatResponse(true, responseMessage, { productId: product._id }));
     } catch (error) {
-      if (error.name === 'ValidationError') {
-        const validationErrors = Object.values(error.errors).map(err => ({
-          field: err.path,
-          message: err.message,
-          value: err.value
-        }));
-  
-        return res.status(400).json(
-          formatResponse(false, 'Validation failed', null, validationErrors)
-        );
-      }
-  
+      // console.error('Error in createAndUpdateProduct:', error);
+      
       if (error.code === 11000) {
-        const duplicateField = Object.keys(error.keyValue)[0];
-        const duplicateValue = error.keyValue[duplicateField];
-  
         return res.status(409).json(
-          formatResponse(false, 'Duplicate entry found', null, [{
-            field: duplicateField,
-            message: `A product with ${duplicateField} "${duplicateValue}" already exists`,
-            value: duplicateValue
-          }])
+          formatResponse(false, `Duplicate SKU found. Each variant must have a unique SKU.`)
         );
       }
   
-      console.error('Product creation/update error:', error);
-  
-      return res.status(500).json(
-        formatResponse(false, ERROR_MESSAGES.SYSTEM.SERVER_ERROR, null, [{
-          code: error.code || 'UNKNOWN_ERROR',
-          message: error.message
-        }])
-      );
+      return res.status(500).json(formatResponse(false, 'Server error', null, [{ message: error.message }]));
     }
   };
+  
   
   export const deleteProducts = async (req, res) => {
     try {
