@@ -21,7 +21,6 @@ import mentionModel from "../model/mentionModel.js";
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 import connectedUsers from "../../socket.js";
-import productModel from "../model/productModel.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
 const adminService = {
@@ -2227,230 +2226,230 @@ const adminService = {
         }
     },
 
-    // ==================================
-    createProduct: async (data) => {
-        const {
-          productTitle,
-          brand,
-          categories,
-          tags,
-          seoTitle,
-          seoDescription,
-          seoKeywords,
-          searchMetadata,
-          images,
-          description,
-          highlights,
-          pricing,
-          availability,
-          variants,
-          specifications,
-          deliveryConfig,
-          ratings,
-          careInstructions,
-          materials,
-          policySection,
-          localization,
-          paymentMethods,
-          crossSellProducts,
-          festivalOffers,
-        } = data;
+    // // ==================================
+    // createProduct: async (data) => {
+    //     const {
+    //       productTitle,
+    //       brand,
+    //       categories,
+    //       tags,
+    //       seoTitle,
+    //       seoDescription,
+    //       seoKeywords,
+    //       searchMetadata,
+    //       images,
+    //       description,
+    //       highlights,
+    //       pricing,
+    //       availability,
+    //       variants,
+    //       specifications,
+    //       deliveryConfig,
+    //       ratings,
+    //       careInstructions,
+    //       materials,
+    //       policySection,
+    //       localization,
+    //       paymentMethods,
+    //       crossSellProducts,
+    //       festivalOffers,
+    //     } = data;
       
-        if (!Array.isArray(data.variants)) {
-          throw new Error("Variants should be an array.");
-        }
+    //     if (!Array.isArray(data.variants)) {
+    //       throw new Error("Variants should be an array.");
+    //     }
       
-        const existingProduct = await productModel.findOne({
-          'variants.sku': { $in: data.variants.map((variant) => variant.sku) },
-        });
-        if (existingProduct) {
-          throw new Error("SKU already exists. Please use unique SKUs.");
-        }
+    //     const existingProduct = await productModel.findOne({
+    //       'variants.sku': { $in: data.variants.map((variant) => variant.sku) },
+    //     });
+    //     if (existingProduct) {
+    //       throw new Error("SKU already exists. Please use unique SKUs.");
+    //     }
       
-        try {
-          const product = await productModel.create({
-            productTitle: productTitle || "",
-            brand: brand || "",
-            categories: categories || [],
-            tags: tags || [],
-            seoTitle: seoTitle || "",
-            seoDescription: seoDescription || "",
-            seoKeywords: seoKeywords || [],
-            searchMetadata: {
-              synonyms: searchMetadata?.synonyms || [],
-              alternateSpellings: searchMetadata?.alternateSpellings || [],
-            },
-            images: images || [],
-            descriptionHighlights: {
-              description: description || "",
-              highlights: highlights || [],
-            },
-            pricing: {
-              regularPrice: pricing?.regularPrice || null,
-              salePrice: pricing?.salePrice || null,
-              discount: pricing?.discount || "",
-              currency: pricing?.currency || "",
-              gstDetails: {
-                gstIncluded: pricing?.gstIncluded || null,
-                gstPercentage: pricing?.gstPercentage || null,
-              },
-            },
-            availability: {
-              inStock: availability?.inStock || null,
-              stockQuantity: availability?.stockQuantity || null,
-              deliveryTime: availability?.deliveryTime || "",
-              availabilityRegions: availability?.availabilityRegions || [],
-              codAvailable: availability?.codAvailable || null,
-              returnPolicy: {
-                returnApplicable: availability?.returnPolicy?.returnApplicable || null,
-                returnWindow: availability?.returnPolicy?.returnWindow || null,
-                returnFees: availability?.returnPolicy?.returnFees || null,
-              },
-            },
-            variants: variants.map((variant) => ({
-              id: variant.id || "",
-              color: variant.color || "",
-              variant: variant.variant || "",
-              quantity: variant.quantity || null,
-              sku: variant.sku || "",
-              variantImages: variant.variantImages || [],
-            })),
-            specifications: specifications || [],
-            deliveryConfig: {
-              type: deliveryConfig?.type || "",
-              fixedCharge: deliveryConfig?.fixedCharge || null,
-              isFreeShipping: deliveryConfig?.isFreeShipping || null,
-              minOrderForFreeShipping: deliveryConfig?.minOrderForFreeShipping || null,
-              maxDeliveryDistance: deliveryConfig?.maxDeliveryDistance || null,
-              deliveryPinCodes: deliveryConfig?.deliveryPinCodes || [],
-              deliveryPartner: deliveryConfig?.deliveryPartner || "",
-              isReturnApplicable: deliveryConfig?.isReturnApplicable || null,
-              returnWindow: deliveryConfig?.returnWindow || null,
-              returnPolicyFees: deliveryConfig?.returnPolicyFees || null,
-            },
-            ratings: {
-              averageRating: ratings?.averageRating || null,
-              totalReviews: ratings?.totalReviews || null,
-              ratingDistribution: ratings?.ratingDistribution || {},
-              reviews: ratings?.reviews || [],
-            },
-            careInstructions: careInstructions || "",
-            materials: materials || [],
-            policySection: policySection || [],
-            localization: localization || {},
-            paymentMethods: paymentMethods || [],
-            crossSellProducts: crossSellProducts?.map((product) => ({
-              productId: product.productId || "",
-              productTitle: product.productTitle || "",
-              price: product.price || "",
-              currency: product.currency || "",
-            })) || [],
-            festivalOffers: festivalOffers || [],
-          });
+    //     try {
+    //       const product = await productModel.create({
+    //         productTitle: productTitle || "",
+    //         brand: brand || "",
+    //         categories: categories || [],
+    //         tags: tags || [],
+    //         seoTitle: seoTitle || "",
+    //         seoDescription: seoDescription || "",
+    //         seoKeywords: seoKeywords || [],
+    //         searchMetadata: {
+    //           synonyms: searchMetadata?.synonyms || [],
+    //           alternateSpellings: searchMetadata?.alternateSpellings || [],
+    //         },
+    //         images: images || [],
+    //         descriptionHighlights: {
+    //           description: description || "",
+    //           highlights: highlights || [],
+    //         },
+    //         pricing: {
+    //           regularPrice: pricing?.regularPrice || null,
+    //           salePrice: pricing?.salePrice || null,
+    //           discount: pricing?.discount || "",
+    //           currency: pricing?.currency || "",
+    //           gstDetails: {
+    //             gstIncluded: pricing?.gstIncluded || null,
+    //             gstPercentage: pricing?.gstPercentage || null,
+    //           },
+    //         },
+    //         availability: {
+    //           inStock: availability?.inStock || null,
+    //           stockQuantity: availability?.stockQuantity || null,
+    //           deliveryTime: availability?.deliveryTime || "",
+    //           availabilityRegions: availability?.availabilityRegions || [],
+    //           codAvailable: availability?.codAvailable || null,
+    //           returnPolicy: {
+    //             returnApplicable: availability?.returnPolicy?.returnApplicable || null,
+    //             returnWindow: availability?.returnPolicy?.returnWindow || null,
+    //             returnFees: availability?.returnPolicy?.returnFees || null,
+    //           },
+    //         },
+    //         variants: variants.map((variant) => ({
+    //           id: variant.id || "",
+    //           color: variant.color || "",
+    //           variant: variant.variant || "",
+    //           quantity: variant.quantity || null,
+    //           sku: variant.sku || "",
+    //           variantImages: variant.variantImages || [],
+    //         })),
+    //         specifications: specifications || [],
+    //         deliveryConfig: {
+    //           type: deliveryConfig?.type || "",
+    //           fixedCharge: deliveryConfig?.fixedCharge || null,
+    //           isFreeShipping: deliveryConfig?.isFreeShipping || null,
+    //           minOrderForFreeShipping: deliveryConfig?.minOrderForFreeShipping || null,
+    //           maxDeliveryDistance: deliveryConfig?.maxDeliveryDistance || null,
+    //           deliveryPinCodes: deliveryConfig?.deliveryPinCodes || [],
+    //           deliveryPartner: deliveryConfig?.deliveryPartner || "",
+    //           isReturnApplicable: deliveryConfig?.isReturnApplicable || null,
+    //           returnWindow: deliveryConfig?.returnWindow || null,
+    //           returnPolicyFees: deliveryConfig?.returnPolicyFees || null,
+    //         },
+    //         ratings: {
+    //           averageRating: ratings?.averageRating || null,
+    //           totalReviews: ratings?.totalReviews || null,
+    //           ratingDistribution: ratings?.ratingDistribution || {},
+    //           reviews: ratings?.reviews || [],
+    //         },
+    //         careInstructions: careInstructions || "",
+    //         materials: materials || [],
+    //         policySection: policySection || [],
+    //         localization: localization || {},
+    //         paymentMethods: paymentMethods || [],
+    //         crossSellProducts: crossSellProducts?.map((product) => ({
+    //           productId: product.productId || "",
+    //           productTitle: product.productTitle || "",
+    //           price: product.price || "",
+    //           currency: product.currency || "",
+    //         })) || [],
+    //         festivalOffers: festivalOffers || [],
+    //       });
       
-          return product;
-        } catch (error) {
-          console.error("Error creating product:", error);
-          throw new Error("Failed to create product. Please try again.");
-        }
-      },
+    //       return product;
+    //     } catch (error) {
+    //       console.error("Error creating product:", error);
+    //       throw new Error("Failed to create product. Please try again.");
+    //     }
+    //   },
       
       
-    // ============================
-    getproduct: async () => {
-        try {
-            const getproduct = await productModel.find();
-            return getproduct
-        } catch (error) {
-            throw error
-        }
-    },
-    // ============================
-    updateProduct: async (data) => {
-        const {
-            product_id,
-            productTitle,
-            brand,
-            categories,
-            tags,
-            seoTitle,
-            seoDescription,
-            seoKeywords,
-            searchMetadata,
-            images,
-            description,
-            highlights,
-            pricing,
-            availability,
-            variants,
-            specifications,
-            deliveryConfig,
-            ratings,
-            careInstructions,
-            materials,
-            policySection,
-            localization,
-            paymentMethods,
-            crossSellProducts,
-            festivalOffers,
-          } = data;
+    // // ============================
+    // getproduct: async () => {
+    //     try {
+    //         const getproduct = await productModel.find();
+    //         return getproduct
+    //     } catch (error) {
+    //         throw error
+    //     }
+    // },
+    // // ============================
+    // updateProduct: async (data) => {
+    //     const {
+    //         product_id,
+    //         productTitle,
+    //         brand,
+    //         categories,
+    //         tags,
+    //         seoTitle,
+    //         seoDescription,
+    //         seoKeywords,
+    //         searchMetadata,
+    //         images,
+    //         description,
+    //         highlights,
+    //         pricing,
+    //         availability,
+    //         variants,
+    //         specifications,
+    //         deliveryConfig,
+    //         ratings,
+    //         careInstructions,
+    //         materials,
+    //         policySection,
+    //         localization,
+    //         paymentMethods,
+    //         crossSellProducts,
+    //         festivalOffers,
+    //       } = data;
         
-        try {
-            if (!product_id || !productTitle  || !categories || !pricing || !availability) {
-                throw new Error("Missing required fields:product_id, productTitle, categories, pricing, availability");
-            }
-            const updateProduct = await productModel.findByIdAndUpdate(product_id,
-                {
-                    productTitle,
-                    brand,
-                    categories,
-                    tags,
-                    seoTitle,
-                    seoDescription,
-                    seoKeywords,
-                    searchMetadata,
-                    images,
-                    description,
-                    highlights,
-                    pricing,
-                    availability,
-                    variants,
-                    specifications,
-                    deliveryConfig,
-                    ratings,
-                    careInstructions,
-                    materials,
-                    policySection,
-                    localization,
-                    paymentMethods,
-                    crossSellProducts,
-                    festivalOffers,
-                },
-                { new: true });
-            return updateProduct
-        } catch (error) {
-            throw error
-        }
-    },
-    // =====================
-    deleteProduct: async (product) => {
-        try {
-            const { product_id } = product;
+    //     try {
+    //         if (!product_id || !productTitle  || !categories || !pricing || !availability) {
+    //             throw new Error("Missing required fields:product_id, productTitle, categories, pricing, availability");
+    //         }
+    //         const updateProduct = await productModel.findByIdAndUpdate(product_id,
+    //             {
+    //                 productTitle,
+    //                 brand,
+    //                 categories,
+    //                 tags,
+    //                 seoTitle,
+    //                 seoDescription,
+    //                 seoKeywords,
+    //                 searchMetadata,
+    //                 images,
+    //                 description,
+    //                 highlights,
+    //                 pricing,
+    //                 availability,
+    //                 variants,
+    //                 specifications,
+    //                 deliveryConfig,
+    //                 ratings,
+    //                 careInstructions,
+    //                 materials,
+    //                 policySection,
+    //                 localization,
+    //                 paymentMethods,
+    //                 crossSellProducts,
+    //                 festivalOffers,
+    //             },
+    //             { new: true });
+    //         return updateProduct
+    //     } catch (error) {
+    //         throw error
+    //     }
+    // },
+    // // =====================
+    // deleteProduct: async (product) => {
+    //     try {
+    //         const { product_id } = product;
 
-            if (!product_id) {
-                throw new Error("product_id is required.");
-            }
-            const deletedProduct = await productModel.findOneAndDelete({ _id: product_id });
+    //         if (!product_id) {
+    //             throw new Error("product_id is required.");
+    //         }
+    //         const deletedProduct = await productModel.findOneAndDelete({ _id: product_id });
 
-            if (!deletedProduct) {
-                throw new Error(`Product with ID ${product_id} not found.`);
-            }
-            return "Product deleted successfully";
-        } catch (error) {
-            console.error(`Error deleting product: ${error.message}`);
-            throw new Error("Unable to delete product. Please try again.");
-        }
-    },
+    //         if (!deletedProduct) {
+    //             throw new Error(`Product with ID ${product_id} not found.`);
+    //         }
+    //         return "Product deleted successfully";
+    //     } catch (error) {
+    //         console.error(`Error deleting product: ${error.message}`);
+    //         throw new Error("Unable to delete product. Please try again.");
+    //     }
+    // },
 
     // ==========
     notifyUser: async (data) => {
