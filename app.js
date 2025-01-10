@@ -10,6 +10,7 @@ import adminRouter from "./src/router/adminRouter.js";
 import commonRouter from "./src/router/commonRouter.js";
 import errorHandling from "./errorHandling.js";
 import  initializeSocket from "./socket.js";
+import redisService from "./src/service/redisService.js";
 
 const app = express();
 
@@ -38,6 +39,9 @@ const server = http.createServer(app);
 
 
 const io = initializeSocket(server);
+redisService.connect();
+
+redisService.subscribeToNotifications(io);
 server.listen(PORT, () => {
     console.log(`Server is running on ${PORT}`);
 });

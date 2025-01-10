@@ -24,6 +24,11 @@ import connectedUsers from "../../socket.js";
 import productModel from "../model/productModel.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
+import MessageModel from "../model/chatModel.js";
+import redisService from "./redisService.js";
+
+
+
 const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree, deviceToken } = data;
@@ -33,7 +38,7 @@ const adminService = {
                 const phnNumber = await registerModel.findOne({ phn_number });
                 if (phnNumber) {
                     const error = new Error("phone number is already exist");
-                    error.status = 400; // Adding status 400 to the error
+                    error.status = 400; 
                     throw error;
                 }
 
@@ -58,7 +63,7 @@ const adminService = {
             }
         } catch (error) {
             if (!error.status) {
-                error.status = 500; // Default to internal server error if no status
+                error.status = 500; 
             }
             throw error;
         }
@@ -2609,7 +2614,66 @@ const adminService = {
             };
         }
     },
-
+    // ================================
+    
+    sendMessage: async (from, to, message) => {
+        console.log(from, to, message, "lopoop");
+      
+        const timestamp = new Date();
+        const chatKey = `chat:${from}:${to}`;
+        const notificationKey = `notifications:${to}`;
+      
+        try {
+          // Store the message in MongoDB
+          const newMessage = await MessageModel.create({ from, to, message, timestamp });
+          console.log(newMessage, "new");
+      
+          // Fetch the MongoDB generated _id
+          const messageWithObjectId = {
+            _id: newMessage._id.toString(), // Convert ObjectId to string
+            from,
+            to,
+            message,
+            timestamp
+          };
+      
+          // Store the message in Redis with the MongoDB _id
+          await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
+      
+          // Publish notification to the recipient via Redis
+          await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
+      
+          // Return success message
+          return { success: true, message: 'Message sent' };
+        } catch (err) {
+          console.error('Error in sendMessage:', err);
+          throw new Error('Error sending message');
+        }
+      },
+      
+  
+  
+//   =============
+getChatHistory : async (from, to) => {
+    const chatKey1 = `chat:${from}:${to}`;
+    const chatKey2 = `chat:${to}:${from}`;
+  
+    try {
+      // Fetch messages from Redis (both directions)
+      const messages1 = await redisService.getRedisClient().lRange(chatKey1, 0, -1);
+      const messages2 = await redisService.getRedisClient().lRange(chatKey2, 0, -1);
+  
+      // Combine and sort messages by timestamp
+      const combinedMessages = [...messages1, ...messages2]
+        .map((msg) => JSON.parse(msg))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  
+      return combinedMessages;
+    } catch (err) {
+      console.error('Error fetching chat history:', err);
+      throw new Error('Error fetching chat history');
+    }
+  },
 }
 
 

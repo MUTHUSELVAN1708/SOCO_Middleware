@@ -1,5 +1,6 @@
 import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
+import redisService from "../service/redisService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
 
 
@@ -727,7 +728,78 @@ getCart:async(req,res,next)=>{
             next(error);
     }
 },
+// =======================
+sendMessage:async (req, res) => {
+    const { from, to, message } = req.body;
+    console.log(req.body,"req.body")
+  
+    if (!from || !to || !message) {
+      return res.status(400).json({ error: 'Missing required fields: from, to, or message' });
+    }
+  
+    try {
+      const response = await adminService.sendMessage(from, to, message);
+      res.status(200).json(response);
+    } catch (err) {
+      console.error('Error in sendMessage:', err);
+      res.status(500).json({ error: 'Error sending message' });
+    }
+  },
+  
+  getChatHistory : async (req, res) => {
+    const { from, to } = req.params;
+  
+    try {
+      const messages = await adminService.getChatHistory(from, to);
+      res.status(200).json({ messages });
+    } catch (err) {
+      console.error('Error in getChatHistory:', err);
+      res.status(500).json({ error: 'Error fetching chat history' });
+    }
+  },
+//   ======================================
+deleteFromRedis: async (req, res) => {
+    const { chatKey, messagesToDelete } = req.body;
+    console.log(req.body,"ki")
+  
+    if (!chatKey || !messagesToDelete || !Array.isArray(messagesToDelete)) {
+      return res.status(400).json({ error: 'chatKey must be provided and messagesToDelete must be an array' });
+    }
+  
+    try {
+      
+      const deleteResults = [];
+  
+      for (const messageToDelete of messagesToDelete) {
+        const result = await redisService.deleteFromRedis(chatKey, messageToDelete);
+        deleteResults.push(result);  
+      }
+  
+      res.status(200).json({ success: true, deletedMessages: deleteResults });
+    } catch (err) {
+      console.error('Error in deleteFromRedis:', err);
+      res.status(500).json({ error: 'Error deleting messages' });
+    }
+  },
+  
+//  =================================
+updateMsg: async (req, res) => {
+    const { chatKey, oldMessage, newMessage } = req.body;
+  
+    if (!chatKey || !oldMessage || !newMessage) {
+      return res.status(400).json({ error: 'chatKey, oldMessage, and newMessage are required' });
+    }
+  
+    try {
+      const updateResult = await redisService.updateMessage(chatKey, oldMessage, newMessage);
+      res.status(200).json(updateResult);
 
+    } catch (err) {
+      console.error('Error in updateMessage:', err);
+      res.status(500).json({ error: 'Error updating message' });
+    }
+  }
+   
 }
 
 

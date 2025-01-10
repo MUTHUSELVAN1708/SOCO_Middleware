@@ -270,10 +270,13 @@ router.get("/getPlayer/:playerId", playerController.getPlayerById);
 // router.post("/")
 
 
+router.post("/sendMessage",adminController.sendMessage);
 
+router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
 
+router.delete("/deleteFromRedis",adminController.deleteFromRedis);
 
-
+router.put("/updateMsg",adminController.updateMsg)
 
 
 
