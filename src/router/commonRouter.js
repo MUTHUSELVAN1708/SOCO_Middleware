@@ -54,6 +54,17 @@ const uploadImages = multer({
     },
 });
 
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+      cb(null, Date.now() + '-' + file.originalname);
+    },
+  }),
+});
+
 // General File Upload Configuration
 const allowedMimeTypes = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
@@ -160,30 +171,38 @@ router.post(
 
 //for multiple files
 router.post(
-  "/filesUpload",
-  uploadFiles.array('files', 10),
+  '/filesUpload',
+  upload.any(),
   (req, res) => {
-    try {
-      console.log(req.files); 
-      
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: 'No files uploaded!' });
+    const fileUrls = [];
+    const uploadedFiles = new Set(); // To track duplicate files
+
+    req.files.forEach((file) => {
+      // Use the filename as the key for the file
+      const fileKey = file.originalname;
+
+      // Check for duplicates based on the filename
+      if (uploadedFiles.has(fileKey)) {
+        return res.status(400).json({ message: `Same image found: ${fileKey}. Please ensure all files are different.` });
       }
+      
 
-      const fileUrls = req.files.map(file =>
-        `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
-      );
+      uploadedFiles.add(fileKey);
 
-      res.status(200).json({
-        message: 'Files uploaded successfully!',
-        fileUrls
-      });
-    } catch (error) {
-      console.error(error); 
-      res.status(500).json({ message: error.message });
+      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+      fileUrls.push(fileUrl);
+    });
+
+    console.log('Returned URLs:', fileUrls);
+
+    if (fileUrls.length > 0) {
+      return res.status(200).json({ message: 'Files uploaded successfully!', urls: fileUrls });
+    } else {
+      return res.status(400).json({ message: 'No valid files were uploaded.' });
     }
   }
 );
+
 
 // Media Upload Route (Images and Videos)
 router.post(
