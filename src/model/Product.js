@@ -76,6 +76,7 @@ const productSchema = new mongoose.Schema({
   },
   variants: [{
     color: String,
+    colorCode:String,
     variant: String,
     quantity: Number,
     sku: { 
@@ -141,6 +142,7 @@ const productSchema = new mongoose.Schema({
     productId: String,
     productTitle: String,
     price: String,
+    imageUrl:String,
     currency: String
   }],
   festivalOffers: {
