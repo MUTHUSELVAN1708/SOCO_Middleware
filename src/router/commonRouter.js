@@ -91,6 +91,8 @@ router.put('/updateRegister', adminController.updateRegister);
 router.post("/forgotPassword", adminController.forgotPassword);
 router.post("/BusinessRegister", adminController.BusinessRegister);
 router.post("/registerUserWithBusiness", adminController.registerUserWithBusiness);
+router.post("/registerUserAccount", adminController.registerUserAccount);
+router.post("/registerBusinessAccount", adminController.registerBusinessAccount);
 router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 
 
