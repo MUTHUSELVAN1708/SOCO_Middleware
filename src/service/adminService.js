@@ -256,6 +256,7 @@ const adminService = {
                 full_Name,
                 phn_number,
                 email,
+                gender,
                 DOB,
                 deviceToken,
                 location_id,
@@ -328,6 +329,7 @@ const adminService = {
             if (!password) errors.push("Password is required.");
             if (!address) errors.push("Address is required.");
             if (!agree) errors.push("Agreement is required.");
+            if (!gender) errors.push("gender is required.");
 
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
@@ -386,6 +388,7 @@ const adminService = {
                 phn_number,
                 password: hashedPassword,
                 email,
+                gender,
                 profile_url: profile_url || "",
                 status,
                 accountIsPublic,
@@ -477,13 +480,250 @@ const adminService = {
             });
 
 
-            return { success: true, user: updatedUser, business: business };
+            return { success: true, user: updatedUser, business: [business] };
 
         } catch (error) {
             console.error("Error in registerUserWithBusiness:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
+
+    registerUserAccount: async (data) => {
+        try {
+            const {
+                full_Name,
+                phn_number,
+                email,
+                gender,
+                DOB,
+                accountIsPublic,
+                deviceToken,
+                reg_otp_id,
+                password,
+                profile_url,
+                status= "active",
+                address,
+                agree,
+                // Chat-related fields
+                onlineStatus = false,
+                isTyping = false,
+                lastOnline = null,
+                currentChatRoom = null,
+                unreadMessagesCount = 0,
+                bio,
+                title,
+                skills,
+                hobbies,
+                education,
+                degree,
+                field,
+                institution,
+                year,
+                grade,
+                achievements
+            } = data;
+    
+            // Validate required fields
+            let errors = [];
+            if (!full_Name) errors.push("Full name is required.");
+            if (!phn_number) errors.push("Phone number is required.");
+            if (!email) errors.push("Email is required.");
+            if (!password) errors.push("Password is required.");
+            if (!address) errors.push("Address is required.");
+            if (!agree) errors.push("Agreement is required.");
+            if (!gender) errors.push("Gender is required.");
+    
+            if (errors.length > 0) {
+                throw { status: 400, message: errors.join(" ") };
+            }
+    
+            // Check for existing users
+            const existingUserQueries = [
+                registerModel.findOne({ full_Name }),
+                registerModel.findOne({ phn_number }),
+                registerModel.findOne({ email }),
+            ];
+    
+            const [existingName, existingPhone, existingEmail] = await Promise.all(existingUserQueries);
+    
+            if (existingName) errors.push("Name already exists. Name must be unique.");
+            if (existingPhone) errors.push("Phone number already exists. Try a different one or log in.");
+            if (existingEmail) errors.push("Email already exists. Try a different one or log in.");
+    
+            if (errors.length > 0) {
+                throw { status: 400, message: errors.join(" ") };
+            }
+    
+            // Hash the password
+            const hashedPassword = await bcrypt.hash(password, 10);
+    
+            // Create user entry
+            const register = await registerModel.create({
+                location_id: null,
+                deviceToken,
+                full_Name,
+                phn_number,
+                accountIsPublic,
+                password: hashedPassword,
+                email,
+                gender,
+                profile_url: profile_url || "",
+                status,
+                reg_otp_id,
+                DOB,
+                agree,
+                onlineStatus,
+                isTyping,
+                lastOnline,
+                currentChatRoom,
+                unreadMessagesCount,
+                bio,
+                title,
+                skills,
+                hobbies,
+                education,
+                degree,
+                field,
+                institution,
+                year,
+                grade,
+                achievements,
+            });
+    
+            // Create the address
+            const addressEntry = await locationModel.create({
+                user_id: register._id,
+                address,
+            });
+    
+            // Update user with address ID
+            const updatedUser = await registerModel.findByIdAndUpdate(
+                register._id,
+                { location_id: addressEntry._id },
+                { new: true }
+            );
+    
+            return { success: true, user: updatedUser };
+        } catch (error) {
+            console.error("Error in registerUserAccount:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
+
+    registerBusinessAccount: async (data) => {
+        try {
+            const {
+                user_id,
+                Brand_Name,
+                org_name,
+                PAN_NO,
+                aadharNo,
+                GST_NO,
+                aadhar_img,
+                pan_img,
+                brand_logo,
+                cover_img,
+                businessAgree,
+                accountIsPublic,
+                postCount = 0,
+                followerCount = 0,
+                followingCount = 0,
+                needPermissionForFollowing = false,
+                friendPermission = false,
+                type_of_service,
+                category,
+                sub_category,
+                ownerName,
+                businessAddress,
+                busCity,
+                busState,
+                busPinCode,
+                busEmail,
+                busPhone,
+                businessType,
+                natureOfBusiness,
+                businessName,
+                important = false,
+                onlineStatus = false,
+                isTyping = false,
+                lastOnline = null,
+                currentChatRoom = null,
+                unreadMessagesCount = 0,
+            } = data;
+    
+            let errors = [];
+    
+            if (!user_id) errors.push("User ID is required.");
+            if (!businessName) errors.push("Business name is required.");
+            if (!businessType) errors.push("Business type is required.");
+            if (!natureOfBusiness) errors.push("Nature of business is required.");
+    
+            if (errors.length > 0) {
+                throw { status: 400, message: errors.join(" ") };
+            }
+
+            const userId = user_id;
+
+            // Fetch the user document using the userId found in businessregisterModel
+            const existingUser = await registerModel.findById(userId);
+            if (!existingUser) {
+                throw { status: 404, message: "User not found for the given user ID in business profile." };
+            }
+    
+            const existingBusiness = await businessregisterModel.findOne({ businessName });
+            if (existingBusiness) {
+                throw { status: 400, message: "Business name already exists. Business name must be unique." };
+            }
+    
+            const business = await businessregisterModel.create({
+                user_id,
+                Brand_Name: Brand_Name || "",
+                org_name: org_name || "",
+                PAN_NO: PAN_NO || "",
+                aadharNo: aadharNo || "",
+                GST_NO: GST_NO || "",
+                status: "Inactive",
+                aadhar_img: aadhar_img || "",
+                pan_img: pan_img || "",
+                brand_logo: brand_logo || "",
+                cover_img: cover_img || "",
+                businessAgree,
+                accountIsPublic,
+                postCount,
+                followerCount,
+                followingCount,
+                needPermissionForFollowing,
+                friendPermission,
+                type_of_service: type_of_service || "",
+                category: category || "",
+                sub_category: sub_category || "",
+                ownerName: ownerName || "",
+                businessAddress: businessAddress || "",
+                businessCity: busCity || "",
+                businessState: busState || "",
+                businessPinCode: busPinCode || "",
+                businessEmail: busEmail || "",
+                businessPhone: busPhone || "",
+                businessType,
+                natureOfBusiness,
+                businessName,
+                important,
+                onlineStatus,
+                isTyping,
+                lastOnline,
+                currentChatRoom,
+                unreadMessagesCount,
+            });
+
+            return { success: true, user: existingUser, business: [business] };
+    
+        } catch (error) {
+            console.error("Error in registerBusinessAccount:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
 
     updateBusinessProfile: async (data) => {
         try {
@@ -590,7 +830,7 @@ const adminService = {
                 { new: true }
             );
 
-            return { success: true, user: existingUser, business: updatedBusiness };
+            return { success: true, user: existingUser, business: [updatedBusiness] };
         } catch (error) {
             console.error("Error in updateBusinessProfile:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
@@ -750,53 +990,54 @@ const adminService = {
         const { email, phn_number, password, deviceToken } = data;
         try {
             let user;
-
+    
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-
+    
             if (!user) {
                 throw { msg: "Account not found. Please register to continue." };
             }
-
+    
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     throw { msg: "Invalid credentials. Please try again or reset your password." };
                 }
             }
-
+    
             console.log("User ID:", user._id, "Device Token:", deviceToken);
-
+    
             const updatedUser = await registerModel.findOneAndUpdate(
                 { _id: user._id },
                 { $addToSet: { deviceToken: deviceToken } },
                 { new: true }
             );
-
+    
             if (updatedUser) {
                 console.log("Device tokens updated successfully:", updatedUser.deviceToken);
             } else {
                 console.error("Failed to update device tokens.");
             }
-
-            const business = await businessregisterModel.findOne({ user_id: user._id });
-
+    
+            // Fetch the list of businesses associated with the user ID
+            const businesses = await businessregisterModel.find({ user_id: user._id });
+    
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-
+    
             return {
                 status: 200,
                 msg: "Login successful",
                 login: {
                     token,
                     user: updatedUser,
-                    business: business ? business : null,
+                    business: businesses.length > 0 ? businesses : [],
                 },
             };
         } catch (error) {
@@ -808,6 +1049,7 @@ const adminService = {
             };
         }
     },
+    
 
     // ===================
     storeOtp: async (user_id, otp) => {

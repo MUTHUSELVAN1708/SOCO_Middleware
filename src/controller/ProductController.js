@@ -122,6 +122,7 @@ const formatResponse = (success, message, data = null, errors = null) => {
         variants: product.variants.map(variant => ({
           id: variant.id,
           color: variant.color,
+          colorCode: variant.colorCode,
           variant: variant.variant,
           quantity: variant.quantity,
           sku: variant.sku,
@@ -141,6 +142,7 @@ const formatResponse = (success, message, data = null, errors = null) => {
           productId: crossSell.productId,
           productTitle: crossSell.productTitle,
           price: crossSell.price,
+          imageUrl:crossSell.imageUrl,
           currency: crossSell.currency === 'INR' ? '₹' : crossSell.currency,
         })),
       };

@@ -104,6 +104,44 @@ const adminController = {
         }
     },
 
+    registerUserAccount: async (req, res, next) => {
+        try {
+            const register = await adminService.registerUserAccount(req.body);
+            res.status(200).json({
+                status: 200,
+                msg: "Successfully created",
+                data: register,
+            });
+            console.error(error);
+        } catch (error) {
+            // Ensure error structure is consistent
+            error.status = error.status || 400; // Default to 400 if no status set
+            error.message = error.message || 'Something went wrong';
+
+            // Pass the error to the next middleware
+            next(error);
+        }
+    },
+
+    registerBusinessAccount: async (req, res, next) => {
+        try {
+            const register = await adminService.registerBusinessAccount(req.body);
+            res.status(200).json({
+                status: 200,
+                msg: "Successfully created",
+                data: register,
+            });
+        } catch (error) {
+            console.error(error);
+            // Ensure error structure is consistent
+            error.status = error.status || 400; // Default to 400 if no status set
+            error.message = error.message || 'Something went wrong';
+
+            // Pass the error to the next middleware
+            next(error);
+        }
+    },
+
     updateBusinessProfile: async (req, res, next) => {
         try {
             const register = await adminService.updateBusinessProfile(req.body);

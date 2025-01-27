@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const createPostSchema = new mongoose.Schema({
-    user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
+    user_id: { type: String, ref: 'user', required: true },
     imageUrl: { type: String, },
     caption: { type: String,  },
     isScheduled: { type: Boolean, default: false },
