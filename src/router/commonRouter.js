@@ -284,9 +284,9 @@ router.get("/getCart/:id",adminController.getCart);
 
 router.get("/getPlayers", playerController.getAllPlayers);
 
-// Route to get a player by ID
+
 router.get("/getPlayer/:playerId", playerController.getPlayerById);
-// router.post("/")
+
 
 
 router.post("/sendMessage",adminController.sendMessage);
@@ -295,7 +295,7 @@ router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
 
 router.delete("/deleteFromRedis",adminController.deleteFromRedis);
 
-router.put("/updateMsg",adminController.updateMsg)
+router.put("/updateMsg",adminController.updateMsg);
 
 
 

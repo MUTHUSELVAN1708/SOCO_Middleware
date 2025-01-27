@@ -18,8 +18,6 @@ import mongoose from "mongoose";
 import moment from "moment";
 import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
-const client = new twilio(process.env.AccountSID, process.env.AuthToken);
-const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 import connectedUsers from "../../socket.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
@@ -27,6 +25,8 @@ import MessageModel from "../model/chatModel.js";
 import redisService from "./redisService.js";
 
 
+const client = new twilio(process.env.AccountSID, process.env.AuthToken);
+const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 
 const adminService = {
     register: async (data) => {
