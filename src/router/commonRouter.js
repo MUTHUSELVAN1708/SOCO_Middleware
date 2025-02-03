@@ -300,6 +300,9 @@ router.delete("/deleteFromRedis",adminController.deleteFromRedis);
 router.put("/updateMsg",adminController.updateMsg);
 
 
+router.get("/getFeed/:user_id",adminController.getFeed)
+
+
 
 
 

@@ -836,7 +836,25 @@ updateMsg: async (req, res) => {
       console.error('Error in updateMessage:', err);
       res.status(500).json({ error: 'Error updating message' });
     }
-  }
+  },
+
+//   =======================
+getFeed:async (req, res) => {
+    const {user_id} = req.params;
+  
+    if (!user_id) {
+      return res.status(400).json({ error: 'user are required' });
+    }
+  
+    try {
+      const getFeed = await adminService.getFeed(user_id);
+      res.status(200).json(getFeed);
+
+    } catch (err) {
+      console.error('Error in getFeed:', err);
+      res.status(500).json({ error: 'Error getFeed message' });
+    }
+  },
    
 }
 

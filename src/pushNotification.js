@@ -87,6 +87,7 @@ const pushNotification={
       throw new Error("Player IDs are required and should be an array of valid OneSignal player IDs.");
     }
 
+    
     const notification = {
       app_id: ONE_SIGNAL_APP_ID, // App ID from OneSignal
       contents: { en: message }, // Notification message
