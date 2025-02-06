@@ -3008,35 +3008,48 @@ const adminService = {
         console.log(user_id)
         try {
             console.log(user_id)
-            const following = await followerModel.find({ follower_id: user_id, status: 'accepted' }).select('user_id');
+            const following = await followerModel
+                .find({ follower_id: user_id, status: 'accepted' })
+                .select('user_id');
             console.log(following, "following")
             const followingIds = following.map(follow => follow.user_id);
             console.log(followingIds, "followingIds")
-            const selfPosts = await createPostModel.find({ user_id: user_id })
+            
+            const selfPosts = await createPostModel
+                .find({ user_id: user_id })
                 .populate('user_id', 'full_Name profile_url')
                 .sort({ timestamp: -1 })
                 .limit(5);
             console.log(selfPosts, "self")
-            const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
+            
+            const followedPosts = await createPostModel
+                .find({ user_id: { $in: followingIds } })
                 .populate('user_id', 'full_Name profile_url')
                 .sort({ timestamp: -1 })
                 .limit(5);  // Adjust as needed
             console.log(followedPosts, "followedPosts")
+            
             // Fetch business interests (this is just an example, adjust based on your data structure)
-            const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
+            const businessPosts = await businessregisterModel
+                .find({ user_id: { $in: followingIds } })
                 .sort({ timestamp: -1 })
                 .limit(5);  // Adjust as needed
             console.log(businessPosts, "businessPosts")
+            
             // Fetch user interests (again, adjust this based on your model)
-            const userPosts = await registerModel.find({ _id: user_id })
+            const userPosts = await registerModel
+                .find({ _id: user_id })
                 .sort({ timestamp: -1 })
                 .limit(5);  // Adjust as needed
             console.log(userPosts, "userPosts")
+            
             const products = await Product.find()
                 .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
                 .sort({ 'ratings.averageRating': -1 })  // Sort by highest rating
                 .limit(5);  // Adjust as needed
             console.log(products, "products")
+            
+            // Combine the feed items with their type
             const feed = [
                 ...selfPosts.map(post => ({ type: 'post', data: post })),
                 ...followedPosts.map(post => ({ type: 'post', data: post })),
@@ -3045,18 +3058,72 @@ const adminService = {
                 ...products.map(product => ({ type: 'product', data: product }))
             ];
             console.log(feed, "feed")
+            
             // Sort the combined feed by timestamp (latest posts first)
             const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp) - new Date(a.data.timestamp));
-
+            
             // Optionally shuffle the feed or apply any other custom sorting
             const shuffledFeed = sortedFeed.sort(() => Math.random() - 0.5);
-
-            return shuffledFeed
+            console.log(shuffledFeed,)
+            // Modify only the response mapping for each feed item
+            const transformedFeed = shuffledFeed.map(item => {
+                const { data: post, type } = item;
+                
+                // For posts, business posts, or user interests, transform using your structure
+                if (type === 'post' || type === 'business' || type === 'user_interest') {
+                    return {
+                        id: post._id,
+                         username: type === 'business'  ? (post.businessName || "") : post.user_id?.full_Name || 'Unknown',
+                         userAvatar: type === 'business'
+                         ? post.brand_logo || ''  
+                         : post.user_id?.profile_url || '',
+                        companyName: type === 'business' ? post.org_name || '' : '',
+                        mediaType: type === "post" 
+                        ? (post.isVideo ? "video" : (post.mediaType || "image"))
+                        : (post.mediaType || "image"),
+                        mediaUrl: post.mediaUrl || '',
+                        carouselUrls: post.carouselUrls || null,
+                        description: post.description || '',
+                        isVerified: post.isVerified || false,
+                        isSponsored: post.isSponsored || false,
+                        likes: post.likes || 0,
+                        comments: post.comments || 0,
+                        shares: post.shares || 0,
+                        views: post.views || 0,
+                        productTags: post.productTags || [],
+                        productPrice: post.productPrice || 0.0,
+                        productUrl: post.productUrl || null,
+                        timePosted: post.timestamp,
+                        location: post.location || '',
+                        isPinned: post.isPinned || false,
+                        campaignType: post.campaignType || null,
+                        adMetrics: post.adMetrics || null,
+                        type
+                    };
+                }
+                
+                if (type === 'product') {
+                    return {
+                        id: post._id,
+                        productTitle: post.basicInfo?.productTitle || '',
+                        images: post.images || [],
+                        regularPrice: post.pricing?.regularPrice || 0,
+                        salePrice: post.pricing?.salePrice || 0,
+                        averageRating: post.ratings?.averageRating || 0,
+                        type
+                    };
+                }
+                
+                return { type, ...post };
+            });
+            
+            return transformedFeed;
         } catch (error) {
             console.error("Error fetching feed:", error);
-            throw error
+            throw error;
         }
     },
+    
     // =============================
     addDeliveryAddress: async (data) => {
         const { user_id, fullName, PhoneNumber, email, streetAddress, apartment, city, state, postalCode, country, lat, lng, deliveryInstructions } = data;
@@ -3111,9 +3178,9 @@ const adminService = {
     deleteAddress:async (deliveryAddress_id) => {
         console.log("deliveryAddress_id")
         try {
-            const { id } = deliveryAddress_id; 
+            const { id } = deliveryAddress_id; // Extract ID from object
     const deleteAddress = await DeliveryAddressModel.findOneAndDelete({ _id: id.toString() });
-            return "successfully deleted"
+            return deleteAddress
         } catch (error) {
             console.error("Error  in delete delivery Address:", error);
             throw error
