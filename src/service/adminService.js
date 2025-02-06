@@ -24,6 +24,7 @@ import cartModel from "../model/cartModel.js";
 import MessageModel from "../model/chatModel.js";
 import redisService from "./redisService.js";
 import Product from "../model/Product.js";
+import DeliveryAddressModel from "../model/deliveryAddressModel.js";
 
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
@@ -38,7 +39,7 @@ const adminService = {
                 const phnNumber = await registerModel.findOne({ phn_number });
                 if (phnNumber) {
                     const error = new Error("phone number is already exist");
-                    error.status = 400; 
+                    error.status = 400;
                     throw error;
                 }
 
@@ -63,7 +64,7 @@ const adminService = {
             }
         } catch (error) {
             if (!error.status) {
-                error.status = 500; 
+                error.status = 500;
             }
             throw error;
         }
@@ -502,7 +503,7 @@ const adminService = {
                 reg_otp_id,
                 password,
                 profile_url,
-                status= "active",
+                status = "active",
                 address,
                 agree,
                 // Chat-related fields
@@ -518,12 +519,12 @@ const adminService = {
                 education,
                 degree,
                 field,
-                institution,
+                institution, interest,
                 year,
                 grade,
                 achievements
             } = data;
-    
+
             // Validate required fields
             let errors = [];
             if (!full_Name) errors.push("Full name is required.");
@@ -533,31 +534,31 @@ const adminService = {
             if (!address) errors.push("Address is required.");
             if (!agree) errors.push("Agreement is required.");
             if (!gender) errors.push("Gender is required.");
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Check for existing users
             const existingUserQueries = [
                 registerModel.findOne({ full_Name }),
                 registerModel.findOne({ phn_number }),
                 registerModel.findOne({ email }),
             ];
-    
+
             const [existingName, existingPhone, existingEmail] = await Promise.all(existingUserQueries);
-    
+
             if (existingName) errors.push("Name already exists. Name must be unique.");
             if (existingPhone) errors.push("Phone number already exists. Try a different one or log in.");
             if (existingEmail) errors.push("Email already exists. Try a different one or log in.");
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Hash the password
             const hashedPassword = await bcrypt.hash(password, 10);
-    
+
             // Create user entry
             const register = await registerModel.create({
                 location_id: null,
@@ -572,6 +573,7 @@ const adminService = {
                 status,
                 reg_otp_id,
                 DOB,
+                interest,
                 agree,
                 onlineStatus,
                 isTyping,
@@ -590,27 +592,27 @@ const adminService = {
                 grade,
                 achievements,
             });
-    
+
             // Create the address
             const addressEntry = await locationModel.create({
                 user_id: register._id,
                 address,
             });
-    
+
             // Update user with address ID
             const updatedUser = await registerModel.findByIdAndUpdate(
                 register._id,
                 { location_id: addressEntry._id },
                 { new: true }
             );
-    
+
             return { success: true, user: updatedUser };
         } catch (error) {
             console.error("Error in registerUserAccount:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
+
 
     registerBusinessAccount: async (data) => {
         try {
@@ -652,14 +654,14 @@ const adminService = {
                 currentChatRoom = null,
                 unreadMessagesCount = 0,
             } = data;
-    
+
             let errors = [];
-    
+
             if (!user_id) errors.push("User ID is required.");
             if (!businessName) errors.push("Business name is required.");
             if (!businessType) errors.push("Business type is required.");
             if (!natureOfBusiness) errors.push("Nature of business is required.");
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
@@ -671,12 +673,12 @@ const adminService = {
             if (!existingUser) {
                 throw { status: 404, message: "User not found for the given user ID in business profile." };
             }
-    
+
             const existingBusiness = await businessregisterModel.findOne({ businessName });
             if (existingBusiness) {
                 throw { status: 400, message: "Business name already exists. Business name must be unique." };
             }
-    
+
             const business = await businessregisterModel.create({
                 user_id,
                 Brand_Name: Brand_Name || "",
@@ -718,13 +720,13 @@ const adminService = {
             });
 
             return { success: true, user: existingUser, business: [business] };
-    
+
         } catch (error) {
             console.error("Error in registerBusinessAccount:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
+
 
     updateBusinessProfile: async (data) => {
         try {
@@ -991,47 +993,47 @@ const adminService = {
         const { email, phn_number, password, deviceToken } = data;
         try {
             let user;
-    
+
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-    
+
             if (!user) {
                 throw { msg: "Account not found. Please register to continue." };
             }
-    
+
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     throw { msg: "Invalid credentials. Please try again or reset your password." };
                 }
             }
-    
+
             console.log("User ID:", user._id, "Device Token:", deviceToken);
-    
+
             const updatedUser = await registerModel.findOneAndUpdate(
                 { _id: user._id },
                 { $addToSet: { deviceToken: deviceToken } },
                 { new: true }
             );
-    
+
             if (updatedUser) {
                 console.log("Device tokens updated successfully:", updatedUser.deviceToken);
             } else {
                 console.error("Failed to update device tokens.");
             }
-    
+
             // Fetch the list of businesses associated with the user ID
             const businesses = await businessregisterModel.find({ user_id: user._id });
-    
+
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-    
+
             return {
                 status: 200,
                 msg: "Login successful",
@@ -1050,7 +1052,7 @@ const adminService = {
             };
         }
     },
-    
+
 
     // ===================
     storeOtp: async (user_id, otp) => {
@@ -2336,12 +2338,12 @@ const adminService = {
 
                 const validFriends = [];
                 for (const friendName of mentionDetails.friends) {
-                    const friend = await registerModel.findOne({ full_Name: friendName }); 
+                    const friend = await registerModel.findOne({ full_Name: friendName });
                     if (friend) {
                         validFriends.push({
                             friend_id: friend._id,
                             full_Name: friend.full_Name,
-                        }); 
+                        });
                     }
                 }
 
@@ -2393,7 +2395,7 @@ const adminService = {
                 status: 'accepted',
                 isBlocked: false,
                 isMuted: false
-            }).select('follower_id'); 
+            }).select('follower_id');
 
             return followers.map(f => f.follower_id);
         } catch (error) {
@@ -2411,36 +2413,36 @@ const adminService = {
             console.log(followerIds, "followerIds");
 
             if (!followerIds.length) {
-                return []; 
+                return [];
             }
 
 
             const query = {
-                user_id: { $in: followerIds }, 
-                status: "published", 
+                user_id: { $in: followerIds },
+                status: "published",
             };
             console.log(query, "query");
 
-            if (visibility) query.visibility = visibility; 
+            if (visibility) query.visibility = visibility;
             console.log(visibility, "visibility");
 
-            if (tags && tags.length > 0) query.tags = { $in: tags }; 
+            if (tags && tags.length > 0) query.tags = { $in: tags };
             console.log(tags, "tags");
 
             if (startDate && endDate) {
                 const start = new Date(startDate);
                 const end = new Date(endDate);
                 if (!isNaN(start) && !isNaN(end)) {
-                    query.timestamp = { $gte: start, $lte: end }; 
+                    query.timestamp = { $gte: start, $lte: end };
                 }
             }
 
             const posts = await createPostModel
                 .find(query)
-                .sort({ timestamp: -1 }) 
-                .skip((page - 1) * limit) 
-                .limit(limit) 
-                .populate("user_id", "full_Name profile_url"); 
+                .sort({ timestamp: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .populate("user_id", "full_Name profile_url");
             console.log(posts, "posts");
 
             const postsWithUserDetails = await Promise.all(posts.map(async (post) => {
@@ -2450,8 +2452,8 @@ const adminService = {
                 return {
                     id: post._id,
                     user_id: post.user_id._id,
-                    userName: userDetails ? userDetails.full_Name : 'Unknown User', 
-                    profileUrl: userDetails ? userDetails.profile_url : '', 
+                    userName: userDetails ? userDetails.full_Name : 'Unknown User',
+                    profileUrl: userDetails ? userDetails.profile_url : '',
                     mediaFile: post.mediaFile,
                     imageUrl: post.imageUrl,
                     caption: post.caption,
@@ -2502,18 +2504,18 @@ const adminService = {
     //       crossSellProducts,
     //       festivalOffers,
     //     } = data;
-      
+
     //     if (!Array.isArray(data.variants)) {
     //       throw new Error("Variants should be an array.");
     //     }
-      
+
     //     const existingProduct = await productModel.findOne({
     //       'variants.sku': { $in: data.variants.map((variant) => variant.sku) },
     //     });
     //     if (existingProduct) {
     //       throw new Error("SKU already exists. Please use unique SKUs.");
     //     }
-      
+
     //     try {
     //       const product = await productModel.create({
     //         productTitle: productTitle || "",
@@ -2594,15 +2596,15 @@ const adminService = {
     //         })) || [],
     //         festivalOffers: festivalOffers || [],
     //       });
-      
+
     //       return product;
     //     } catch (error) {
     //       console.error("Error creating product:", error);
     //       throw new Error("Failed to create product. Please try again.");
     //     }
     //   },
-      
-      
+
+
     // // ============================
     // getproduct: async () => {
     //     try {
@@ -2641,7 +2643,7 @@ const adminService = {
     //         crossSellProducts,
     //         festivalOffers,
     //       } = data;
-        
+
     //     try {
     //         if (!product_id || !productTitle  || !categories || !pricing || !availability) {
     //             throw new Error("Missing required fields:product_id, productTitle, categories, pricing, availability");
@@ -2857,204 +2859,267 @@ const adminService = {
         }
     },
     // ================================
-    
+
     sendMessage: async (from, to, message) => {
         console.log(from, to, message, "lopoop");
-      
+
         const timestamp = new Date();
         const chatKey = `chat:${from}:${to}`;
         const notificationKey = `notifications:${to}`;
-      
+
         try {
-          // Store the message in MongoDB
-          const newMessage = await MessageModel.create({ from, to, message, timestamp });
-          console.log(newMessage, "new");
-      
-          // Fetch the MongoDB generated _id
-          const messageWithObjectId = {
-            _id: newMessage._id.toString(), // Convert ObjectId to string
-            from,
-            to,
-            message,
-            timestamp
-          };
-      
-          // Store the message in Redis with the MongoDB _id
-          await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
-      
-          // Publish notification to the recipient via Redis
-          await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
-      
-          // Return success message
-          return { success: true, message: 'Message sent' };
+            // Store the message in MongoDB
+            const newMessage = await MessageModel.create({ from, to, message, timestamp });
+            console.log(newMessage, "new");
+
+            // Fetch the MongoDB generated _id
+            const messageWithObjectId = {
+                _id: newMessage._id.toString(), // Convert ObjectId to string
+                from,
+                to,
+                message,
+                timestamp
+            };
+
+            // Store the message in Redis with the MongoDB _id
+            await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
+
+            // Publish notification to the recipient via Redis
+            await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
+
+            // Return success message
+            return { success: true, message: 'Message sent' };
         } catch (err) {
-          console.error('Error in sendMessage:', err);
-          throw new Error('Error sending message');
+            console.error('Error in sendMessage:', err);
+            throw new Error('Error sending message');
         }
-      },
-      
-  
-  
-//   =============
-getChatHistory : async (from, to) => {
-    const chatKey1 = `chat:${from}:${to}`;
-    const chatKey2 = `chat:${to}:${from}`;
-  
-    try {
-      // Fetch messages from Redis (both directions)
-      const messages1 = await redisService.getRedisClient().lRange(chatKey1, 0, -1);
-      const messages2 = await redisService.getRedisClient().lRange(chatKey2, 0, -1);
-  
-      // Combine and sort messages by timestamp
-      const combinedMessages = [...messages1, ...messages2]
-        .map((msg) => JSON.parse(msg))
-        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  
-      return combinedMessages;
-    } catch (err) {
-      console.error('Error fetching chat history:', err);
-      throw new Error('Error fetching chat history');
-    }
-  },
+    },
 
 
 
-//   ======================
-// const Product = require('../models/productModel');
-// const UserPost = require('../models/userPostModel');
-// const User = require('../models/userModel');
-// const Business = require('../models/businessModel'); // Assuming business data has interests too
+    //   =============
+    getChatHistory: async (from, to) => {
+        const chatKey1 = `chat:${from}:${to}`;
+        const chatKey2 = `chat:${to}:${from}`;
 
-// Function to get a unified feed like Instagram
-//  getFeed : async (req, res) => {
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 10;
+        try {
+            // Fetch messages from Redis (both directions)
+            const messages1 = await redisService.getRedisClient().lRange(chatKey1, 0, -1);
+            const messages2 = await redisService.getRedisClient().lRange(chatKey2, 0, -1);
 
-//     try {
-//         const skip = (page - 1) * limit;
-//         const user_id = req.user.id; 
+            // Combine and sort messages by timestamp
+            const combinedMessages = [...messages1, ...messages2]
+                .map((msg) => JSON.parse(msg))
+                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-//         // Get user and business interests
-//         const userInterests = await adminService.getUserAndBusinessInterests(user_id);
-
-//         // Fetch posts (products and user posts) based on interests
-//         const feedData = await adminService.getFeedData(userInterests, skip, limit);
-
-//         // Send the feed data along with pagination info
-//         res.status(200).json({
-//             success: true,
-//             feed: feedData,
-//             page,
-//             totalPages: Math.ceil(feedData.totalCount / limit),
-//         });
-//     } catch (error) {
-//         console.error('Error fetching feed:', error);
-//         res.status(500).json({ success: false, message: 'Server error' });
-//     }
-// },
-
-//  getUserAndBusinessInterests : async (user_id) => {
-//     const user = await followerModel.findById(user_id);
-//     const userInterests = {
-//         followedUsers: user.followedUsers || [],
-//         followedBusinesses: user.followedBusinesses || [],
-//         productCategories: user.productCategories || [],
-//         globalCategories: ['trending', 'popular'], // Example global categories
-//     };
-
-//     const businesses = await Business.find({ followers: { $in: [user_id] } });
-//     const businessCategories = businesses.map(business => business.interests).flat();
-
-//     return {
-//         ...userInterests,
-//         businessCategories,
-//         followedBusinesses: businesses.map(b => b._id),
-//     };
-// },
-
-// // Function to fetch feed data based on interests and pagination
-//  getFeedData : async (userInterests, skip, limit) => {
-//     const { followedUsers, followedBusinesses, productCategories, businessCategories, globalCategories } = userInterests;
-
-//     // Fetch products based on interests
-//     const products = await Product.find({
-//         $or: [
-//             { categories: { $in: [...productCategories, ...businessCategories, ...globalCategories] } },
-//         ]
-//     }).skip(skip).limit(limit);
-
-//     // Fetch user posts (user and business content)
-//     const userPosts = await postModel.find({
-//         $or: [
-//             { user_id: { $in: followedUsers } },
-//             { businessId: { $in: followedBusinesses } }
-//         ]
-//     }).skip(skip).limit(limit);
-
-//     // Combine posts and products into a single feed (shuffle them to mimic Instagram)
-//     const feed = [...products, ...userPosts];
-//     const totalCount = feed.length;
-
-//     return {
-//         feed: feed.sort(() => Math.random() - 0.5), // Shuffle posts to mix the feed
-//         totalCount,
-//     };
-// },
+            return combinedMessages;
+        } catch (err) {
+            console.error('Error fetching chat history:', err);
+            throw new Error('Error fetching chat history');
+        }
+    },
 
 
-getFeed:async(user_id)=>{
-    console.log(user_id)
-    try {
+
+    //   ======================
+    // const Product = require('../models/productModel');
+    // const UserPost = require('../models/userPostModel');
+    // const User = require('../models/userModel');
+    // const Business = require('../models/businessModel'); // Assuming business data has interests too
+
+    // Function to get a unified feed like Instagram
+    //  getFeed : async (req, res) => {
+    //     const page = parseInt(req.query.page) || 1;
+    //     const limit = parseInt(req.query.limit) || 10;
+
+    //     try {
+    //         const skip = (page - 1) * limit;
+    //         const user_id = req.user.id; 
+
+    //         // Get user and business interests
+    //         const userInterests = await adminService.getUserAndBusinessInterests(user_id);
+
+    //         // Fetch posts (products and user posts) based on interests
+    //         const feedData = await adminService.getFeedData(userInterests, skip, limit);
+
+    //         // Send the feed data along with pagination info
+    //         res.status(200).json({
+    //             success: true,
+    //             feed: feedData,
+    //             page,
+    //             totalPages: Math.ceil(feedData.totalCount / limit),
+    //         });
+    //     } catch (error) {
+    //         console.error('Error fetching feed:', error);
+    //         res.status(500).json({ success: false, message: 'Server error' });
+    //     }
+    // },
+
+    //  getUserAndBusinessInterests : async (user_id) => {
+    //     const user = await followerModel.findById(user_id);
+    //     const userInterests = {
+    //         followedUsers: user.followedUsers || [],
+    //         followedBusinesses: user.followedBusinesses || [],
+    //         productCategories: user.productCategories || [],
+    //         globalCategories: ['trending', 'popular'], // Example global categories
+    //     };
+
+    //     const businesses = await Business.find({ followers: { $in: [user_id] } });
+    //     const businessCategories = businesses.map(business => business.interests).flat();
+
+    //     return {
+    //         ...userInterests,
+    //         businessCategories,
+    //         followedBusinesses: businesses.map(b => b._id),
+    //     };
+    // },
+
+    // // Function to fetch feed data based on interests and pagination
+    //  getFeedData : async (userInterests, skip, limit) => {
+    //     const { followedUsers, followedBusinesses, productCategories, businessCategories, globalCategories } = userInterests;
+
+    //     // Fetch products based on interests
+    //     const products = await Product.find({
+    //         $or: [
+    //             { categories: { $in: [...productCategories, ...businessCategories, ...globalCategories] } },
+    //         ]
+    //     }).skip(skip).limit(limit);
+
+    //     // Fetch user posts (user and business content)
+    //     const userPosts = await postModel.find({
+    //         $or: [
+    //             { user_id: { $in: followedUsers } },
+    //             { businessId: { $in: followedBusinesses } }
+    //         ]
+    //     }).skip(skip).limit(limit);
+
+    //     // Combine posts and products into a single feed (shuffle them to mimic Instagram)
+    //     const feed = [...products, ...userPosts];
+    //     const totalCount = feed.length;
+
+    //     return {
+    //         feed: feed.sort(() => Math.random() - 0.5), // Shuffle posts to mix the feed
+    //         totalCount,
+    //     };
+    // },
+
+
+    getFeed: async (user_id) => {
         console.log(user_id)
-    const following = await followerModel.find({ follower_id: user_id, status: 'accepted' }).select('user_id');
-    console.log(following,"following")
-    const followingIds = following.map(follow => follow.user_id);
-console.log(followingIds,"followingIds")
-    const selfPosts = await createPostModel.find({ user_id: user_id })
-        .populate('user_id', 'full_Name profile_url')
-        .sort({ timestamp: -1 })
-        .limit(5);  
-console.log(selfPosts,"self")
-    const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
-        .populate('user_id', 'full_Name profile_url')
-        .sort({ timestamp: -1 })
-        .limit(5);  // Adjust as needed
-        console.log(followedPosts,"followedPosts")
-    // Fetch business interests (this is just an example, adjust based on your data structure)
-    const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
-        .sort({ timestamp: -1 })
-        .limit(5);  // Adjust as needed
-        console.log(businessPosts,"businessPosts")
-    // Fetch user interests (again, adjust this based on your model)
-    const userPosts = await registerModel.find({ _id: user_id })
-        .sort({ timestamp: -1 })
-        .limit(5);  // Adjust as needed
-        console.log(userPosts,"userPosts")
-    const products = await Product.find()
-        .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
-        .sort({ 'ratings.averageRating': -1 })  // Sort by highest rating
-        .limit(5);  // Adjust as needed
-        console.log(products,"products")
-    const feed = [
-        ...selfPosts.map(post => ({ type: 'post', data: post })),
-        ...followedPosts.map(post => ({ type: 'post', data: post })),
-        ...businessPosts.map(post => ({ type: 'business', data: post })),
-        ...userPosts.map(post => ({ type: 'user_interest', data: post })),
-        ...products.map(product => ({ type: 'product', data: product }))
-    ];
-    console.log(feed,"feed")
-    // Sort the combined feed by timestamp (latest posts first)
-    const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp) - new Date(a.data.timestamp));
+        try {
+            console.log(user_id)
+            const following = await followerModel.find({ follower_id: user_id, status: 'accepted' }).select('user_id');
+            console.log(following, "following")
+            const followingIds = following.map(follow => follow.user_id);
+            console.log(followingIds, "followingIds")
+            const selfPosts = await createPostModel.find({ user_id: user_id })
+                .populate('user_id', 'full_Name profile_url')
+                .sort({ timestamp: -1 })
+                .limit(5);
+            console.log(selfPosts, "self")
+            const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
+                .populate('user_id', 'full_Name profile_url')
+                .sort({ timestamp: -1 })
+                .limit(5);  // Adjust as needed
+            console.log(followedPosts, "followedPosts")
+            // Fetch business interests (this is just an example, adjust based on your data structure)
+            const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
+                .sort({ timestamp: -1 })
+                .limit(5);  // Adjust as needed
+            console.log(businessPosts, "businessPosts")
+            // Fetch user interests (again, adjust this based on your model)
+            const userPosts = await registerModel.find({ _id: user_id })
+                .sort({ timestamp: -1 })
+                .limit(5);  // Adjust as needed
+            console.log(userPosts, "userPosts")
+            const products = await Product.find()
+                .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
+                .sort({ 'ratings.averageRating': -1 })  // Sort by highest rating
+                .limit(5);  // Adjust as needed
+            console.log(products, "products")
+            const feed = [
+                ...selfPosts.map(post => ({ type: 'post', data: post })),
+                ...followedPosts.map(post => ({ type: 'post', data: post })),
+                ...businessPosts.map(post => ({ type: 'business', data: post })),
+                ...userPosts.map(post => ({ type: 'user_interest', data: post })),
+                ...products.map(product => ({ type: 'product', data: product }))
+            ];
+            console.log(feed, "feed")
+            // Sort the combined feed by timestamp (latest posts first)
+            const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp) - new Date(a.data.timestamp));
 
-    // Optionally shuffle the feed or apply any other custom sorting
-    const shuffledFeed = sortedFeed.sort(() => Math.random() - 0.5);
+            // Optionally shuffle the feed or apply any other custom sorting
+            const shuffledFeed = sortedFeed.sort(() => Math.random() - 0.5);
 
-   return shuffledFeed
-} catch (error) {
-    console.error("Error fetching feed:", error);
-    throw error
-}
-}
+            return shuffledFeed
+        } catch (error) {
+            console.error("Error fetching feed:", error);
+            throw error
+        }
+    },
+    // =============================
+    addDeliveryAddress: async (data) => {
+        const { user_id, fullName, PhoneNumber, email, streetAddress, apartment, city, state, postalCode, country, lat, lng, deliveryInstructions } = data;
+        try {
+            if (!user_id || !fullName || !PhoneNumber || !email || !streetAddress || !city || !state || !postalCode || !country || !lat || !lng) {
+                throw new Error("requried some field")
+            }
+
+            const addressCount = await DeliveryAddressModel.countDocuments({ user_id });
+
+            if (addressCount >= 3) {
+                throw new Error("You can only store up to 3 delivery addresses.");
+            }
+            const createAddress = await DeliveryAddressModel.create({
+                user_id,
+                fullName,
+                PhoneNumber,
+                email,
+                streetAddress,
+                apartment,
+                city,
+                state,
+                postalCode,
+                country,
+                lat,
+                lng,
+                deliveryInstructions
+
+            })
+            return createAddress
+        } catch (error) {
+            console.error("Error createAddress:", error);
+            throw error
+        }
+    },
+    // ========================
+    getDeliveryAddress: async (user_id) => {
+        try {
+            const defaultAddress= await locationModel.find(user_id)
+            console.log(defaultAddress,"def")
+            const getDeliveryAddress = await DeliveryAddressModel.find(user_id);
+            return {
+                defaultAddress,
+                deliveryAddresses: getDeliveryAddress
+            };
+        } catch (error) {
+            console.error("Error  in get DeliveryAddress:", error);
+            throw error
+        }
+    },
+    // =================
+    deleteAddress:async (deliveryAddress_id) => {
+        console.log("deliveryAddress_id")
+        try {
+            const { id } = deliveryAddress_id; 
+    const deleteAddress = await DeliveryAddressModel.findOneAndDelete({ _id: id.toString() });
+            return "successfully deleted"
+        } catch (error) {
+            console.error("Error  in delete delivery Address:", error);
+            throw error
+        }
+    },
+    // =================
 
 }
 

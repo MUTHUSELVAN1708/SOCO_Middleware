@@ -96,7 +96,7 @@ router.post("/registerBusinessAccount", adminController.registerBusinessAccount)
 router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 
 
-
+                                                                                                               
 // Image Upload Route
 router.post(
     "/imgUpload",
@@ -302,11 +302,10 @@ router.put("/updateMsg",adminController.updateMsg);
 
 router.get("/getFeed/:user_id",adminController.getFeed)
 
+router.post("/addDeliveryAddress",adminController.addDeliveryAddress);
+router.get("/getDeliveryAddress/:user_id",adminController.getDeliveryAddress);
 
-
-
-
-
+router.delete("/deleteAddress/:id",adminController.deleteAddress)
 
 
 

@@ -855,7 +855,43 @@ getFeed:async (req, res) => {
       res.status(500).json({ error: 'Error getFeed message' });
     }
   },
+
+//   ========================
+addDeliveryAddress:async (req, res) => {
    
+    try {
+      const addDeliveryAddress = await adminService.addDeliveryAddress(req.body);
+      res.status(200).json(addDeliveryAddress);
+
+    } catch (err) {
+      console.error('Error in addDeliveryAddress:', err);
+      res.status(500).json({ error:err.message });
+    }
+  },
+//   =====================
+getDeliveryAddress:async (req, res) => {
+   const {user_id}=req.params
+    try {
+      const getDeliveryAddress = await adminService.getDeliveryAddress(req.params);
+      res.status(200).json(getDeliveryAddress);
+
+    } catch (err) {
+      console.error('Error in getDeliveryAddress:', err);
+      res.status(500).json({ error:err.message});
+    }
+  },
+//   ================
+deleteAddress:async (req, res) => {
+    const {id}=req.params
+     try {
+       const deleteAddress = await adminService.deleteAddress(req.params);
+       res.status(200).json({msg:deleteAddress});
+ 
+     } catch (err) {
+       console.error('Error in deleteAddress:', err);
+       res.status(500).json({ error:err.message});
+     }
+   },
 }
 
 
