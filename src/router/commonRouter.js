@@ -300,7 +300,7 @@ router.delete("/deleteFromRedis",adminController.deleteFromRedis);
 router.put("/updateMsg",adminController.updateMsg);
 
 
-router.get("/getFeed/:user_id",adminController.getFeed)
+router.get("/getFeed/:user_id/:address",adminController.getFeed)
 
 router.post("/addDeliveryAddress",adminController.addDeliveryAddress);
 router.get("/getDeliveryAddress/:user_id",adminController.getDeliveryAddress);

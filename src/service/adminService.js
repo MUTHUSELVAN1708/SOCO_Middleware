@@ -2921,166 +2921,111 @@ const adminService = {
 
 
 
-    //   ======================
-    // const Product = require('../models/productModel');
-    // const UserPost = require('../models/userPostModel');
-    // const User = require('../models/userModel');
-    // const Business = require('../models/businessModel'); // Assuming business data has interests too
+    //   =====================
 
-    // Function to get a unified feed like Instagram
-    //  getFeed : async (req, res) => {
-    //     const page = parseInt(req.query.page) || 1;
-    //     const limit = parseInt(req.query.limit) || 10;
-
-    //     try {
-    //         const skip = (page - 1) * limit;
-    //         const user_id = req.user.id; 
-
-    //         // Get user and business interests
-    //         const userInterests = await adminService.getUserAndBusinessInterests(user_id);
-
-    //         // Fetch posts (products and user posts) based on interests
-    //         const feedData = await adminService.getFeedData(userInterests, skip, limit);
-
-    //         // Send the feed data along with pagination info
-    //         res.status(200).json({
-    //             success: true,
-    //             feed: feedData,
-    //             page,
-    //             totalPages: Math.ceil(feedData.totalCount / limit),
-    //         });
-    //     } catch (error) {
-    //         console.error('Error fetching feed:', error);
-    //         res.status(500).json({ success: false, message: 'Server error' });
-    //     }
-    // },
-
-    //  getUserAndBusinessInterests : async (user_id) => {
-    //     const user = await followerModel.findById(user_id);
-    //     const userInterests = {
-    //         followedUsers: user.followedUsers || [],
-    //         followedBusinesses: user.followedBusinesses || [],
-    //         productCategories: user.productCategories || [],
-    //         globalCategories: ['trending', 'popular'], // Example global categories
-    //     };
-
-    //     const businesses = await Business.find({ followers: { $in: [user_id] } });
-    //     const businessCategories = businesses.map(business => business.interests).flat();
-
-    //     return {
-    //         ...userInterests,
-    //         businessCategories,
-    //         followedBusinesses: businesses.map(b => b._id),
-    //     };
-    // },
-
-    // // Function to fetch feed data based on interests and pagination
-    //  getFeedData : async (userInterests, skip, limit) => {
-    //     const { followedUsers, followedBusinesses, productCategories, businessCategories, globalCategories } = userInterests;
-
-    //     // Fetch products based on interests
-    //     const products = await Product.find({
-    //         $or: [
-    //             { categories: { $in: [...productCategories, ...businessCategories, ...globalCategories] } },
-    //         ]
-    //     }).skip(skip).limit(limit);
-
-    //     // Fetch user posts (user and business content)
-    //     const userPosts = await postModel.find({
-    //         $or: [
-    //             { user_id: { $in: followedUsers } },
-    //             { businessId: { $in: followedBusinesses } }
-    //         ]
-    //     }).skip(skip).limit(limit);
-
-    //     // Combine posts and products into a single feed (shuffle them to mimic Instagram)
-    //     const feed = [...products, ...userPosts];
-    //     const totalCount = feed.length;
-
-    //     return {
-    //         feed: feed.sort(() => Math.random() - 0.5), // Shuffle posts to mix the feed
-    //         totalCount,
-    //     };
-    // },
-
-
-    getFeed: async (user_id) => {
-        console.log(user_id)
+    getFeed: async (data) => {
+        let { user_id, address } = data; 
+        console.log(data, "Input Data");
         try {
-            console.log(user_id)
+            if (typeof address === "string") {
+                try {
+                    address = JSON.parse(address);
+                } catch (err) {
+                    throw new Error("Failed to parse address parameter. Please provide valid JSON.");
+                }
+            }
+    
+            const targetLat = Number(address.lat);
+            const targetLng = Number(address.lng);
+            if (isNaN(targetLat) || isNaN(targetLng)) {
+                throw new Error("Invalid latitude or longitude values.");
+            }
+    
             const following = await followerModel
                 .find({ follower_id: user_id, status: 'accepted' })
                 .select('user_id');
-            console.log(following, "following")
+            console.log(following, "Following Users");
             const followingIds = following.map(follow => follow.user_id);
-            console.log(followingIds, "followingIds")
-            
-            const selfPosts = await createPostModel
-                .find({ user_id: user_id })
+            console.log(followingIds, "Following IDs");
+    
+            const delta = 0.10; // 
+            const nearbyLocations = await locationModel.find({
+                "address.lat": { $gte: targetLat - delta, $lte: targetLat + delta },
+                "address.lng": { $gte: targetLng - delta, $lte: targetLng + delta }
+            });
+            console.log(nearbyLocations, "Nearby Location Documents");
+    
+            const localUserIds = nearbyLocations.map(loc => loc.user_id);
+            console.log(localUserIds, "Local User IDs");
+    
+            const localPosts = await createPostModel.find({
+                user_id: { $in: localUserIds }
+            })
                 .populate('user_id', 'full_Name profile_url')
                 .sort({ timestamp: -1 })
                 .limit(5);
-            console.log(selfPosts, "self")
-            
-            const followedPosts = await createPostModel
-                .find({ user_id: { $in: followingIds } })
-                .populate('user_id', 'full_Name profile_url')
-                .sort({ timestamp: -1 })
-                .limit(5);  // Adjust as needed
-            console.log(followedPosts, "followedPosts")
-            
-            // Fetch business interests (this is just an example, adjust based on your data structure)
-            const businessPosts = await businessregisterModel
-                .find({ user_id: { $in: followingIds } })
-                .sort({ timestamp: -1 })
-                .limit(5);  // Adjust as needed
-            console.log(businessPosts, "businessPosts")
-            
-            // Fetch user interests (again, adjust this based on your model)
-            const userPosts = await registerModel
-                .find({ _id: user_id })
-                .sort({ timestamp: -1 })
-                .limit(5);  // Adjust as needed
-            console.log(userPosts, "userPosts")
-            
-            const products = await Product.find()
-                .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
-                .sort({ 'ratings.averageRating': -1 })  // Sort by highest rating
-                .limit(5);  // Adjust as needed
-            console.log(products, "products")
-            
-            // Combine the feed items with their type
+            console.log(localPosts, "Local Posts");
+
+            const selfPosts = await createPostModel.find({ user_id: user_id })
+            .populate('user_id', 'full_Name profile_url')
+            .sort({ timestamp: -1 })
+            .limit(5);
+        console.log(selfPosts, "Self Posts");
+
+        const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
+            .populate('user_id', 'full_Name profile_url')
+            .sort({ timestamp: -1 })
+            .limit(5);
+        console.log(followedPosts, "Followed Posts");
+
+        const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
+            .sort({ timestamp: -1 })
+            .limit(5);
+        console.log(businessPosts, "Business Posts");
+
+        const userPosts = await registerModel.find({ _id: user_id })
+            .sort({ timestamp: -1 })
+            .limit(5);
+        console.log(userPosts, "User Interest Posts");
+
+        // 8. Fetch products
+        const products = await Product.find()
+            .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
+            .sort({ 'ratings.averageRating': -1 })
+            .limit(5);
+        console.log(products, "Products");
             const feed = [
                 ...selfPosts.map(post => ({ type: 'post', data: post })),
                 ...followedPosts.map(post => ({ type: 'post', data: post })),
                 ...businessPosts.map(post => ({ type: 'business', data: post })),
                 ...userPosts.map(post => ({ type: 'user_interest', data: post })),
-                ...products.map(product => ({ type: 'product', data: product }))
+                ...products.map(product => ({ type: 'product', data: product })),
+                ...localPosts.map(post => ({ type: 'local', data: post }))
             ];
-            console.log(feed, "feed")
-            
-            // Sort the combined feed by timestamp (latest posts first)
-            const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp) - new Date(a.data.timestamp));
-            
-            // Optionally shuffle the feed or apply any other custom sorting
+            console.log(feed, "Combined Feed");
+    
+            const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp || 0) - new Date(a.data.timestamp || 0));
+    
             const shuffledFeed = sortedFeed.sort(() => Math.random() - 0.5);
-            console.log(shuffledFeed,)
-            // Modify only the response mapping for each feed item
+            console.log(shuffledFeed, "Shuffled Feed");
+    
             const transformedFeed = shuffledFeed.map(item => {
                 const { data: post, type } = item;
+    
                 
-                // For posts, business posts, or user interests, transform using your structure
-                if (type === 'post' || type === 'business' || type === 'user_interest') {
+                if (type === 'post' || type === 'business' || type === 'user_interest' || type === 'local') {
                     return {
                         id: post._id,
-                         username: type === 'business'  ? (post.businessName || "") : post.user_id?.full_Name || 'Unknown',
-                         userAvatar: type === 'business'
-                         ? post.brand_logo || ''  
-                         : post.user_id?.profile_url || '',
+                        username: type === 'business'
+                            ? (post.businessName || "")
+                            : post.user_id?.full_Name || 'Unknown',
+                        userAvatar: type === 'business'
+                            ? post.brand_logo || ''
+                            : post.user_id?.profile_url || '',
                         companyName: type === 'business' ? post.org_name || '' : '',
-                        mediaType: type === "post" 
-                        ? (post.isVideo ? "video" : (post.mediaType || "image"))
-                        : (post.mediaType || "image"),
+                        mediaType: type === "post" || type === "local"
+                            ? (post.isVideo ? "video" : (post.mediaType || "image"))
+                            : (post.mediaType || "image"),
                         mediaUrl: post.mediaUrl || '',
                         carouselUrls: post.carouselUrls || null,
                         description: post.description || '',
@@ -3101,7 +3046,8 @@ const adminService = {
                         type
                     };
                 }
-                
+    
+               
                 if (type === 'product') {
                     return {
                         id: post._id,
@@ -3113,16 +3059,18 @@ const adminService = {
                         type
                     };
                 }
-                
+    
                 return { type, ...post };
             });
-            
+    
+    
             return transformedFeed;
         } catch (error) {
             console.error("Error fetching feed:", error);
             throw error;
         }
     },
+    
     
     // =============================
     addDeliveryAddress: async (data) => {

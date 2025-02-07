@@ -840,14 +840,14 @@ updateMsg: async (req, res) => {
 
 //   =======================
 getFeed:async (req, res) => {
-    const {user_id} = req.params;
+    const {user_id,address} = req.params;
   
     if (!user_id) {
       return res.status(400).json({ error: 'user are required' });
     }
   
     try {
-      const getFeed = await adminService.getFeed(user_id);
+      const getFeed = await adminService.getFeed(req.params);
       res.status(200).json(getFeed);
 
     } catch (err) {
