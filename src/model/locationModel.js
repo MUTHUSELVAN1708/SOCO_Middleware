@@ -31,6 +31,10 @@ user_id:{
             type: String,
             required: false
         },
+        state: {
+            type: String,
+            required: false
+        },
         country: {
             type: String,
             required: false

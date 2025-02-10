@@ -9,6 +9,8 @@ import "./src/db/db.js"; // Ensure the database connection is properly handled
 import adminRouter from "./src/router/adminRouter.js";
 import commonRouter from "./src/router/commonRouter.js";
 import productRoutes from "./src/router/productRoutes.js";
+import commentRoutes from "./src/router/commentRoutes.js";
+import feedRoutes from "./src/router/feedRouter.js";
 import errorHandling from "./errorHandling.js";
 import  initializeSocket from "./socket.js";
 import redisService from "./src/service/redisService.js";
@@ -30,6 +32,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use("/admin", adminRouter);
 app.use("/common", commonRouter);
 app.use('/api', productRoutes);
+app.use('/comment', commentRoutes);
+app.use('/feed', feedRoutes);
 
 // Error Handling
 app.use(errorHandling);
