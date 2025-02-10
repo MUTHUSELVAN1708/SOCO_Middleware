@@ -2860,41 +2860,55 @@ const adminService = {
     },
     // ================================
 
-    sendMessage: async (from, to, message) => {
-        console.log(from, to, message, "lopoop");
-
+    sendMessage: async (data) => {
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch (err) {
+            console.error("Failed to parse input data:", err);
+            throw new Error("Invalid JSON input");
+          }
+        }
+      
+        const { from, to, message } = data;
+        console.log("Input data:", data);
+      
+        if (!from || !to || !message) {
+          throw new Error("Missing required fields: from, to, or message");
+        }
+      
         const timestamp = new Date();
         const chatKey = `chat:${from}:${to}`;
         const notificationKey = `notifications:${to}`;
-
+      
         try {
-            // Store the message in MongoDB
-            const newMessage = await MessageModel.create({ from, to, message, timestamp });
-            console.log(newMessage, "new");
-
-            // Fetch the MongoDB generated _id
-            const messageWithObjectId = {
-                _id: newMessage._id.toString(), // Convert ObjectId to string
-                from,
-                to,
-                message,
-                timestamp
-            };
-
-            // Store the message in Redis with the MongoDB _id
-            await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
-
-            // Publish notification to the recipient via Redis
-            await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
-
-            // Return success message
-            return { success: true, message: 'Message sent' };
+          // Create the message in MongoDB
+          const newMessage = await MessageModel.create({ from, to, message, timestamp });
+          console.log("New message created:", newMessage);
+      
+          // Build the message object with the MongoDB _id converted to a string
+          const messageWithObjectId = {
+            _id: newMessage._id.toString(),
+            from,
+            to,
+            message,
+            timestamp,
+          };
+      
+          // Push the message into Redis under the chat key
+          await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
+      
+          // Publish a notification to the recipient's channel
+          await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
+      
+          // Return success message
+          return { success: true, message: 'Message sent' };
         } catch (err) {
-            console.error('Error in sendMessage:', err);
-            throw new Error('Error sending message');
+          console.error('Error in sendMessage:', err);
+          throw new Error('Error sending message');
         }
-    },
-
+      },
+      
 
 
     //   =============

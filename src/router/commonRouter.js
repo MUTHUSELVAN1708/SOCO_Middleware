@@ -113,7 +113,7 @@ router.post(
 const allowedAccountTypes = ['user', 'business'];
 const allowedFields = ['profile_url', 'avatar_url'];
 
-// General File Upload Route with Account Type
+
 router.post(
     "/fileUploadByAccountType",
     uploadFiles.single('file'),

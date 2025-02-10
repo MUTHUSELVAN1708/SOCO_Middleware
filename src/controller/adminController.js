@@ -64,7 +64,6 @@ const adminController = {
 
             res.status(200).json({
                 status: 200,
-                msg: "OTP verified successfully",
                 verifyOtp,
             });
         } catch (error) {
