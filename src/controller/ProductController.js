@@ -1,5 +1,6 @@
 import Product from '../model/Product.js';
 import { validateProduct } from '../utils/validators.js';
+import adminService from '../service/adminService.js';
 import mongoose from 'mongoose';
 
 const ERROR_MESSAGES = {
@@ -175,14 +176,6 @@ const formatResponse = (success, message, data = null, errors = null) => {
         );
       }
   
-      // Normalize SKUs to lowercase to prevent case-sensitive duplicates
-      if (productData.variants) {
-        productData.variants = productData.variants.map(variant => ({
-          ...variant,
-          sku: variant.sku.toLowerCase()
-        }));
-      }
-  
       const defaultRatings = {
         averageRating: 0,
         totalReviews: 0,
@@ -203,21 +196,6 @@ const formatResponse = (success, message, data = null, errors = null) => {
         product = await Product.findOne({ _id: productId });
         if (!product) return res.status(404).json(formatResponse(false, 'Product not found'));
   
-        // Check for duplicate SKUs before updating
-        if (productData.variants) {
-          const skus = productData.variants.map(v => v.sku);
-          const existingSku = await Product.findOne({
-            _id: { $ne: productId },
-            'variants.sku': { $in: skus }
-          });
-          
-          if (existingSku) {
-            return res.status(409).json(
-              formatResponse(false, `Duplicate SKU found in another product`)
-            );
-          }
-        }
-  
         product = await Product.findOneAndUpdate(
           { _id: productId },
           { $set: productData },
@@ -225,44 +203,68 @@ const formatResponse = (success, message, data = null, errors = null) => {
         );
         responseMessage = 'Product updated successfully';
       } else {
-        // Check for duplicate SKUs before creating
-        if (productData.variants) {
-          const skus = productData.variants.map(v => v.sku);
-          console.log(skus);
-          const existingSku = await Product.findOne({
-            'variants.sku': { $in: skus }
-          });
-          console.log(existingSku);
-          if (existingSku) {
-            console.log('running without sku');
-            return res.status(409).json(
-              formatResponse(false, `Duplicate SKU found in another product`)
-            );
-          }
-        }
-
-  
         product = await Product.create({
           ...productData,
           ratings: defaultRatings,
           createdBy: userId,
         });
         responseMessage = 'Product created successfully';
+  
+        const postData = {
+          user_id: userId ?? '',
+          typeOfAccount: "business",
+          creatorName: productData?.creatorName ?? '',
+          creatorProfileImageUrl: productData?.creatorProfileImageUrl ?? '',
+          lat: productData?.lat ?? 0,
+          lng: productData?.lng ?? 0,
+          pinCode: productData?.pinCode ?? '',
+          city: productData?.city ?? '',
+          district: productData?.district ?? '',
+          state: productData?.state ?? '',
+          completeAddress: productData?.completeAddress ?? '',
+          postLanguage: productData?.postLanguage ?? ['English'],
+          postCategories: productData?.postCategories ?? [],
+          interestPeoples: productData?.interestPeoples ?? [],
+          likesCount: 0,
+          commentsCount: 0,
+          viewsCount: 0,
+          sharesCount: 0,
+          isBusinessPost: false,
+          isUserPost: false,
+          productId: product._id,
+          isProductPost: true,
+          imageUrl: productData?.images?.[0] ?? '',
+          caption: productData?.basicInfo?.productTitle ?? '',
+          isScheduled: false,
+          scheduleDateTime: productData?.scheduleDateTime,
+          tags: productData?.tags ?? [],
+          description: productData?.description ?? '',
+          isVideo: false,
+          location: productData?.location ?? '',
+          mediaFile: productData?.images?.[0] ?? '',
+          thumbnailFile: productData?.images?.[0] ?? '',
+          enableComments: true,
+          enableFavorites: true,
+          mentions: productData?.mentions ?? [],
+          filters: productData?.filters ?? [],
+          quality: 'HD',
+          visibility: 'public',
+          aspectRatio: productData?.aspectRatio ?? 1.0,
+        };
+  
+        try {
+          await adminService.createPost(postData);
+        } catch (postError) {
+          console.error("Error creating post:", postError);
+        }
       }
   
       return res.status(200).json(formatResponse(true, responseMessage, { productId: product._id }));
     } catch (error) {
-      // console.error('Error in createAndUpdateProduct:', error);
-      
-      if (error.code === 11000) {
-        return res.status(409).json(
-          formatResponse(false, `Duplicate SKU found. Each variant must have a unique SKU.`)
-        );
-      }
-  
       return res.status(500).json(formatResponse(false, 'Server error', null, [{ message: error.message }]));
     }
   };
+  
   
   
   export const deleteProducts = async (req, res) => {

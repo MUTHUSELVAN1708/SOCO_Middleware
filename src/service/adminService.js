@@ -11,7 +11,7 @@ import businessregisterModel from "../model/BusinessModel.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
-import postModel from "../model/postModel.js";
+// import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
 import levenshtein from "fast-levenshtein";
 import mongoose from "mongoose";
@@ -258,6 +258,7 @@ const adminService = {
                 full_Name,
                 phn_number,
                 email,
+                languages,
                 gender,
                 DOB,
                 deviceToken,
@@ -388,6 +389,13 @@ const adminService = {
                 deviceToken,
                 full_Name,
                 phn_number,
+                languages,
+                lat: address['lat'],
+                lng: address['lng'],
+                city: address['city'],
+                district: address['district'],
+                state: address['state'],
+                pinCode: address['Pincode'],
                 password: hashedPassword,
                 email,
                 gender,
@@ -497,6 +505,7 @@ const adminService = {
                 phn_number,
                 email,
                 gender,
+                languages,
                 DOB,
                 accountIsPublic,
                 deviceToken,
@@ -566,6 +575,13 @@ const adminService = {
                 full_Name,
                 phn_number,
                 accountIsPublic,
+                languages,
+                lat: address['lat'],
+                lng: address['lng'],
+                city: address['city'],
+                district: address['district'],
+                state: address['state'],
+                pinCode: address['Pincode'],
                 password: hashedPassword,
                 email,
                 gender,
@@ -1692,14 +1708,33 @@ const adminService = {
     // },
 
     createPost: async (data) => {
+        console.log("Received postData:", data);
         const {
             user_id,
+            creatorName,
+            creatorProfileImageUrl,
+            lat,
+            lng,
+            pinCode,
+            city,
+            district,
+            state,
+            completeAddress,
+            postLanguage,
+            interestPeoples,
+            postCategories,
+            likesCount,
+            commentsCount,
+            viewsCount,
+            sharesCount,
+            isBusinessPost,
+            isUserPost,
+            isProductPost,
+            productId,
             imageUrl,
             caption,
             isScheduled,
             scheduleDateTime,
-            likes,
-            comments,
             tags,
             description,
             isVideo,
@@ -1721,8 +1756,10 @@ const adminService = {
             typeOfAccount,
         } = data;
 
+
         try {
             let user;
+            console.log("Inside create Post call ", data);
             console.log("scheduleDateTime value:", scheduleDateTime);
 
             if (typeOfAccount === "business") {
@@ -1739,12 +1776,34 @@ const adminService = {
 
             let newPost = {
                 user_id,
+                creatorName,
+            creatorProfileImageUrl,
+            lat,
+            lng,
+            pinCode,
+            city,
+            // location: {
+            //     type: "Point",
+            //     coordinates: [lng, lat]  // ✅ Longitude first, then latitude
+            // },
+            district,
+            state,
+            productId: productId ?? '',
+            completeAddress,
+            postLanguage: postLanguage ?? [],
+            postCategories:postCategories ?? [],
+            interestPeoples: interestPeoples ?? [],
+            likesCount,
+            commentsCount,
+            viewsCount,
+            sharesCount,
+            isBusinessPost,
+            isUserPost,
+            isProductPost,
                 imageUrl,
                 caption,
                 isScheduled,
                 scheduleDateTime,
-                likes,
-                comments,
                 tags,
                 description,
                 isVideo,
@@ -1793,7 +1852,8 @@ const adminService = {
 
             return userPost;
         } catch (error) {
-            throw new Error("Failed to create the post.");
+            console.error("Error creating post:", error); // Log the actual error
+            throw new Error(`Failed to create the post: ${error.message}`);
         }
     },
 
@@ -1920,19 +1980,18 @@ const adminService = {
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
             const skip = (page - 1) * limit;
-
-            // Fetch posts with pagination and sorting
-            const posts = await postModel.find({ user_id })
+    
+            // Fetch posts with pagination, sorting, and filter out isProductPost = true
+            const posts = await createPostModel.find({ user_id, isProductPost: false })
                 .sort({ timestamp: -1 })
                 .skip(skip)
                 .limit(limit)
                 .select('imageUrl caption likes tags timestamp isVideo thumbnailFile');
-
-
-            // Count total results for pagination
-            const totalResults = await postModel.countDocuments({ user_id });
+    
+            // Count total results for pagination (excluding isProductPost: true)
+            const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
             const totalPages = Math.ceil(totalResults / limit);
-
+    
             return {
                 posts,
                 pagination: {
@@ -1946,8 +2005,8 @@ const adminService = {
             };
         } catch (error) {
             throw error;
-        }
-    },
+        }},
+    
     // ======================
 
     followUser: async (user_id, follower_id) => {

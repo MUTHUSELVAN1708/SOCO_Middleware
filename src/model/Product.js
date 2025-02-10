@@ -42,6 +42,7 @@ const productSchema = new mongoose.Schema({
     }
   },
   images: [String],
+  postCommentsCount:{ type: Number, required: false,default:0 },
   descriptionHighlights: {
     description: { type: String, required: false },
     highlights: [String]
@@ -171,7 +172,7 @@ productSchema.index({ 'basicInfo.productTitle': 'text', 'basicInfo.tags': 'text'
 productSchema.index({ 'pricing.regularPrice': 1 });
 productSchema.index({ 'availability.inStock': 1 });
 productSchema.index({ 'ratings.averageRating': 1 });
-productSchema.index({ 'variants.sku': 1 }, { unique: true, sparse: true });
+// productSchema.index({ 'variants.sku': 1 }, { unique: true, sparse: true });
 
 
 const Product = mongoose.model('Product', productSchema);
