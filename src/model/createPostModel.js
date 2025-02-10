@@ -1,13 +1,32 @@
 import mongoose from "mongoose";
 
 const createPostSchema = new mongoose.Schema({
-    user_id: { type: String, ref: 'user', required: true },
+    user_id: { type: String, required: true },
+    creatorName: { type: String, required: true },
+    creatorProfileImageUrl: { type: String },
+    pinCode: { type: String },
+    city: { type: String },
+    district: { type: String },
+    state: { type: String },
+    country: { type: String },
+    completeAddress: { type: String }, 
+    lat: { type: Number },
+    lng: { type: Number },
+    postLanguage: { type: [String], default: [] }, 
+    interestPeoples: { type: [String], default: [] },
+    postCategories: { type: [String], default: [] },
+    likesCount: { type: Number, default: 0 }, 
+    commentsCount: { type: Number, default: 0 },
+    viewsCount: { type: Number, default: 0 }, 
+    sharesCount: { type: Number, default: 0 },
+    isBusinessPost: { type: Boolean, default: false }, 
+    isUserPost: { type: Boolean, default: false }, 
+    isProductPost: { type: Boolean, default: false },
+    productId: { type: String, },
     imageUrl: { type: String, },
     caption: { type: String,  },
     isScheduled: { type: Boolean, default: false },
     scheduleDateTime: { type: Date, default: null },
-    likes: { type: Number, },
-    comments: { type: Number, },
     tags: { type: [String], },
     description: { type: String,  },
     isVideo: { type: Boolean, default: false },
@@ -32,6 +51,7 @@ const createPostSchema = new mongoose.Schema({
     versionKey: false
 }
  );
+
 
 createPostSchema.virtual("Post_id").get(function () {
     return this._id.toString();
