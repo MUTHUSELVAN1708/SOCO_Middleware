@@ -483,6 +483,94 @@ const adminController = {
             next(error);
         }
     },
+
+    getPostDetails: async (req, res, next) => {
+        const postId = req.body.postId;  
+        const isBusinessAccount = req.body.isBusiness;
+        console.log("Received postId:", postId);
+        console.log("Received isBusinessAccount:", isBusinessAccount);
+
+
+        try {
+            const getPostsDetails = await adminService.getPostDetails(postId, isBusinessAccount);
+
+            res.status(200).json({
+                status: 200,
+                data: getPostsDetails,
+            });
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    getUserProfile: async (req, res, next) => {
+        const id = req.body.id;  
+        const isBusinessAccount = req.body.isBusiness;
+
+
+        try {
+            const getUserDetails = await adminService.getUserProfile(id, isBusinessAccount);
+
+            res.status(200).json({
+                status: 200,
+                data: getUserDetails,
+            });
+        } catch (error) {
+            console.error("Error fetching Users:", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    fetchUserFriends: async (req, res, next) => {
+        const id = req.body.id;  
+
+        try {
+            const getUserDetails = await adminService.fetchUserFriends(id);
+
+            res.status(200).json({
+                status: 200,
+                data: getUserDetails,
+            });
+        } catch (error) {
+            console.error("Error fetching Users Friend:", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+
+    fetchUserPosts: async (req, res, next) => {
+        const id = req.body.id;  
+        const limit= req.body.limit; 
+        const page = req.body.page; 
+
+        try {
+            const getUserDetails = await adminService.fetchUserPosts(id,page,limit);
+
+            res.status(200).json({
+                status: 200,
+                data: getUserDetails,
+            });
+        } catch (error) {
+            console.error("Error fetching Users posts :", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
     // ==================
     followUser: async (req, res) => {
         try {

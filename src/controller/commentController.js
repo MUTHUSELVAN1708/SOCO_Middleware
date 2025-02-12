@@ -1,6 +1,7 @@
 import Comment from '../model/Comment.js';
 import registerModel from '../model/registerModel.js';
 import businessregisterModel from '../model/BusinessModel.js';
+import createPostModel from '../model/createPostModel.js';
 import CommentLike from '../model/CommentLike.js'; 
 import UserInfo from '../model/UserInfo.js';
 import { handleSuccess, handleError } from '../utils/responseHandler.js';
@@ -277,8 +278,10 @@ const addComment = async (req, res) => {
       await newComment.save();
 
       console.log('----- after save comment -----');
+      await createPostModel.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
 
       const populatedComment = await Comment.findById(newComment._id).populate('userInfo').exec();
+
 
       return res.status(201).json({
           success: true,
@@ -297,12 +300,15 @@ const addComment = async (req, res) => {
 
 
 const addReply = async (req, res) => {
+  console.log(' ------- inside  addd replied 0 -------------');
   const { commentId } = req.params;
   const { postId, userId, content, isBusiness } = req.body;
 
   try {
+    console.log(' ------- inside  addd replied -------------');
       const parentComment = await Comment.findOne({ commentId });
       if (!parentComment) return res.status(404).json({ success: false, message: 'Comment not found' });
+      console.log(parentComment);
 
       let user;
       if (isBusiness) {
