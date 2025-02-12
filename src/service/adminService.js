@@ -8,6 +8,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken"
 import locationModel from "../model/locationModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
+import Comment from "../model/Comment.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
@@ -2006,6 +2007,78 @@ const adminService = {
         } catch (error) {
             throw error;
         }},
+
+        getPostDetails: async (postId, isBusinessAccount) => {
+            try {
+                console.log(postId);
+                
+                // Fetch post details
+                const post = await createPostModel.findById(postId).select(
+                    "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp"
+                );
+                if (!post) throw new Error("Post not found");
+        
+                // Fetch user details
+                const user = isBusinessAccount
+                    ? await businessregisterModel.findById(post.user_id)
+                    : await registerModel.findById(post.user_id);
+        
+                if (!user) throw new Error("User not found");
+        
+                // Fetch total comments count
+                const totalComments = await Comment.countDocuments({ postId });
+        
+                // Fetch top 3 most popular comments based on likesCount
+                const comments = await Comment.find({ postId })
+                    .sort({ likesCount: -1 })
+                    .limit(3)
+                    .populate({
+                        path: "userInfo",
+                        select: "name avatarUrl", 
+                    })
+                    .select("commentId userId content createdAt likesCount replyCount hasMoreReplies");
+        
+                // Format comments
+                const formattedComments = comments.map(comment => ({
+                    id: comment.commentId,
+                    userId: comment.userId,
+                    userName: comment.userInfo?.name || "Unknown",
+                    userAvatar: comment.userInfo?.avatarUrl || "",
+                    text: comment.content,
+                    createdAt: comment.createdAt,
+                    likesCount: comment.likesCount,
+                    replyCount: comment.replyCount,
+                    hasMoreReplies: comment.hasMoreReplies,
+                }));
+        
+                return {
+                    id: post._id,
+                    user_id: post.user_id,
+                    creatorName: post.creatorName,
+                    creatorProfileImageUrl: post.creatorProfileImageUrl,
+                    mediaFile: post.mediaFile,
+                    thumbnailFile: post.thumbnailFile,
+                    videoDuration: post.videoDuration,
+                    aspectRatio: post.aspectRatio,
+                    isVideo: post.isVideo,
+                    likesCount: post.likesCount,
+                    commentsCount: post.commentsCount,
+                    totalComments: totalComments, // Added total comments count
+                    viewsCount: post.viewsCount,
+                    sharesCount: post.sharesCount,
+                    isBusinessPost: post.isBusinessPost,
+                    caption: post.caption,
+                    createdAt: post.timestamp,
+                    isLiked: false,
+                    isPinned: false,
+                    comments: formattedComments,
+                };
+            } catch (error) {
+                throw error;
+            }
+        },
+        
+        
     
     // ======================
 
@@ -3208,6 +3281,121 @@ const adminService = {
         }
     },
     // =================
+    getUserProfile: async (id, isBusinessAccount) => {
+        try {
+          const user = isBusinessAccount
+            ? await businessregisterModel.findById(id)
+            : await registerModel.findById(id);
+      
+          if (!user) {
+            return null;
+          }
+      
+          const fullName = isBusinessAccount
+            ? user.ownerName || "Business Owner"
+            : user.full_Name || "";
+      
+          return {
+            id: user._id.toString(),
+            username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
+            fullName: fullName,
+            bio: isBusinessAccount ? user.natureOfBusiness || "This is a business account" : user.bio || "No bio",
+            profileImageUrl: isBusinessAccount ? user.brand_logo || "" : user.profile_url || "",
+            posts: user.postCount || 0,
+            followers: user.followerCount || 0,
+            following: user.followingCount || 0,
+            isVerified: user.isVerified || false,
+            isPrivate: user.accountIsPublic === undefined ? false : !user.accountIsPublic,
+            needPermissionForFollowing: user.needPermissionForFollowing,
+            highlights: user.highlights?.length ? user.highlights : [],
+          };
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          return null;
+        }
+      },
+
+      fetchUserFriends: async (id) => {
+        try {
+          const totalFriendsCount = await followerModel.countDocuments({ user_id: id, status: 'accepted' });
+      
+          const friends = await followerModel
+            .find({ user_id: id, status: 'accepted' })
+            .limit(10);
+      
+          const friendDetails = await Promise.all(
+            friends.map(async (friend) => {
+              const isBusinessAccount = friend.isBusinessAccount;
+              const user = isBusinessAccount
+                ? await businessregisterModel.findById(friend.follower_id)
+                : await registerModel.findById(friend.follower_id);
+      
+              if (!user) return null;
+      
+              return {
+                id: user._id.toString(),
+                username: `@${isBusinessAccount ? user.businessName || `Business${user._id}` : user.full_Name || `User${user._id}`}`,
+                profileImageUrl: isBusinessAccount ? user.brand_logo || '' : user.profile_url || '',
+                isFollowing: true,
+              };
+            })
+          );
+      
+          return {
+            friends: friendDetails.filter(Boolean), // Remove null values if user was not found
+            hasMoreFriends: totalFriendsCount > 10,
+            totalFriendsCount,
+          };
+        } catch (error) {
+          console.error("Error fetching user friends:", error);
+          return {
+            friends: [],
+            hasMoreFriends: false,
+            totalFriendsCount: 0,
+          };
+        }
+      },
+
+       fetchUserPosts : async (userId, page = 1, limit = 12) => {
+        try {
+          const skip = (page - 1) * limit;
+      
+          const totalPostsCount = await createPostModel.countDocuments({ user_id: userId });
+      
+          const posts = await createPostModel
+            .find({ user_id: userId })
+            .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 }) // Sort by popularity
+            .skip(skip)
+            .limit(limit);
+      
+          const postDetails = posts.map((post) => ({
+            id: post._id.toString(),
+            userId: post.user_id,
+            imageUrl: post.imageUrl || '',
+            caption: post.caption || '',
+            likes: post.likesCount || 0,
+            comments: post.commentsCount || 0,
+            createdAt: post.timestamp,
+            tags: post.tags || [],
+          }));
+      
+          return {
+            posts: postDetails,
+            hasMorePosts: totalPostsCount > skip + posts.length,
+            totalPostsCount,
+          };
+        } catch (error) {
+          console.error('Error fetching user posts:', error);
+          return {
+            posts: [],
+            hasMorePosts: false,
+            totalPostsCount: 0,
+          };
+        }
+      },
+      
+      
+      
 
 }
 
