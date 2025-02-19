@@ -3220,54 +3220,96 @@ const adminService = {
     
     // =============================
     addDeliveryAddress: async (data) => {
-        const { user_id, fullName, PhoneNumber, email, streetAddress, apartment, city, state, postalCode, country, lat, lng, deliveryInstructions } = data;
+        const {
+            user_id,
+            fullName,
+            phoneNumber,
+            email,
+            streetAddress,
+            apartment,
+            city,
+            state,
+            postalCode,
+            country,
+            lat,
+            lng,
+            isDefault,
+            deliveryInstructions,
+            addressType = 'home', // Default value for addressType
+        } = data;
+    
         try {
-            if (!user_id || !fullName || !PhoneNumber || !email || !streetAddress || !city || !state || !postalCode || !country || !lat || !lng) {
-                throw new Error("requried some field")
+            if (!user_id || !fullName || !phoneNumber || !streetAddress || !city || !state || !postalCode) {
+                throw new Error("Required fields are missing.");
             }
-
+    
             const addressCount = await DeliveryAddressModel.countDocuments({ user_id });
-
+    
             if (addressCount >= 3) {
                 throw new Error("You can only store up to 3 delivery addresses.");
             }
+    
+            // If the new address is marked as default, update other addresses to isDefault: false
+            if (isDefault) {
+                await DeliveryAddressModel.updateMany(
+                    { user_id, isDefault: true },
+                    { $set: { isDefault: false } }
+                );
+            }
+    
+            // Create a new delivery address
             const createAddress = await DeliveryAddressModel.create({
                 user_id,
                 fullName,
-                PhoneNumber,
+                phoneNumber,
                 email,
                 streetAddress,
                 apartment,
                 city,
                 state,
+                isDefault,
                 postalCode,
-                country,
-                lat,
-                lng,
-                deliveryInstructions
-
-            })
-            return createAddress
+                country: country || 'India',
+                lat: lat || 0,
+                lng: lng || 0,
+                deliveryInstructions,
+                addressType,
+            });
+    
+            return createAddress;
         } catch (error) {
-            console.error("Error createAddress:", error);
-            throw error
+            console.error("Error in createAddress:", error);
+            throw error;
         }
     },
+    
+      
     // ========================
+    // getDeliveryAddress: async (user_id) => {
+    //     try {
+    //         const defaultAddress= await locationModel.find(user_id)
+    //         console.log(defaultAddress,"def")
+    //         const getDeliveryAddress = await DeliveryAddressModel.find(user_id);
+    //         return {
+    //             defaultAddress,
+    //             deliveryAddresses: getDeliveryAddress
+    //         };
+    //     } catch (error) {
+    //         console.error("Error  in get DeliveryAddress:", error);
+    //         throw error
+    //     }
+    // },
+
     getDeliveryAddress: async (user_id) => {
         try {
-            const defaultAddress= await locationModel.find(user_id)
-            console.log(defaultAddress,"def")
-            const getDeliveryAddress = await DeliveryAddressModel.find(user_id);
-            return {
-                defaultAddress,
-                deliveryAddresses: getDeliveryAddress
-            };
+            const deliveryAddresses = await DeliveryAddressModel.find(user_id);
+            return deliveryAddresses;
         } catch (error) {
-            console.error("Error  in get DeliveryAddress:", error);
-            throw error
+            console.error("Error in getDeliveryAddress:", error);
+            throw error;
         }
     },
+    
     // =================
     deleteAddress:async (deliveryAddress_id) => {
         console.log("deliveryAddress_id")
