@@ -8,4 +8,5 @@ router.post('/addProduct', createAndUpdateProduct);
 router.put('/updateProduct/:productId',createAndUpdateProduct);
 router.delete('/deleteProducts',deleteProducts);
 
+
 export default router;

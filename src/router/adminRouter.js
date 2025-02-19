@@ -16,6 +16,8 @@ router.put("/updateBusinessStatus",adminController.updateBusinessStatus);//for a
 router.post("/payment",adminController.payment);
 router.post("/checkout",adminController.checkout);
 
+router.post("/whishlist",adminController.whishlist);
+router.delete("/deleteWhishlist",adminController.deleteWhishlist);
 
 
 export default router

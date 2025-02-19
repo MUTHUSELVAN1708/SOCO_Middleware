@@ -118,7 +118,7 @@
 
 import { Server } from "socket.io"; 
 import adminService from "./src/service/adminService.js";
-import redisService from "./src/service/redisService.js";
+// import redisService from "./src/service/redisService.js";
 
 const initializeSocket = (server) => {
     const io = new Server(server, {

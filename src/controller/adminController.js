@@ -235,7 +235,7 @@ const adminController = {
             next(error);
         }
     },
-    
+
     // ==================
     BusinessRegister: async (req, res, next) => {
         try {
@@ -485,7 +485,7 @@ const adminController = {
     },
 
     getPostDetails: async (req, res, next) => {
-        const postId = req.body.postId;  
+        const postId = req.body.postId;
         const isBusinessAccount = req.body.isBusiness;
         console.log("Received postId:", postId);
         console.log("Received isBusinessAccount:", isBusinessAccount);
@@ -509,7 +509,7 @@ const adminController = {
     },
 
     getUserProfile: async (req, res, next) => {
-        const id = req.body.id;  
+        const id = req.body.id;
         const isBusinessAccount = req.body.isBusiness;
 
 
@@ -531,7 +531,7 @@ const adminController = {
     },
 
     fetchUserFriends: async (req, res, next) => {
-        const id = req.body.id;  
+        const id = req.body.id;
 
         try {
             const getUserDetails = await adminService.fetchUserFriends(id);
@@ -551,12 +551,12 @@ const adminController = {
     },
 
     fetchUserPosts: async (req, res, next) => {
-        const id = req.body.id;  
-        const limit= req.body.limit; 
-        const page = req.body.page; 
+        const id = req.body.id;
+        const limit = req.body.limit;
+        const page = req.body.page;
 
         try {
-            const getUserDetails = await adminService.fetchUserPosts(id,page,limit);
+            const getUserDetails = await adminService.fetchUserPosts(id, page, limit);
 
             res.status(200).json({
                 status: 200,
@@ -717,8 +717,8 @@ const adminController = {
         }
     },
     // =========================
-createProduct: async (req, res, next) => {
-    try {
+    createProduct: async (req, res, next) => {
+        try {
             const createProduct = await adminService.createProduct(req.body);
             res.status(200).json({
                 status: 200,
@@ -732,7 +732,7 @@ createProduct: async (req, res, next) => {
         }
     },
     // ===============
-    getproduct: async(req,res,next)=> {
+    getproduct: async (req, res, next) => {
         try {
             const getproduct = await adminService.getproduct();
             res.status(200).json({
@@ -748,7 +748,7 @@ createProduct: async (req, res, next) => {
     },
 
     // =======================
-    updateProduct: async(req,res,next)=> {
+    updateProduct: async (req, res, next) => {
         try {
             const updateProduct = await adminService.updateProduct(req.body);
             res.status(200).json({
@@ -764,8 +764,8 @@ createProduct: async (req, res, next) => {
     },
 
     // ================
-    deleteProduct:async(req,res,next)=> {
-      
+    deleteProduct: async (req, res, next) => {
+
         try {
             const deleteProduct = await adminService.deleteProduct(req.body);
             res.status(200).json({
@@ -780,236 +780,268 @@ createProduct: async (req, res, next) => {
         }
     },
 
-// ===============
-notifyuser:async (req, res) => {
-    const {user_id, message, } = req.body; 
-  console.log(req.body,"req.body")
-    try {
-      if (!message || !user_id) {
-        return res.status(400).json({
-          success: false,
-          message: "Message  are required!",
-        });
-      }
-  
-      const response = await adminService.notifyUser(req.body);
-      res.status(200).json({
-        success: true,
-        message: "Notification sent successfully!",
-        data: response,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Failed to send notification",
-        error: error.message,
-      });
-    }
-  },
+    // ===============
+    notifyuser: async (req, res) => {
+        const { user_id, message, } = req.body;
+        console.log(req.body, "req.body")
+        try {
+            if (!message || !user_id) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Message  are required!",
+                });
+            }
 
-// ====
-cart:async(req,res,next)=>{
-    try{
-        const cart = await adminService.cart(req.body);
-        res.status(200).json({
-            status: 200,
-            cart
-        })
-    }catch(error){
-        error.error = error.message;
+            const response = await adminService.notifyUser(req.body);
+            res.status(200).json({
+                success: true,
+                message: "Notification sent successfully!",
+                data: response,
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: "Failed to send notification",
+                error: error.message,
+            });
+        }
+    },
+
+    // ====
+    cart: async (req, res, next) => {
+        try {
+            const cart = await adminService.cart(req.body);
+            res.status(200).json({
+                status: 200,
+                cart
+            })
+        } catch (error) {
+            error.error = error.message;
             console.error(error);
             error.statuscode = 400;
             next(error);
-    }
-},
-// =======================
-removeFromCart:async(req,res,next)=>{
-    try{
-        const removeFromCart = await adminService.removeFromCart(req.body);
-        res.status(200).json({
-            status: 200,
-            removeFromCart
-        })
-    }catch(error){
-        error.error = error.message;
+        }
+    },
+    // =======================
+    removeFromCart: async (req, res, next) => {
+        try {
+            const removeFromCart = await adminService.removeFromCart(req.body);
+            res.status(200).json({
+                status: 200,
+                removeFromCart
+            })
+        } catch (error) {
+            error.error = error.message;
             console.error(error);
             error.statuscode = 400;
             next(error);
-    }
-},
-// ================================
-getCart:async(req,res,next)=>{
-    try{
-        const{id}=req.params;
-        const getCart = await adminService.getCart(id);
-        res.status(200).json({
-            status: 200,
-            getCart
-        })
-    }catch(error){
-        error.error = error.message;
+        }
+    },
+    // ================================
+    getCart: async (req, res, next) => {
+        try {
+            const { id } = req.params;
+            const getCart = await adminService.getCart(id);
+            res.status(200).json({
+                status: 200,
+                getCart
+            })
+        } catch (error) {
+            error.error = error.message;
             console.error(error);
             error.statuscode = 400;
             next(error);
-    }
-},
-// =======================
-sendMessage:async (req, res) => {
-    const{from, to}=req.params
-    const {  message } = req.body;
-    console.log(from, to,message,"req.body")
-  
-    if (!from || !to || !message) {
-      return res.status(400).json({ error: 'Missing required fields: from, to, or message' });
-    }
-  
-    try {
-      const response = await adminService.sendMessage(from, to, message);
-      res.status(200).json(response);
-    } catch (err) {
-      console.error('Error in sendMessage:', err);
-      res.status(500).json({ error: 'Error sending message' });
-    }
-  },
-  
-  getChatHistory : async (req, res) => {
-    const { from, to } = req.params;
-  
-    try {
-      const messages = await adminService.getChatHistory(from, to);
-      res.status(200).json({ messages });
-    } catch (err) {
-      console.error('Error in getChatHistory:', err);
-      res.status(500).json({ error: 'Error fetching chat history' });
-    }
-  },
-//   ======================================
-deleteFromRedis: async (req, res) => {
-    const { chatKey, messagesToDelete } = req.body;
-    console.log(req.body,"ki")
-  
-    if (!chatKey || !messagesToDelete || !Array.isArray(messagesToDelete)) {
-      return res.status(400).json({ error: 'chatKey must be provided and messagesToDelete must be an array' });
-    }
-  
-    try {
-      
-      const deleteResults = [];
-  
-      for (const messageToDelete of messagesToDelete) {
-        const result = await redisService.deleteFromRedis(chatKey, messageToDelete);
-        deleteResults.push(result);  
-      }
-  
-      res.status(200).json({ success: true, deletedMessages: deleteResults });
-    } catch (err) {
-      console.error('Error in deleteFromRedis:', err);
-      res.status(500).json({ error: 'Error deleting messages' });
-    }
-  },
-  
-//  =================================
-updateMsg: async (req, res) => {
-    const { chatKey, oldMessage, newMessage } = req.body;
-  
-    if (!chatKey || !oldMessage || !newMessage) {
-      return res.status(400).json({ error: 'chatKey, oldMessage, and newMessage are required' });
-    }
-  
-    try {
-      const updateResult = await redisService.updateMessage(chatKey, oldMessage, newMessage);
-      res.status(200).json(updateResult);
+        }
+    },
+    // =======================
+    sendMessage: async (req, res) => {
+        const { from, to } = req.params
+        const { message } = req.body;
+        console.log(from, to, message, "req.body")
 
-    } catch (err) {
-      console.error('Error in updateMessage:', err);
-      res.status(500).json({ error: 'Error updating message' });
-    }
-  },
+        if (!from || !to || !message) {
+            return res.status(400).json({ error: 'Missing required fields: from, to, or message' });
+        }
 
-//   =======================
-getFeed:async (req, res) => {
-    const {user_id,address} = req.params;
-  
-    if (!user_id) {
-      return res.status(400).json({ error: 'user are required' });
-    }
-  
-    try {
-      const getFeed = await adminService.getFeed(req.params);
-      res.status(200).json(getFeed);
+        try {
+            const response = await adminService.sendMessage(from, to, message);
+            res.status(200).json(response);
+        } catch (err) {
+            console.error('Error in sendMessage:', err);
+            res.status(500).json({ error: 'Error sending message' });
+        }
+    },
 
-    } catch (err) {
-      console.error('Error in getFeed:', err);
-      res.status(500).json({ error: 'Error getFeed message' });
-    }
-  },
+    getChatHistory: async (req, res) => {
+        const { from, to } = req.params;
 
-//   ========================
-addDeliveryAddress:async (req, res) => {
-   
-    try {
-      const addDeliveryAddress = await adminService.addDeliveryAddress(req.body);
-      res.status(200).json(addDeliveryAddress);
+        try {
+            const messages = await adminService.getChatHistory(from, to);
+            res.status(200).json({ messages });
+        } catch (err) {
+            console.error('Error in getChatHistory:', err);
+            res.status(500).json({ error: 'Error fetching chat history' });
+        }
+    },
+    //   ======================================
+    deleteFromRedis: async (req, res) => {
+        const { chatKey, messagesToDelete } = req.body;
+        console.log(req.body, "ki")
 
-    } catch (err) {
-      console.error('Error in addDeliveryAddress:', err);
-      res.status(500).json({ error:err.message });
-    }
-  },
-//   =====================
-getDeliveryAddress:async (req, res) => {
-   const {user_id}=req.params
-    try {
-      const getDeliveryAddress = await adminService.getDeliveryAddress(req.params);
-      res.status(200).json(getDeliveryAddress);
+        if (!chatKey || !messagesToDelete || !Array.isArray(messagesToDelete)) {
+            return res.status(400).json({ error: 'chatKey must be provided and messagesToDelete must be an array' });
+        }
 
-    } catch (err) {
-      console.error('Error in getDeliveryAddress:', err);
-      res.status(500).json({ error:err.message});
-    }
-  },
-//   ================
-deleteAddress:async (req, res) => {
-    const {id}=req.params
-     try {
-       const deleteAddress = await adminService.deleteAddress(req.params);
-       res.status(200).json({msg:deleteAddress});
- 
-     } catch (err) {
-       console.error('Error in deleteAddress:', err);
-       res.status(500).json({ error:err.message});
-     }
-   },
+        try {
 
-//    ================================
-payment : async (req, res, next) => {
-    try {
-      const paymentResult = await adminService.payment(req.body);
-      res.status(200).json(paymentResult);
-    } catch (error) {
-      console.error("Error in payment processing:", error.message);
-      next({
-        message: error.message || "Internal Server Error",
-        statusCode: error.statusCode || 500,
-      });
-    }
-  },
-//   ====================
-checkout:async(req,res,next)=>{
-    
-    try{
-        const checkout=await adminService.checkout(req.body);
-console.log(checkout,"pppppppppppppp")
-        const invoice=await adminService.Invoice(checkout);
-        res.status(200).json( checkout );
+            const deleteResults = [];
 
-    }catch(error){
-        error.message = error.error;
-        console.log(error);
-        error.statuscode = 500;
-        next(error); 
-    }
-},
+            for (const messageToDelete of messagesToDelete) {
+                const result = await redisService.deleteFromRedis(chatKey, messageToDelete);
+                deleteResults.push(result);
+            }
+
+            res.status(200).json({ success: true, deletedMessages: deleteResults });
+        } catch (err) {
+            console.error('Error in deleteFromRedis:', err);
+            res.status(500).json({ error: 'Error deleting messages' });
+        }
+    },
+
+    //  =================================
+    updateMsg: async (req, res) => {
+        const { chatKey, oldMessage, newMessage } = req.body;
+
+        if (!chatKey || !oldMessage || !newMessage) {
+            return res.status(400).json({ error: 'chatKey, oldMessage, and newMessage are required' });
+        }
+
+        try {
+            const updateResult = await redisService.updateMessage(chatKey, oldMessage, newMessage);
+            res.status(200).json(updateResult);
+
+        } catch (err) {
+            console.error('Error in updateMessage:', err);
+            res.status(500).json({ error: 'Error updating message' });
+        }
+    },
+
+    //   =======================
+    getFeed: async (req, res) => {
+        const { user_id, address } = req.params;
+
+        if (!user_id) {
+            return res.status(400).json({ error: 'user are required' });
+        }
+
+        try {
+            const getFeed = await adminService.getFeed(req.params);
+            res.status(200).json(getFeed);
+
+        } catch (err) {
+            console.error('Error in getFeed:', err);
+            res.status(500).json({ error: 'Error getFeed message' });
+        }
+    },
+
+    //   ========================
+    addDeliveryAddress: async (req, res) => {
+
+        try {
+            const addDeliveryAddress = await adminService.addDeliveryAddress(req.body);
+            res.status(200).json(addDeliveryAddress);
+
+        } catch (err) {
+            console.error('Error in addDeliveryAddress:', err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+    //   =====================
+    getDeliveryAddress: async (req, res) => {
+        const { user_id } = req.params
+        try {
+            const getDeliveryAddress = await adminService.getDeliveryAddress(req.params);
+            res.status(200).json(getDeliveryAddress);
+
+        } catch (err) {
+            console.error('Error in getDeliveryAddress:', err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+    //   ================
+    deleteAddress: async (req, res) => {
+        const { id } = req.params
+        try {
+            const deleteAddress = await adminService.deleteAddress(req.params);
+            res.status(200).json({ msg: deleteAddress });
+
+        } catch (err) {
+            console.error('Error in deleteAddress:', err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+
+    //    ================================
+    payment: async (req, res, next) => {
+        try {
+            const paymentResult = await adminService.payment(req.body);
+            res.status(200).json(paymentResult);
+        } catch (error) {
+            console.error("Error in payment processing:", error.message);
+            next({
+                message: error.message || "Internal Server Error",
+                statusCode: error.statusCode || 500,
+            });
+        }
+    },
+    //   ====================
+    checkout: async (req, res, next) => {
+
+        try {
+            const checkout = await adminService.checkout(req.body);
+            console.log(checkout, "pppppppppppppp")
+            const invoice = await adminService.Invoice(checkout);
+            res.status(200).json(checkout);
+
+        } catch (error) {
+            error.message = error.error;
+            console.log(error);
+            error.statuscode = 500;
+            next(error);
+        }
+    },
+    // =========================\
+    whishlist: async (req, res, next) => {
+
+        try {
+            const whishlist = await adminService.whishlist(req.body);
+            console.log(whishlist, "whishlist")
+
+            res.status(200).json(whishlist);
+
+        } catch (error) {
+            error.message = error.error;
+            console.log(error);
+            error.statuscode = 500;
+            next(error);
+        }
+    },
+    // ====================
+    deleteWhishlist:async (req, res, next) => {
+
+        try {
+            const deleteWhishlist = await adminService.deleteWhishlist(req.body);
+            console.log(deleteWhishlist, "deleteWhishlist")
+
+            res.status(200).json({message: "Product removed from favorites"});
+
+        } catch (error) {
+            error.message = error.error;
+            console.log(error);
+            error.statuscode = 500;
+            next(error);
+        }
+    },
 
 }
 
