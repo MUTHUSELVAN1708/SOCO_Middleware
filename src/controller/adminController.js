@@ -1,6 +1,6 @@
 import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
-import redisService from "../service/redisService.js";
+// import redisService from "../service/redisService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
 
 

@@ -23,7 +23,7 @@ import connectedUsers from "../../socket.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
 import MessageModel from "../model/chatModel.js";
-import redisService from "./redisService.js";
+// import redisService from "./redisService.js";
 import Product from "../model/Product.js";
 import DeliveryAddressModel from "../model/deliveryAddressModel.js";
 

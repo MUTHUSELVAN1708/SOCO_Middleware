@@ -13,7 +13,7 @@ import commentRoutes from "./src/router/commentRoutes.js";
 import feedRoutes from "./src/router/feedRouter.js";
 import errorHandling from "./errorHandling.js";
 import  initializeSocket from "./socket.js";
-import redisService from "./src/service/redisService.js";
+// import redisService from "./src/service/redisService.js";
 
 const app = express();
 
@@ -45,9 +45,9 @@ const server = http.createServer(app);
 
 
 const io = initializeSocket(server);
-redisService.connect();
+// redisService.connect();
 
-redisService.subscribeToNotifications(io);
+// redisService.subscribeToNotifications(io);
 server.listen(PORT, () => {
     console.log(`Server is running on ${PORT}`);
 });
