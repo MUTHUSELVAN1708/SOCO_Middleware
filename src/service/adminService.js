@@ -3582,48 +3582,40 @@ const adminService = {
             paymentMode,
             address,
             phone_number,
+            amount,
             name,
             email,
-            product_id,
-            quantity,
-            size, 
+            product_id, // Direct Buy Now product
+            quantity = 1, // Default quantity is 1
+            size,
         } = data;
-
+    
         try {
-            let product;
-
+            let checkoutRecords = [];
+            let totalPrice = 0;
+    
             if (product_id) {
-                // Direct Buy Now (Fetch single product)
-                product = await Product.findById(product_id);
+                // ✅ "Buy Now" Mode - Fetch Single Product
+                const product = await Product.findById(product_id);
                 if (!product) {
                     throw { error: "Product not found" };
                 }
-            } else {
-                // Normal Checkout (Cart-based)
-                const cartItems = await cartModel.find({ user_id });
-                if (!cartItems.length) {
-                    throw { error: "Cart is empty" };
-                }
-            }
-
-            let totalPrice = 0;
-            let checkoutRecords = [];
-
-            if (product_id) {
+    
                 const itemTotalPrice = product.pricing?.salePrice * quantity;
                 totalPrice = itemTotalPrice;
-
+    
+                // Process Payment
                 const payment = await adminService.payment({
                     amount: itemTotalPrice,
                     name,
                     email,
                 });
-
+    
                 if (!payment.success) {
                     throw { error: "Payment failed" };
                 }
-
-                // Create Checkout Record
+    
+                // Create Order Entry
                 const checkoutRecord = await checkoutModel.create({
                     user_id,
                     product_id: product._id,
@@ -3634,32 +3626,38 @@ const adminService = {
                     phone_number,
                     paymentMode,
                     price: itemTotalPrice,
-                    razorpay_payment_id: payment.order_id, // Store payment details
+                    razorpay_payment_id: payment.order_id,
                 });
-
+    
                 checkoutRecords.push(checkoutRecord);
             } else {
-                // ✅ Normal Cart Checkout Logic
+                // ✅ Cart Checkout Mode - Fetch All Cart Items
+                const cartItems = await cartModel.find({ user_id });
+                if (!cartItems.length) {
+                    throw { error: "Cart is empty" };
+                }
+    
                 for (const cartItem of cartItems) {
                     const product = await Product.findById(cartItem.product_id);
                     if (!product) {
                         throw { error: `Product not found` };
                     }
-
+    
                     const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
                     totalPrice += itemTotalPrice;
-
+    
                     // Process Payment
                     const payment = await adminService.payment({
                         amount: itemTotalPrice,
                         name,
                         email,
                     });
-
+    
                     if (!payment.success) {
                         throw { error: "Payment failed" };
                     }
-
+    
+                    // Create Order Entry
                     const checkoutRecord = await checkoutModel.create({
                         user_id,
                         product_id: product._id,
@@ -3672,14 +3670,14 @@ const adminService = {
                         price: itemTotalPrice,
                         razorpay_payment_id: payment.order_id,
                     });
-
+    
                     checkoutRecords.push(checkoutRecord);
-
+    
                     // Remove item from cart
                     await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
                 }
             }
-
+    
             return {
                 message: "Checkout completed successfully",
                 checkoutRecords,
@@ -3690,6 +3688,7 @@ const adminService = {
             throw error;
         }
     },
+    
 
     // ========================
     Invoice: async (data) => {
