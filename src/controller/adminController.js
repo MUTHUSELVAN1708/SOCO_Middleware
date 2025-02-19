@@ -855,8 +855,9 @@ getCart:async(req,res,next)=>{
 },
 // =======================
 sendMessage:async (req, res) => {
-    const { from, to, message } = req.body;
-    console.log(req.body,"req.body")
+    const{from, to}=req.params
+    const {  message } = req.body;
+    console.log(from, to,message,"req.body")
   
     if (!from || !to || !message) {
       return res.status(400).json({ error: 'Missing required fields: from, to, or message' });
@@ -979,6 +980,37 @@ deleteAddress:async (req, res) => {
        res.status(500).json({ error:err.message});
      }
    },
+
+//    ================================
+payment : async (req, res, next) => {
+    try {
+      const paymentResult = await adminService.payment(req.body);
+      res.status(200).json(paymentResult);
+    } catch (error) {
+      console.error("Error in payment processing:", error.message);
+      next({
+        message: error.message || "Internal Server Error",
+        statusCode: error.statusCode || 500,
+      });
+    }
+  },
+//   ====================
+checkout:async(req,res,next)=>{
+    
+    try{
+        const checkout=await adminService.checkout(req.body);
+console.log(checkout,"pppppppppppppp")
+        const invoice=await adminService.Invoice(checkout);
+        res.status(200).json( checkout );
+
+    }catch(error){
+        error.message = error.error;
+        console.log(error);
+        error.statuscode = 500;
+        next(error); 
+    }
+},
+
 }
 
 

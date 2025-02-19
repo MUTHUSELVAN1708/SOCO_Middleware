@@ -13,7 +13,8 @@ router.put("/updateBusinessStatus",adminController.updateBusinessStatus);//for a
 // router.put("/updateProduct",adminController.updateProduct);
 // router.delete("/deleteProduct",adminController.deleteProduct);
 
-
+router.post("/payment",adminController.payment);
+router.post("/checkout",adminController.checkout);
 
 
 

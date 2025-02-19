@@ -7,7 +7,7 @@ const trackingSchema = new mongoose.Schema({
         viewedAt: { type: Date, default: Date.now },
         isWatched: { type: Boolean, default: false }
     }]
-}, {
+}, {  
     versionKey: false,
     timestamps: true
 });

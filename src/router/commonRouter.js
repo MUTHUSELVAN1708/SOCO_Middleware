@@ -295,7 +295,7 @@ router.get("/getPlayer/:playerId", playerController.getPlayerById);
 
 
 
-router.post("/sendMessage",adminController.sendMessage);
+router.post("/sendMessage/:from/:to",adminController.sendMessage);
 
 router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
 

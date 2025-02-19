@@ -27,16 +27,6 @@ import redisService from "./redisService.js";
 import Product from "../model/Product.js";
 import DeliveryAddressModel from "../model/deliveryAddressModel.js";
 
-import Razorpay from "razorpay";
-import checkoutModel from "../model/checkoutModel.js";
-import invoiceModel from "../model/invoiceModel.js";
-
-const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
-
-const razorpayInstance = new Razorpay({
-  key_id: process.env.RAZORPAY_ID_KEY,
-  key_secret: process.env.RAZORPAY_SECRET_KEY,
-});
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
@@ -2881,32 +2871,30 @@ const adminService = {
             productName,
             category,
             unit,
+            price,
+
         } = data;
-    
+
         try {
             const user = await registerModel.findById(user_id);
             if (!user) {
                 throw new Error("User not found");
             }
-    
-            const product = await Product.findById(product_id);
-            console.log(product, "product");
+
+            const product = await productModel.findById(product_id);
             if (!product) {
                 throw new Error("Product not found");
             }
-    
+
             if (quantity <= 0) {
                 throw new Error("Invalid initial quantity");
             }
-    
-            // Ensure salePrice is a valid number
-            const salePrice = Number(product?.pricing?.salePrice);
-            if (isNaN(salePrice)) {
-                throw new Error("Sale price is invalid or missing");
-            }
-    
-            let cartItem = await cartModel.findOne({ user_id, product_id });
-    
+
+            let cartItem = await cartModel.findOne({
+                user_id,
+                product_id,
+            });
+
             if (cartItem) {
                 cartItem.quantity += Number(quantity);
                 cartItem.unit = unit;
@@ -2914,6 +2902,7 @@ const adminService = {
                 cartItem.size = size || product.size;
                 cartItem.images = images || product.images;
                 cartItem.category = category || product.category;
+
             } else {
                 cartItem = await cartModel.create({
                     user_id,
@@ -2922,30 +2911,33 @@ const adminService = {
                     size: size || product.size,
                     unit: unit,
                     images: images || product.images,
+
                     category: category || product.category,
                     quantity: Number(quantity),
-                    price: salePrice, 
+                    price: product.price,
                     colors: colors || product.colors,
                 });
             }
-    
+
             let totalPrice = 0;
             if (unit === "gram" || unit === "piece") {
-                totalPrice = cartItem.quantity * cartItem.price; 
+                totalPrice = cartItem.quantity * product.price;
             } else {
                 throw new Error("Invalid unit specified");
             }
-    
+
             cartItem.price = totalPrice;
             await cartItem.save();
-    
+
             return cartItem;
         } catch (error) {
             console.error("Error storing in cart:", error);
-            throw { error: "Something went wrong" };
+            throw {
+                error: "something wrong",
+            };
         }
     },
-    
+
     // =======================
     removeFromCart: async (data) => {
         const { user_id, cart_id } = data;
@@ -3000,54 +2992,54 @@ const adminService = {
     },
     // ================================
 
-    sendMessage: async (io,socket, from, to, message) => {
-        console.log("Input data:", { from, to, message });
-    
-        if (!from || !to || !message) {
-            socket.emit("sendedMsg", { success: false, message: "Missing required fields: from, to, or message" });
-            throw new Error("Missing required fields: from, to, or message");
+    sendMessage: async (data) => {
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch (err) {
+            console.error("Failed to parse input data:", err);
+            throw new Error("Invalid JSON input");
+          }
         }
-    
+      
+        const { from, to, message } = data;
+        console.log("Input data:", data);
+      
+        if (!from || !to || !message) {
+          throw new Error("Missing required fields: from, to, or message");
+        }
+      
         const timestamp = new Date();
         const chatKey = `chat:${from}:${to}`;
         const notificationKey = `notifications:${to}`;
-    
+      
         try {
-            const newMessage = await MessageModel.create({ from, to, message, timestamp });
-            console.log("New message created:", newMessage);
-    
-            // Message object with MongoDB _id
-            const messageWithObjectId = {
-                _id: newMessage._id.toString(),
-                from,
-                to,
-                message,
-                timestamp,
-            };
-    
-            // Store message in Redis
-            await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
-    
-            const receiverSocketId = connectedUsers[to];
-    
-            if (receiverSocketId) {
-                console.log(`Receiver (${to}) is online. Sending message...`);
-                socket.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
-            } else {
-                console.log(`Receiver (${to}) is offline. Storing message in Redis.`);
-                await redisService.getRedisClient().lPush(`offlineMessages:${to}`, JSON.stringify(messageWithObjectId));
-            }
-    
-            socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
-    
-            return { success: true, message: "Message sent" };
+          // Create the message in MongoDB
+          const newMessage = await MessageModel.create({ from, to, message, timestamp });
+          console.log("New message created:", newMessage);
+      
+          // Build the message object with the MongoDB _id converted to a string
+          const messageWithObjectId = {
+            _id: newMessage._id.toString(),
+            from,
+            to,
+            message,
+            timestamp,
+          };
+      
+          // Push the message into Redis under the chat key
+          await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
+      
+          // Publish a notification to the recipient's channel
+          await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
+      
+          // Return success message
+          return { success: true, message: 'Message sent' };
         } catch (err) {
-            console.error(" Error in sendMessage:", err);
-            socket.emit("sendedMsg", { success: false, message: "Error sending message" });
-            throw new Error("Error sending message");
+          console.error('Error in sendMessage:', err);
+          throw new Error('Error sending message');
         }
-    },
-    
+      },
       
 
 
@@ -3331,7 +3323,6 @@ const adminService = {
         }
     },
     // =================
-
     getUserProfile: async (id, isBusinessAccount) => {
         try {
           const user = isBusinessAccount
@@ -3447,166 +3438,6 @@ const adminService = {
       
       
       
-// =======
-    payment: async ({ amount, name, email }) => {
-        console.log("Payment details:", amount, name, email);
-        try {
-          if (!amount || !name || !email) {
-            return {
-              success: false,
-              msg: "All fields (amount, name, email) are required!",
-            };
-          }
-    
-          const options = {
-            amount: amount * 100,
-            currency: "INR",
-            receipt: `receipt_${Date.now()}`,
-          };
-    
-          const order = await razorpayInstance.orders.create(options);
-    
-          return {
-            success: true,
-            msg: "Order Created",
-            order_id: order.id,
-            amount: amount,
-            // product_name: req.body.product_name,
-            // description: req.body.description,
-            key_id: process.env.RAZORPAY_ID_KEY,
-    
-            name: name,
-            email: email,
-          };
-        } catch (error) {
-          console.error("Error in payment processing:", error.message);
-          return {
-            success: false,
-            msg: "Internal Server Error",
-          };
-        }
-      },
-    //   =================================
-    checkout: async (data) => {
-        const {
-          user_id,
-          paymentMode,
-          address,
-          phone_number,
-          amount,
-    
-          name,
-          email,
-        } = data;
-    
-        try {
-          const cartItems = await cartModel.find({ user_id });
-          if (!cartItems.length) {
-            throw { error: "Cart is empty" };
-          }
-          console.log("cartItems",cartItems)
-          let totalQuantity = 0;
-          for (const item of cartItems) {
-            totalQuantity += item.quantity;
-          }
-          console.log("totalQuantity", totalQuantity);
-    
-       
-    
-          const checkoutRecords = [];
-          let totalPrice = 0;
-    
-          for (const cartItem of cartItems) {
-            const product = await Product.findById(cartItem.product_id);
-            if (!product) {
-              throw { error: `Product not found` };
-            }
-            console.log("pro", product);
-            const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
-            totalPrice += itemTotalPrice;
-    
-            const payment = await adminService.payment({
-              amount: itemTotalPrice,
-              name,
-              email,
-            });
-    console.log(payment,"kkkk")
-            if (!payment.success) {
-              throw { error: "Payment failed" };
-            }
-            const checkoutRecord = await checkoutModel.create({
-              user_id,
-              product_id: product._id,
-              product_img: product.images,
-              size: cartItem.size,
-              quantity: cartItem.quantity,
-              address,
-              phone_number,
-              paymentMode,
-              price: itemTotalPrice,
-              // razorpay_order_id:payment.razorpay_order_id,
-              razorpay_payment_id: payment.order_id, //razorpay_payment_id: payment.razorpay_payment_id,
-            });
-    
-            checkoutRecords.push(checkoutRecord);
-    
-            const deleteResult = await cartModel.deleteOne({
-              user_id: cartItem.user_id,
-              product_id: cartItem.product_id,
-            });
-    
-            if (deleteResult.deletedCount === 0) {
-              throw { error: "Failed to delete item from cart" };
-            }
-          }
-    
-          return {
-            message: "Checkout completed successfully",
-            checkoutRecords,
-            totalPrice,
-          };
-        } catch (error) {
-          console.error("Error during checkout:", error);
-          throw error;
-        }
-      },
-    // ========================
-    Invoice: async (data) => {
-        try {
-          console.log("datass", data.checkoutRecords);
-          const validData = data.checkoutRecords;
-          const invoices = [];
-    
-          const currentDate = new Date();
-          const random = Math.floor(Math.random() * (1000 - 100 + 1)) + 1000;
-    
-          const year = currentDate.getFullYear();
-          const month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
-          const date = currentDate.getDate().toString().padStart(2, "0");
-    
-          for (const record of validData) {
-            // console.log("product_size", record.product_size);
-    
-            const invoiceNumber = `${year}${month}${date}-${random}`;
-    
-            const createInvoice = await invoiceModel.create({
-              checkout_id: record._id,
-              invoiceNumber,
-              size: record.size,
-              price: record.price,
-            });
-            console.log("createInvoice", createInvoice);
-            invoices.push(createInvoice);
-          }
-    
-          return invoices;
-        } catch (error) {
-          throw {
-            error: "something wrong",
-          };
-        }
-      },
-
 
 }
 
