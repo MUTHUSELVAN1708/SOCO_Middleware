@@ -3603,16 +3603,16 @@ const adminService = {
     
                 const itemTotalPrice = product.pricing?.salePrice * quantity;
                 totalPrice = itemTotalPrice;
+                if (paymentMode === "online") {
+                    payment = await adminService.payment({
+                        amount: itemTotalPrice,
+                        name,
+                        email,
+                    });
     
-                // Process Payment
-                const payment = await adminService.payment({
-                    amount: itemTotalPrice,
-                    name,
-                    email,
-                });
-    
-                if (!payment.success) {
-                    throw { error: "Payment failed" };
+                    if (!payment.success) {
+                        throw { error: "Payment failed" };
+                    }
                 }
     
                 // Create Order Entry
@@ -3626,12 +3626,12 @@ const adminService = {
                     phone_number,
                     paymentMode,
                     price: itemTotalPrice,
-                    razorpay_payment_id: payment.order_id,
+                    razorpay_payment_id: paymentMode === "online" ? payment.order_id : null, 
                 });
     
                 checkoutRecords.push(checkoutRecord);
             } else {
-                // ✅ Cart Checkout Mode - Fetch All Cart Items
+                
                 const cartItems = await cartModel.find({ user_id });
                 if (!cartItems.length) {
                     throw { error: "Cart is empty" };
@@ -3646,15 +3646,16 @@ const adminService = {
                     const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
                     totalPrice += itemTotalPrice;
     
-                    // Process Payment
-                    const payment = await adminService.payment({
-                        amount: itemTotalPrice,
-                        name,
-                        email,
-                    });
-    
-                    if (!payment.success) {
-                        throw { error: "Payment failed" };
+                    if (paymentMode === "online") {
+                        payment = await adminService.payment({
+                            amount: itemTotalPrice,
+                            name,
+                            email,
+                        });
+        
+                        if (!payment.success) {
+                            throw { error: "Payment failed" };
+                        }
                     }
     
                     // Create Order Entry
@@ -3668,7 +3669,7 @@ const adminService = {
                         phone_number,
                         paymentMode,
                         price: itemTotalPrice,
-                        razorpay_payment_id: payment.order_id,
+                        razorpay_payment_id: paymentMode === "online" ? payment.order_id : null, 
                     });
     
                     checkoutRecords.push(checkoutRecord);
