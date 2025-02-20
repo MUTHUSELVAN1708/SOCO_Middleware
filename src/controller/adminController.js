@@ -1046,6 +1046,58 @@ const adminController = {
             next(error);
         }
     },
+    // =:=========================
+    getWishLish:async (req, res, next) => {
+
+        try {
+            const getWishLish = await adminService.getWishLish(req.body);
+            console.log(getWishLish, "getWishLish")
+
+            res.status(200).json({message: "Product fetched from favorites"});
+
+        } catch (error) {
+            error.message = error.error;
+            console.log(error);
+            error.statuscode = 500;
+            next(error);
+        }
+    },
+    // =====================
+    getOrderHistory: async (req, res, next) => {
+        try {
+            const { user_id} = req.params;  
+    
+            const orderHistory = await adminService.getOrderHistory(user_id);
+    
+            res.status(200).json({
+                status: 200,
+                orderHistory
+            });
+        } catch (error) {
+            console.error("Error fetching order history:", error.message);
+            next({
+                statuscode: 400,
+                message: error.message || "Error fetching order history",
+            });
+        }
+    },
+    // ======================
+    updateOrderStatus: async (req,res) => {
+        try {
+            const { checkout_id } = req.params;
+            const { newStatus } = req.body;
+    
+            const updatedOrder = await adminService.updateOrderStatus(checkout_id, newStatus);
+    
+            res.status(200).json({
+                status: 200,
+                message: "Order status updated successfully",
+                updatedOrder
+            });
+        }  catch (error) {
+            throw new Error("Error updating order status");
+        }
+    }
 
 }
 

@@ -15,8 +15,11 @@ router.put("/updateBusinessStatus",adminController.updateBusinessStatus);//for a
 
 router.post("/payment",adminController.payment);
 router.post("/checkout",adminController.checkout);
+router.get("/getOrderHistory/:user_id",adminController.getOrderHistory);
+router.put("/updateOrderStatus/:checkout_id",adminController.updateOrderStatus);
 
 router.post("/whishlist",adminController.whishlist);
+router.get("/getWishLish",adminController.getWishLish)
 router.delete("/deleteWhishlist",adminController.deleteWhishlist);
 
 

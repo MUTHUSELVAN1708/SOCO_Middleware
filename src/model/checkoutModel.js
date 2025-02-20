@@ -78,6 +78,20 @@ const checkoutSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    status: {
+        type: String,
+        enum: ["Pending", "Processing", "Shipped", "Out for Delivery", "Delivered", "Cancelled"],
+        default: "Pending"
+    },
+    tracking_number: { type: String, default: null },
+    courier_service: { type: String, default: "Delhivery" },
+    expected_delivery_date: { type: String },
+    tracking_updates: [
+        {
+            status: String,
+            timestamp: Date
+        }
+    ],
     timestamp: { type: Date, default: Date.now },
 
 }, {

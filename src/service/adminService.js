@@ -232,23 +232,23 @@ const adminService = {
         const { email, enteredOtp } = data;
         try {
             const storedOtpEntry = await otpModel.findOne({ email });
-    
+
             if (!storedOtpEntry) {
                 return {
                     success: false,
                     message: "No OTP entry found for the provided email",
                 };
             }
-    
+
             const isOtpValid = await bcrypt.compare(enteredOtp, storedOtpEntry.reg_otp);
-    
+
             if (!isOtpValid) {
                 return {
                     success: false,
                     message: "Invalid OTP entered",
                 };
             }
-    
+
             return {
                 success: true, // ✅ Ensure 'success' field is always present
                 message: "OTP verified successfully",
@@ -261,7 +261,7 @@ const adminService = {
             };
         }
     },
-    
+
 
 
     //   ==========
@@ -2990,21 +2990,21 @@ const adminService = {
     getCart: async (user_id) => {
         try {
             console.log("Fetching cart for user:", user_id);
-    
+
             const getCart = await cartModel.find({ user_id });
-    
-            if (!getCart.length) { 
+
+            if (!getCart.length) {
                 throw new Error("Cart is empty");
             }
-    
+
             return getCart;
         } catch (error) {
             console.error("Error fetching cart:", error.message);
-    
-            throw new Error("Something went wrong while fetching the cart");
+
+            throw error;
         }
     },
-    
+
     // ================================
 
     sendMessage: async (io, socket, from, to, message) => {
@@ -3587,40 +3587,36 @@ const adminService = {
             paymentMode,
             address,
             phone_number,
-            amount,
             name,
             email,
             product_id, // Direct Buy Now product
             quantity = 1, // Default quantity is 1
             size,
         } = data;
-    
+
         try {
             let checkoutRecords = [];
             let totalPrice = 0;
-    
+            let payment = null; // Store payment info
+
             if (product_id) {
                 // ✅ "Buy Now" Mode - Fetch Single Product
                 const product = await Product.findById(product_id);
-                if (!product) {
-                    throw { error: "Product not found" };
-                }
-    
+                console.log(product, "gggggg")
+                if (!product) throw { error: "Product not found" };
+
+                const trackingNumber = `TRACK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                const expectedDeliveryDate = product.availability?.deliveryTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
+
                 const itemTotalPrice = product.pricing?.salePrice * quantity;
                 totalPrice = itemTotalPrice;
+
                 if (paymentMode === "online") {
-                    payment = await adminService.payment({
-                        amount: itemTotalPrice,
-                        name,
-                        email,
-                    });
-    
-                    if (!payment.success) {
-                        throw { error: "Payment failed" };
-                    }
+                    payment = await adminService.payment({ amount: itemTotalPrice, name, email });
+                    if (!payment.success) throw { error: "Payment failed" };
                 }
-    
-                // Create Order Entry
+
+                // ✅ Create Order Entry
                 const checkoutRecord = await checkoutModel.create({
                     user_id,
                     product_id: product._id,
@@ -3631,39 +3627,42 @@ const adminService = {
                     phone_number,
                     paymentMode,
                     price: itemTotalPrice,
-                    razorpay_payment_id: paymentMode === "online" ? payment.order_id : null, 
+                    razorpay_payment_id: paymentMode === "online" ? payment.order_id : null,
+                    tracking_number: trackingNumber,
+                    courier_service: "Delhivery",
+                    expected_delivery_date: expectedDeliveryDate,
+                    tracking_updates: [{ status: "Pending", timestamp: new Date() }]
                 });
-    
+
                 checkoutRecords.push(checkoutRecord);
             } else {
-                
+                // ✅ "Cart Checkout" Mode
                 const cartItems = await cartModel.find({ user_id });
-                if (!cartItems.length) {
-                    throw { error: "Cart is empty" };
-                }
-    
+                if (!cartItems.length) throw { error: "Cart is empty" };
+
+                // **Calculate total price before making payment**
                 for (const cartItem of cartItems) {
                     const product = await Product.findById(cartItem.product_id);
-                    if (!product) {
-                        throw { error: `Product not found` };
-                    }
-    
+                    if (!product) throw { error: `Product not found` };
+
+                    totalPrice += product.pricing?.salePrice * cartItem.quantity;
+                }
+
+                // **Process payment once for the total amount**
+                if (paymentMode === "online") {
+                    payment = await adminService.payment({ amount: totalPrice, name, email });
+                    if (!payment.success) throw { error: "Payment failed" };
+                }
+
+                // ✅ Create order entries for each item in the cart
+                for (const cartItem of cartItems) {
+                    const product = await Product.findById(cartItem.product_id);
+                    if (!product) throw { error: `Product not found` };
+
                     const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
-                    totalPrice += itemTotalPrice;
-    
-                    if (paymentMode === "online") {
-                        payment = await adminService.payment({
-                            amount: itemTotalPrice,
-                            name,
-                            email,
-                        });
-        
-                        if (!payment.success) {
-                            throw { error: "Payment failed" };
-                        }
-                    }
-    
-                    // Create Order Entry
+                    const trackingNumber = `TRACK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`; // Unique tracking per product
+                    const expectedDeliveryDate = product.availability?.deliveryTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
+
                     const checkoutRecord = await checkoutModel.create({
                         user_id,
                         product_id: product._id,
@@ -3674,16 +3673,20 @@ const adminService = {
                         phone_number,
                         paymentMode,
                         price: itemTotalPrice,
-                        razorpay_payment_id: paymentMode === "online" ? payment.order_id : null, 
+                        razorpay_payment_id: paymentMode === "online" ? payment.order_id : null,
+                        tracking_number: trackingNumber,
+                        courier_service: "Delhivery",
+                        expected_delivery_date: expectedDeliveryDate,
+                        tracking_updates: [{ status: "Pending", timestamp: new Date() }]
                     });
-    
+
                     checkoutRecords.push(checkoutRecord);
-    
-                    // Remove item from cart
+
+                    // ✅ Remove item from cart after successful checkout
                     await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
                 }
             }
-    
+
             return {
                 message: "Checkout completed successfully",
                 checkoutRecords,
@@ -3694,7 +3697,8 @@ const adminService = {
             throw error;
         }
     },
-    
+
+
 
     // ========================
     Invoice: async (data) => {
@@ -3760,6 +3764,49 @@ const adminService = {
             throw error
         }
     },
+    // ===========================
+    getWishLish: async (user_id) => {
+        try {
+            const getWishLish = await FavoriteModel.find({ user_id });
+            if (!getWishLish) {
+                throw error({ message: " no Product stored in favorites" })
+            }
+            return getWishLish
+        } catch (error) {
+            throw error
+        }
+    },
+    // =====================
+    getOrderHistory: async (user_id) => {
+        console.log(user_id)
+        try {
+            const orders = await checkoutModel.find({ user_id })
+            console.log(orders)
+            if (!orders.length) {
+                throw new Error("No order history found");
+            }
+
+            return orders;
+        } catch (error) {
+            throw new Error("Error fetching order history");
+        }
+    },
+    // ==========================
+    updateOrderStatus: async (checkout_id, newStatus) => {
+        console.log(checkout_id, newStatus)
+        try {
+            const order = await checkoutModel.findById(checkout_id);
+            if (!order) throw new Error("Order not found");
+    
+            order.status = newStatus;
+            order.tracking_updates.push({ status: newStatus, timestamp: new Date() });
+    
+            await order.save();
+            return order;
+        } catch (error) {
+            throw new Error("Error updating order status");
+        }
+    }
 
 
 }
