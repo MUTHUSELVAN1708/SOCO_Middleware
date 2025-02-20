@@ -43,35 +43,24 @@ const adminController = {
     verifyOtp: async (req, res, next) => {
         try {
             const { email, enteredOtp } = req.body;
-
+    
             if (!email || !enteredOtp) {
                 const error = new Error("Email and OTP are required");
-<<<<<<< HEAD
-                error.statuscode = 400;
-=======
                 error.statusCode = 400;
->>>>>>> 7cdbe26452a37d17dd03de4c5aab6f822d6b70cb
                 error.errorType = "ValidationError";
                 throw error;
             }
-
+    
             if (!/^\d+$/.test(enteredOtp)) {
                 const error = new Error("OTP must contain only numeric values");
-<<<<<<< HEAD
-                error.statuscode = 400;
-=======
                 error.statusCode = 400;
->>>>>>> 7cdbe26452a37d17dd03de4c5aab6f822d6b70cb
                 error.errorType = "ValidationError";
                 throw error;
             }
-
+    
             console.log(req.body);
-
+    
             const verifyOtp = await adminService.verifingOtp(req.body);
-<<<<<<< HEAD
-
-=======
     
             if (!verifyOtp.success) {
                 return res.status(400).json({
@@ -81,7 +70,6 @@ const adminController = {
                 });
             }
     
->>>>>>> 7cdbe26452a37d17dd03de4c5aab6f822d6b70cb
             res.status(200).json({
                 status: 200,
                 verifyOtp,
@@ -89,21 +77,6 @@ const adminController = {
         } catch (error) {
             error.error = error.message;
             console.error(error);
-<<<<<<< HEAD
-            const statusCode = error.statuscode || 500;
-
-            // Add specific error type for OTP verification failure
-            const errorType = error.errorType ||
-                (statusCode === 400 ? "OtpVerificationError" : "ServerError");
-
-            res.status(statusCode).json({
-                status: statusCode,
-                msg: error.message || "An unexpected error occurred",
-                errorType: errorType,
-            });
-        }
-    },
-=======
             const statusCode = error.statusCode || 500;
     
             res.status(statusCode).json({
@@ -113,9 +86,6 @@ const adminController = {
             });
         }
     },
-    
-    
->>>>>>> 7cdbe26452a37d17dd03de4c5aab6f822d6b70cb
 
     // ==========
     registerUserWithBusiness: async (req, res, next) => {

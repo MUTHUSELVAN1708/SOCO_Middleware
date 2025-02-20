@@ -232,25 +232,25 @@ const adminService = {
         const { email, enteredOtp } = data;
         try {
             const storedOtpEntry = await otpModel.findOne({ email });
-
+    
             if (!storedOtpEntry) {
                 return {
                     success: false,
                     message: "No OTP entry found for the provided email",
                 };
             }
-
+    
             const isOtpValid = await bcrypt.compare(enteredOtp, storedOtpEntry.reg_otp);
-
+    
             if (!isOtpValid) {
                 return {
                     success: false,
                     message: "Invalid OTP entered",
                 };
             }
-
+    
             return {
-                
+                success: true, // ✅ Ensure 'success' field is always present
                 message: "OTP verified successfully",
             };
         } catch (error) {
@@ -261,6 +261,7 @@ const adminService = {
             };
         }
     },
+    
 
 
     //   ==========
