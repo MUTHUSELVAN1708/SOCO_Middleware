@@ -19,6 +19,7 @@ const mediaStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Determine destination folder based on file type
     const folder = file.mimetype.startsWith('image') ? 'images' : 'videos';
+    console.log(folder);
     cb(null, `uploads/${folder}`);
   },
   filename: (req, file, cb) => {
@@ -32,7 +33,7 @@ const mediaStorage = multer.diskStorage({
 // File Upload Configuration (Images and Videos)
 const uploadMedia = multer({
   storage: mediaStorage,
-  limits: { fileSize: 1024 * 1024 * 5 },
+  limits: { fileSize: 1024 * 1024 * 500 },
    // Fix here
   fileFilter: (req, file, cb) => {
     const allowedMimeTypes = [
@@ -215,35 +216,50 @@ router.post(
   ]),
   async (req, res) => {
     try {
+      console.log('--- Inside uploadMedia Route ---');
+      console.log('Request received:', new Date().toISOString());
+
       const files = req.files;
-      console.log('Initialized');
+      console.log('Files object initialized:', files);
+
       if (!files || (!files.image && !files.video)) {
+        console.warn('No media files found in request.');
         return res.status(400).json({ message: 'No media files uploaded!' });
       }
 
       const response = {};
 
       if (files.image) {
-        response.images = files.image.map((file) => ({
-          fileName: file.originalname,
-          filePath: `${req.protocol}://${req.get('host')}/uploads/images/${encodeURIComponent(file.filename)}`,
-        }));
+        console.log(`Processing ${files.image.length} image(s)...`);
+        response.images = files.image.map((file) => {
+          console.log(`Image Uploaded - Original Name: ${file.originalname}, Saved Name: ${file.filename}`);
+          return {
+            fileName: file.originalname,
+            filePath: `${req.protocol}://${req.get('host')}/uploads/images/${encodeURIComponent(file.filename)}`,
+          };
+        });
       }
-      
+
       if (files.video) {
-        response.videos = files.video.map((file) => ({
-          originalFileName: file.originalname,
-          uniqueId: file.filename,
-          filePath: `${req.protocol}://${req.get('host')}/uploads/videos/${encodeURIComponent(file.filename)}`,
-        }));
+        console.log(`Processing ${files.video.length} video(s)...`);
+        response.videos = files.video.map((file) => {
+          console.log(`Video Uploaded - Original Name: ${file.originalname}, Saved Name: ${file.filename}`);
+          return {
+            originalFileName: file.originalname,
+            uniqueId: file.filename,
+            filePath: `${req.protocol}://${req.get('host')}/uploads/videos/${encodeURIComponent(file.filename)}`,
+          };
+        });
       }
-      
+
+      console.log('Media uploaded successfully:', response);
 
       return res.status(200).json({
         message: 'Media uploaded successfully!',
         media: response,
       });
     } catch (error) {
+      console.error('Error in uploadMedia:', error);
       res.status(500).json({ message: 'Internal server error.', error: error.message });
     }
   }
