@@ -2902,7 +2902,6 @@ const adminService = {
                 throw new Error("Invalid initial quantity");
             }
 
-            // Ensure salePrice is a valid number
             const salePrice = Number(product?.pricing?.salePrice);
             if (isNaN(salePrice)) {
                 throw new Error("Sale price is invalid or missing");
@@ -2917,6 +2916,9 @@ const adminService = {
                 cartItem.size = size || product.size;
                 cartItem.images = images || product.images;
                 cartItem.category = category || product.category;
+                cartItem.discount =  product.pricing?.discount;
+                cartItem.originalPrice =  product.pricing?.regularPrice;
+                cartItem.gst = product.pricing?.gstDetails?.gstPercentage;
             } else {
                 cartItem = await cartModel.create({
                     user_id,
@@ -2929,6 +2931,9 @@ const adminService = {
                     quantity: Number(quantity),
                     price: salePrice,
                     colors: colors || product.colors,
+                    gst:product.pricing.gstDetails.gstPercentage,
+                    discount : product.pricing?.discount,
+                    originalPrice :  product.pricing?.regularPrice,
                 });
             }
 

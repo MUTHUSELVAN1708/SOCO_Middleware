@@ -42,6 +42,18 @@ const cartSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    gst: {
+        type: Number,
+        required: true
+    },
+    originalPrice: {
+        type: Number,
+        required: true
+    },
+    discount: {
+        type: Number,
+        required: true
+    },
     unit:{
         type: String,
         required: true 
