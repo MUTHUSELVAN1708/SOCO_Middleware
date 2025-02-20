@@ -23,10 +23,21 @@ import connectedUsers from "../../socket.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
 import MessageModel from "../model/chatModel.js";
-import redisService from "./redisService.js";
+// import redisService from "./redisService.js";
 import Product from "../model/Product.js";
 import DeliveryAddressModel from "../model/deliveryAddressModel.js";
 
+import Razorpay from "razorpay";
+import checkoutModel from "../model/checkoutModel.js";
+import invoiceModel from "../model/invoiceModel.js";
+import FavoriteModel from "../model/favoriteModel.js";
+
+const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
+
+const razorpayInstance = new Razorpay({
+    key_id: process.env.RAZORPAY_ID_KEY,
+    key_secret: process.env.RAZORPAY_SECRET_KEY,
+});
 
 const client = new twilio(process.env.AccountSID, process.env.AuthToken);
 const SECRET_KEY = crypto.randomBytes(32).toString('hex');
@@ -239,7 +250,7 @@ const adminService = {
             }
 
             return {
-                success: true,
+                
                 message: "OTP verified successfully",
             };
         } catch (error) {
@@ -1778,29 +1789,29 @@ const adminService = {
             let newPost = {
                 user_id,
                 creatorName,
-            creatorProfileImageUrl,
-            lat,
-            lng,
-            pinCode,
-            city,
-            // location: {
-            //     type: "Point",
-            //     coordinates: [lng, lat]  // ✅ Longitude first, then latitude
-            // },
-            district,
-            state,
-            productId: productId ?? '',
-            completeAddress,
-            postLanguage: postLanguage ?? [],
-            postCategories:postCategories ?? [],
-            interestPeoples: interestPeoples ?? [],
-            likesCount,
-            commentsCount,
-            viewsCount,
-            sharesCount,
-            isBusinessPost,
-            isUserPost,
-            isProductPost,
+                creatorProfileImageUrl,
+                lat,
+                lng,
+                pinCode,
+                city,
+                // location: {
+                //     type: "Point",
+                //     coordinates: [lng, lat]  // ✅ Longitude first, then latitude
+                // },
+                district,
+                state,
+                productId: productId ?? '',
+                completeAddress,
+                postLanguage: postLanguage ?? [],
+                postCategories: postCategories ?? [],
+                interestPeoples: interestPeoples ?? [],
+                likesCount,
+                commentsCount,
+                viewsCount,
+                sharesCount,
+                isBusinessPost,
+                isUserPost,
+                isProductPost,
                 imageUrl,
                 caption,
                 isScheduled,
@@ -1981,18 +1992,18 @@ const adminService = {
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
             const skip = (page - 1) * limit;
-    
+
             // Fetch posts with pagination, sorting, and filter out isProductPost = true
             const posts = await createPostModel.find({ user_id, isProductPost: false })
                 .sort({ timestamp: -1 })
                 .skip(skip)
                 .limit(limit)
                 .select('imageUrl caption likes tags timestamp isVideo thumbnailFile');
-    
+
             // Count total results for pagination (excluding isProductPost: true)
             const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
             const totalPages = Math.ceil(totalResults / limit);
-    
+
             return {
                 posts,
                 pagination: {
@@ -2006,80 +2017,81 @@ const adminService = {
             };
         } catch (error) {
             throw error;
-        }},
+        }
+    },
 
-        getPostDetails: async (postId, isBusinessAccount) => {
-            try {
-                console.log(postId);
-                
-                // Fetch post details
-                const post = await createPostModel.findById(postId).select(
-                    "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp"
-                );
-                if (!post) throw new Error("Post not found");
-        
-                // Fetch user details
-                const user = isBusinessAccount
-                    ? await businessregisterModel.findById(post.user_id)
-                    : await registerModel.findById(post.user_id);
-        
-                if (!user) throw new Error("User not found");
-        
-                // Fetch total comments count
-                const totalComments = await Comment.countDocuments({ postId });
-        
-                // Fetch top 3 most popular comments based on likesCount
-                const comments = await Comment.find({ postId })
-                    .sort({ likesCount: -1 })
-                    .limit(3)
-                    .populate({
-                        path: "userInfo",
-                        select: "name avatarUrl", 
-                    })
-                    .select("commentId userId content createdAt likesCount replyCount hasMoreReplies");
-        
-                // Format comments
-                const formattedComments = comments.map(comment => ({
-                    id: comment.commentId,
-                    userId: comment.userId,
-                    userName: comment.userInfo?.name || "Unknown",
-                    userAvatar: comment.userInfo?.avatarUrl || "",
-                    text: comment.content,
-                    createdAt: comment.createdAt,
-                    likesCount: comment.likesCount,
-                    replyCount: comment.replyCount,
-                    hasMoreReplies: comment.hasMoreReplies,
-                }));
-        
-                return {
-                    id: post._id,
-                    user_id: post.user_id,
-                    creatorName: post.creatorName,
-                    creatorProfileImageUrl: post.creatorProfileImageUrl,
-                    mediaFile: post.mediaFile,
-                    thumbnailFile: post.thumbnailFile,
-                    videoDuration: post.videoDuration,
-                    aspectRatio: post.aspectRatio,
-                    isVideo: post.isVideo,
-                    likesCount: post.likesCount,
-                    commentsCount: post.commentsCount,
-                    totalComments: totalComments, // Added total comments count
-                    viewsCount: post.viewsCount,
-                    sharesCount: post.sharesCount,
-                    isBusinessPost: post.isBusinessPost,
-                    caption: post.caption,
-                    createdAt: post.timestamp,
-                    isLiked: false,
-                    isPinned: false,
-                    comments: formattedComments,
-                };
-            } catch (error) {
-                throw error;
-            }
-        },
-        
-        
-    
+    getPostDetails: async (postId, isBusinessAccount) => {
+        try {
+            console.log(postId);
+
+            // Fetch post details
+            const post = await createPostModel.findById(postId).select(
+                "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp"
+            );
+            if (!post) throw new Error("Post not found");
+
+            // Fetch user details
+            const user = isBusinessAccount
+                ? await businessregisterModel.findById(post.user_id)
+                : await registerModel.findById(post.user_id);
+
+            if (!user) throw new Error("User not found");
+
+            // Fetch total comments count
+            const totalComments = await Comment.countDocuments({ postId });
+
+            // Fetch top 3 most popular comments based on likesCount
+            const comments = await Comment.find({ postId })
+                .sort({ likesCount: -1 })
+                .limit(3)
+                .populate({
+                    path: "userInfo",
+                    select: "name avatarUrl",
+                })
+                .select("commentId userId content createdAt likesCount replyCount hasMoreReplies");
+
+            // Format comments
+            const formattedComments = comments.map(comment => ({
+                id: comment.commentId,
+                userId: comment.userId,
+                userName: comment.userInfo?.name || "Unknown",
+                userAvatar: comment.userInfo?.avatarUrl || "",
+                text: comment.content,
+                createdAt: comment.createdAt,
+                likesCount: comment.likesCount,
+                replyCount: comment.replyCount,
+                hasMoreReplies: comment.hasMoreReplies,
+            }));
+
+            return {
+                id: post._id,
+                user_id: post.user_id,
+                creatorName: post.creatorName,
+                creatorProfileImageUrl: post.creatorProfileImageUrl,
+                mediaFile: post.mediaFile,
+                thumbnailFile: post.thumbnailFile,
+                videoDuration: post.videoDuration,
+                aspectRatio: post.aspectRatio,
+                isVideo: post.isVideo,
+                likesCount: post.likesCount,
+                commentsCount: post.commentsCount,
+                totalComments: totalComments, // Added total comments count
+                viewsCount: post.viewsCount,
+                sharesCount: post.sharesCount,
+                isBusinessPost: post.isBusinessPost,
+                caption: post.caption,
+                createdAt: post.timestamp,
+                isLiked: false,
+                isPinned: false,
+                comments: formattedComments,
+            };
+        } catch (error) {
+            throw error;
+        }
+    },
+
+
+
     // ======================
 
     followUser: async (user_id, follower_id) => {
@@ -2871,8 +2883,6 @@ const adminService = {
             productName,
             category,
             unit,
-            price,
-
         } = data;
 
         try {
@@ -2881,7 +2891,8 @@ const adminService = {
                 throw new Error("User not found");
             }
 
-            const product = await productModel.findById(product_id);
+            const product = await Product.findById(product_id);
+            console.log(product, "product");
             if (!product) {
                 throw new Error("Product not found");
             }
@@ -2890,10 +2901,13 @@ const adminService = {
                 throw new Error("Invalid initial quantity");
             }
 
-            let cartItem = await cartModel.findOne({
-                user_id,
-                product_id,
-            });
+            // Ensure salePrice is a valid number
+            const salePrice = Number(product?.pricing?.salePrice);
+            if (isNaN(salePrice)) {
+                throw new Error("Sale price is invalid or missing");
+            }
+
+            let cartItem = await cartModel.findOne({ user_id, product_id });
 
             if (cartItem) {
                 cartItem.quantity += Number(quantity);
@@ -2902,7 +2916,6 @@ const adminService = {
                 cartItem.size = size || product.size;
                 cartItem.images = images || product.images;
                 cartItem.category = category || product.category;
-
             } else {
                 cartItem = await cartModel.create({
                     user_id,
@@ -2911,17 +2924,16 @@ const adminService = {
                     size: size || product.size,
                     unit: unit,
                     images: images || product.images,
-
                     category: category || product.category,
                     quantity: Number(quantity),
-                    price: product.price,
+                    price: salePrice,
                     colors: colors || product.colors,
                 });
             }
 
             let totalPrice = 0;
             if (unit === "gram" || unit === "piece") {
-                totalPrice = cartItem.quantity * product.price;
+                totalPrice = cartItem.quantity * cartItem.price;
             } else {
                 throw new Error("Invalid unit specified");
             }
@@ -2932,9 +2944,7 @@ const adminService = {
             return cartItem;
         } catch (error) {
             console.error("Error storing in cart:", error);
-            throw {
-                error: "something wrong",
-            };
+            throw { error: "Something went wrong" };
         }
     },
 
@@ -2992,55 +3002,55 @@ const adminService = {
     },
     // ================================
 
-    sendMessage: async (data) => {
-        if (typeof data === "string") {
-          try {
-            data = JSON.parse(data);
-          } catch (err) {
-            console.error("Failed to parse input data:", err);
-            throw new Error("Invalid JSON input");
-          }
-        }
-      
-        const { from, to, message } = data;
-        console.log("Input data:", data);
-      
+    sendMessage: async (io, socket, from, to, message) => {
+        console.log("Input data:", { from, to, message });
+
         if (!from || !to || !message) {
-          throw new Error("Missing required fields: from, to, or message");
+            socket.emit("sendedMsg", { success: false, message: "Missing required fields: from, to, or message" });
+            throw new Error("Missing required fields: from, to, or message");
         }
-      
+
         const timestamp = new Date();
         const chatKey = `chat:${from}:${to}`;
         const notificationKey = `notifications:${to}`;
-      
+
         try {
-          // Create the message in MongoDB
-          const newMessage = await MessageModel.create({ from, to, message, timestamp });
-          console.log("New message created:", newMessage);
-      
-          // Build the message object with the MongoDB _id converted to a string
-          const messageWithObjectId = {
-            _id: newMessage._id.toString(),
-            from,
-            to,
-            message,
-            timestamp,
-          };
-      
-          // Push the message into Redis under the chat key
-          await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
-      
-          // Publish a notification to the recipient's channel
-          await redisService.getRedisClient().publish(notificationKey, JSON.stringify({ from, message }));
-      
-          // Return success message
-          return { success: true, message: 'Message sent' };
+            const newMessage = await MessageModel.create({ from, to, message, timestamp });
+            console.log("New message created:", newMessage);
+
+            // Message object with MongoDB _id
+            const messageWithObjectId = {
+                _id: newMessage._id.toString(),
+                from,
+                to,
+                message,
+                timestamp,
+            };
+
+            // Store message in Redis
+            await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
+
+            const receiverSocketId = connectedUsers[to];
+
+            if (receiverSocketId) {
+                console.log(`Receiver (${to}) is online. Sending message...`);
+                socket.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
+            } else {
+                console.log(`Receiver (${to}) is offline. Storing message in Redis.`);
+                await redisService.getRedisClient().lPush(`offlineMessages:${to}`, JSON.stringify(messageWithObjectId));
+            }
+
+            socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
+
+            return { success: true, message: "Message sent" };
         } catch (err) {
-          console.error('Error in sendMessage:', err);
-          throw new Error('Error sending message');
+            console.error(" Error in sendMessage:", err);
+            socket.emit("sendedMsg", { success: false, message: "Error sending message" });
+            throw new Error("Error sending message");
         }
-      },
-      
+    },
+
+
 
 
     //   =============
@@ -3070,7 +3080,7 @@ const adminService = {
     //   =====================
 
     getFeed: async (data) => {
-        let { user_id, address } = data; 
+        let { user_id, address } = data;
         console.log(data, "Input Data");
         try {
             if (typeof address === "string") {
@@ -3080,30 +3090,30 @@ const adminService = {
                     throw new Error("Failed to parse address parameter. Please provide valid JSON.");
                 }
             }
-    
+
             const targetLat = Number(address.lat);
             const targetLng = Number(address.lng);
             if (isNaN(targetLat) || isNaN(targetLng)) {
                 throw new Error("Invalid latitude or longitude values.");
             }
-    
+
             const following = await followerModel
                 .find({ follower_id: user_id, status: 'accepted' })
                 .select('user_id');
             console.log(following, "Following Users");
             const followingIds = following.map(follow => follow.user_id);
             console.log(followingIds, "Following IDs");
-    
+
             const delta = 0.10; // 
             const nearbyLocations = await locationModel.find({
                 "address.lat": { $gte: targetLat - delta, $lte: targetLat + delta },
                 "address.lng": { $gte: targetLng - delta, $lte: targetLng + delta }
             });
             console.log(nearbyLocations, "Nearby Location Documents");
-    
+
             const localUserIds = nearbyLocations.map(loc => loc.user_id);
             console.log(localUserIds, "Local User IDs");
-    
+
             const localPosts = await createPostModel.find({
                 user_id: { $in: localUserIds }
             })
@@ -3113,33 +3123,33 @@ const adminService = {
             console.log(localPosts, "Local Posts");
 
             const selfPosts = await createPostModel.find({ user_id: user_id })
-            .populate('user_id', 'full_Name profile_url')
-            .sort({ timestamp: -1 })
-            .limit(5);
-        console.log(selfPosts, "Self Posts");
+                .populate('user_id', 'full_Name profile_url')
+                .sort({ timestamp: -1 })
+                .limit(5);
+            console.log(selfPosts, "Self Posts");
 
-        const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
-            .populate('user_id', 'full_Name profile_url')
-            .sort({ timestamp: -1 })
-            .limit(5);
-        console.log(followedPosts, "Followed Posts");
+            const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
+                .populate('user_id', 'full_Name profile_url')
+                .sort({ timestamp: -1 })
+                .limit(5);
+            console.log(followedPosts, "Followed Posts");
 
-        const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
-            .sort({ timestamp: -1 })
-            .limit(5);
-        console.log(businessPosts, "Business Posts");
+            const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
+                .sort({ timestamp: -1 })
+                .limit(5);
+            console.log(businessPosts, "Business Posts");
 
-        const userPosts = await registerModel.find({ _id: user_id })
-            .sort({ timestamp: -1 })
-            .limit(5);
-        console.log(userPosts, "User Interest Posts");
+            const userPosts = await registerModel.find({ _id: user_id })
+                .sort({ timestamp: -1 })
+                .limit(5);
+            console.log(userPosts, "User Interest Posts");
 
-        // 8. Fetch products
-        const products = await Product.find()
-            .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
-            .sort({ 'ratings.averageRating': -1 })
-            .limit(5);
-        console.log(products, "Products");
+            // 8. Fetch products
+            const products = await Product.find()
+                .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
+                .sort({ 'ratings.averageRating': -1 })
+                .limit(5);
+            console.log(products, "Products");
             const feed = [
                 ...selfPosts.map(post => ({ type: 'post', data: post })),
                 ...followedPosts.map(post => ({ type: 'post', data: post })),
@@ -3149,16 +3159,16 @@ const adminService = {
                 ...localPosts.map(post => ({ type: 'local', data: post }))
             ];
             console.log(feed, "Combined Feed");
-    
+
             const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp || 0) - new Date(a.data.timestamp || 0));
-    
+
             const shuffledFeed = sortedFeed.sort(() => Math.random() - 0.5);
             console.log(shuffledFeed, "Shuffled Feed");
-    
+
             const transformedFeed = shuffledFeed.map(item => {
                 const { data: post, type } = item;
-    
-                
+
+
                 if (type === 'post' || type === 'business' || type === 'user_interest' || type === 'local') {
                     return {
                         id: post._id,
@@ -3192,8 +3202,8 @@ const adminService = {
                         type
                     };
                 }
-    
-               
+
+
                 if (type === 'product') {
                     return {
                         id: post._id,
@@ -3205,19 +3215,19 @@ const adminService = {
                         type
                     };
                 }
-    
+
                 return { type, ...post };
             });
-    
-    
+
+
             return transformedFeed;
         } catch (error) {
             console.error("Error fetching feed:", error);
             throw error;
         }
     },
-    
-    
+
+
     // =============================
     addDeliveryAddress: async (data) => {
         const {
@@ -3237,18 +3247,18 @@ const adminService = {
             deliveryInstructions,
             addressType = 'home', // Default value for addressType
         } = data;
-    
+
         try {
             if (!user_id || !fullName || !phoneNumber || !streetAddress || !city || !state || !postalCode) {
                 throw new Error("Required fields are missing.");
             }
-    
+
             const addressCount = await DeliveryAddressModel.countDocuments({ user_id });
-    
+
             if (addressCount >= 3) {
                 throw new Error("You can only store up to 3 delivery addresses.");
             }
-    
+
             // If the new address is marked as default, update other addresses to isDefault: false
             if (isDefault) {
                 await DeliveryAddressModel.updateMany(
@@ -3256,7 +3266,7 @@ const adminService = {
                     { $set: { isDefault: false } }
                 );
             }
-    
+
             // Create a new delivery address
             const createAddress = await DeliveryAddressModel.create({
                 user_id,
@@ -3275,15 +3285,15 @@ const adminService = {
                 deliveryInstructions,
                 addressType,
             });
-    
+
             return createAddress;
         } catch (error) {
             console.error("Error in createAddress:", error);
             throw error;
         }
     },
-    
-      
+
+
     // ========================
     // getDeliveryAddress: async (user_id) => {
     //     try {
@@ -3309,13 +3319,13 @@ const adminService = {
             throw error;
         }
     },
-    
+
     // =================
-    deleteAddress:async (deliveryAddress_id) => {
+    deleteAddress: async (deliveryAddress_id) => {
         console.log("deliveryAddress_id")
         try {
             const { id } = deliveryAddress_id; // Extract ID from object
-    const deleteAddress = await DeliveryAddressModel.findOneAndDelete({ _id: id.toString() });
+            const deleteAddress = await DeliveryAddressModel.findOneAndDelete({ _id: id.toString() });
             return deleteAddress
         } catch (error) {
             console.error("Error  in delete delivery Address:", error);
@@ -3323,121 +3333,429 @@ const adminService = {
         }
     },
     // =================
+
     getUserProfile: async (id, isBusinessAccount) => {
         try {
-          const user = isBusinessAccount
-            ? await businessregisterModel.findById(id)
-            : await registerModel.findById(id);
-      
-          if (!user) {
-            return null;
-          }
-      
-          const fullName = isBusinessAccount
-            ? user.ownerName || "Business Owner"
-            : user.full_Name || "";
-      
-          return {
-            id: user._id.toString(),
-            username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
-            fullName: fullName,
-            bio: isBusinessAccount ? user.natureOfBusiness || "This is a business account" : user.bio || "No bio",
-            profileImageUrl: isBusinessAccount ? user.brand_logo || "" : user.profile_url || "",
-            posts: user.postCount || 0,
-            followers: user.followerCount || 0,
-            following: user.followingCount || 0,
-            isVerified: user.isVerified || false,
-            isPrivate: user.accountIsPublic === undefined ? false : !user.accountIsPublic,
-            needPermissionForFollowing: user.needPermissionForFollowing,
-            highlights: user.highlights?.length ? user.highlights : [],
-          };
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          return null;
-        }
-      },
+            const user = isBusinessAccount
+                ? await businessregisterModel.findById(id)
+                : await registerModel.findById(id);
 
-      fetchUserFriends: async (id) => {
-        try {
-          const totalFriendsCount = await followerModel.countDocuments({ user_id: id, status: 'accepted' });
-      
-          const friends = await followerModel
-            .find({ user_id: id, status: 'accepted' })
-            .limit(10);
-      
-          const friendDetails = await Promise.all(
-            friends.map(async (friend) => {
-              const isBusinessAccount = friend.isBusinessAccount;
-              const user = isBusinessAccount
-                ? await businessregisterModel.findById(friend.follower_id)
-                : await registerModel.findById(friend.follower_id);
-      
-              if (!user) return null;
-      
-              return {
+            if (!user) {
+                return null;
+            }
+
+            const fullName = isBusinessAccount
+                ? user.ownerName || "Business Owner"
+                : user.full_Name || "";
+
+            return {
                 id: user._id.toString(),
-                username: `@${isBusinessAccount ? user.businessName || `Business${user._id}` : user.full_Name || `User${user._id}`}`,
-                profileImageUrl: isBusinessAccount ? user.brand_logo || '' : user.profile_url || '',
-                isFollowing: true,
-              };
-            })
-          );
-      
-          return {
-            friends: friendDetails.filter(Boolean), // Remove null values if user was not found
-            hasMoreFriends: totalFriendsCount > 10,
-            totalFriendsCount,
-          };
+                username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
+                fullName: fullName,
+                bio: isBusinessAccount ? user.natureOfBusiness || "This is a business account" : user.bio || "No bio",
+                profileImageUrl: isBusinessAccount ? user.brand_logo || "" : user.profile_url || "",
+                posts: user.postCount || 0,
+                followers: user.followerCount || 0,
+                following: user.followingCount || 0,
+                isVerified: user.isVerified || false,
+                isPrivate: user.accountIsPublic === undefined ? false : !user.accountIsPublic,
+                needPermissionForFollowing: user.needPermissionForFollowing,
+                highlights: user.highlights?.length ? user.highlights : [],
+            };
         } catch (error) {
-          console.error("Error fetching user friends:", error);
-          return {
-            friends: [],
-            hasMoreFriends: false,
-            totalFriendsCount: 0,
-          };
+            console.error("Error fetching user profile:", error);
+            return null;
         }
-      },
+    },
 
-       fetchUserPosts : async (userId, page = 1, limit = 12) => {
+    fetchUserFriends: async (id) => {
         try {
-          const skip = (page - 1) * limit;
-      
-          const totalPostsCount = await createPostModel.countDocuments({ user_id: userId });
-      
-          const posts = await createPostModel
-            .find({ user_id: userId })
-            .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 }) // Sort by popularity
-            .skip(skip)
-            .limit(limit);
-      
-          const postDetails = posts.map((post) => ({
-            id: post._id.toString(),
-            userId: post.user_id,
-            imageUrl: post.imageUrl || '',
-            caption: post.caption || '',
-            likes: post.likesCount || 0,
-            comments: post.commentsCount || 0,
-            createdAt: post.timestamp,
-            tags: post.tags || [],
-          }));
-      
-          return {
-            posts: postDetails,
-            hasMorePosts: totalPostsCount > skip + posts.length,
-            totalPostsCount,
-          };
+            const totalFriendsCount = await followerModel.countDocuments({ user_id: id, status: 'accepted' });
+
+            const friends = await followerModel
+                .find({ user_id: id, status: 'accepted' })
+                .limit(10);
+
+            const friendDetails = await Promise.all(
+                friends.map(async (friend) => {
+                    const isBusinessAccount = friend.isBusinessAccount;
+                    const user = isBusinessAccount
+                        ? await businessregisterModel.findById(friend.follower_id)
+                        : await registerModel.findById(friend.follower_id);
+
+                    if (!user) return null;
+
+                    return {
+                        id: user._id.toString(),
+                        username: `@${isBusinessAccount ? user.businessName || `Business${user._id}` : user.full_Name || `User${user._id}`}`,
+                        profileImageUrl: isBusinessAccount ? user.brand_logo || '' : user.profile_url || '',
+                        isFollowing: true,
+                    };
+                })
+            );
+
+            return {
+                friends: friendDetails.filter(Boolean), // Remove null values if user was not found
+                hasMoreFriends: totalFriendsCount > 10,
+                totalFriendsCount,
+            };
         } catch (error) {
-          console.error('Error fetching user posts:', error);
-          return {
-            posts: [],
-            hasMorePosts: false,
-            totalPostsCount: 0,
-          };
+            console.error("Error fetching user friends:", error);
+            return {
+                friends: [],
+                hasMoreFriends: false,
+                totalFriendsCount: 0,
+            };
         }
-      },
-      
-      
-      
+    },
+
+    fetchUserPosts: async (userId, page = 1, limit = 12) => {
+        try {
+            const skip = (page - 1) * limit;
+
+            const totalPostsCount = await createPostModel.countDocuments({ user_id: userId });
+
+            const posts = await createPostModel
+                .find({ user_id: userId })
+                .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 }) // Sort by popularity
+                .skip(skip)
+                .limit(limit);
+
+            const postDetails = posts.map((post) => ({
+                id: post._id.toString(),
+                userId: post.user_id,
+                imageUrl: post.imageUrl || '',
+                caption: post.caption || '',
+                likes: post.likesCount || 0,
+                comments: post.commentsCount || 0,
+                createdAt: post.timestamp,
+                tags: post.tags || [],
+            }));
+
+            return {
+                posts: postDetails,
+                hasMorePosts: totalPostsCount > skip + posts.length,
+                totalPostsCount,
+            };
+        } catch (error) {
+            console.error('Error fetching user posts:', error);
+            return {
+                posts: [],
+                hasMorePosts: false,
+                totalPostsCount: 0,
+            };
+        }
+    },
+
+
+
+    // =======
+    payment: async ({ amount, name, email }) => {
+        console.log("Payment details:", amount, name, email);
+        try {
+            if (!amount || !name || !email) {
+                return {
+                    success: false,
+                    msg: "All fields (amount, name, email) are required!",
+                };
+            }
+
+            const options = {
+                amount: amount * 100,
+                currency: "INR",
+                receipt: `receipt_${Date.now()}`,
+            };
+
+            const order = await razorpayInstance.orders.create(options);
+
+            return {
+                success: true,
+                msg: "Order Created",
+                order_id: order.id,
+                amount: amount,
+                // product_name: req.body.product_name,
+                // description: req.body.description,
+                key_id: process.env.RAZORPAY_ID_KEY,
+
+                name: name,
+                email: email,
+            };
+        } catch (error) {
+            console.error("Error in payment processing:", error.message);
+            return {
+                success: false,
+                msg: "Internal Server Error",
+            };
+        }
+    },
+    //   =================================
+    // checkout: async (data) => {
+    //     const {
+    //         user_id,
+    //         paymentMode,
+    //         address,
+    //         phone_number,
+    //         amount,
+
+    //         name,
+    //         email,
+    //     } = data;
+
+    //     try {
+    //         const cartItems = await cartModel.find({ user_id });
+    //         if (!cartItems.length) {
+    //             throw { error: "Cart is empty" };
+    //         }
+    //         console.log("cartItems", cartItems)
+    //         let totalQuantity = 0;
+    //         for (const item of cartItems) {
+    //             totalQuantity += item.quantity;
+    //         }
+    //         console.log("totalQuantity", totalQuantity);
+
+
+
+    //         const checkoutRecords = [];
+    //         let totalPrice = 0;
+
+    //         for (const cartItem of cartItems) {
+    //             const product = await Product.findById(cartItem.product_id);
+    //             if (!product) {
+    //                 throw { error: `Product not found` };
+    //             }
+    //             console.log("pro", product);
+    //             const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
+    //             totalPrice += itemTotalPrice;
+
+    //             const payment = await adminService.payment({
+    //                 amount: itemTotalPrice,
+    //                 name,
+    //                 email,
+    //             });
+    //             console.log(payment, "kkkk")
+    //             if (!payment.success) {
+    //                 throw { error: "Payment failed" };
+    //             }
+    //             const checkoutRecord = await checkoutModel.create({
+    //                 user_id,
+    //                 product_id: product._id,
+    //                 product_img: product.images,
+    //                 size: cartItem.size,
+    //                 quantity: cartItem.quantity,
+    //                 address,
+    //                 phone_number,
+    //                 paymentMode,
+    //                 price: itemTotalPrice,
+    //                 // razorpay_order_id:payment.razorpay_order_id,
+    //                 razorpay_payment_id: payment.order_id, //razorpay_payment_id: payment.razorpay_payment_id,
+    //             });
+
+    //             checkoutRecords.push(checkoutRecord);
+
+    //             const deleteResult = await cartModel.deleteOne({
+    //                 user_id: cartItem.user_id,
+    //                 product_id: cartItem.product_id,
+    //             });
+
+    //             if (deleteResult.deletedCount === 0) {
+    //                 throw { error: "Failed to delete item from cart" };
+    //             }
+    //         }
+
+    //         return {
+    //             message: "Checkout completed successfully",
+    //             checkoutRecords,
+    //             totalPrice,
+    //         };
+    //     } catch (error) {
+    //         console.error("Error during checkout:", error);
+    //         throw error;
+    //     }
+    // },
+
+
+
+    // ==============
+    checkout: async (data) => {
+        const {
+            user_id,
+            paymentMode,
+            address,
+            phone_number,
+            amount,
+            name,
+            email,
+            product_id, // Direct Buy Now product
+            quantity = 1, // Default quantity is 1
+            size,
+        } = data;
+    
+        try {
+            let checkoutRecords = [];
+            let totalPrice = 0;
+    
+            if (product_id) {
+                // ✅ "Buy Now" Mode - Fetch Single Product
+                const product = await Product.findById(product_id);
+                if (!product) {
+                    throw { error: "Product not found" };
+                }
+    
+                const itemTotalPrice = product.pricing?.salePrice * quantity;
+                totalPrice = itemTotalPrice;
+                if (paymentMode === "online") {
+                    payment = await adminService.payment({
+                        amount: itemTotalPrice,
+                        name,
+                        email,
+                    });
+    
+                    if (!payment.success) {
+                        throw { error: "Payment failed" };
+                    }
+                }
+    
+                // Create Order Entry
+                const checkoutRecord = await checkoutModel.create({
+                    user_id,
+                    product_id: product._id,
+                    product_img: product.images,
+                    size,
+                    quantity,
+                    address,
+                    phone_number,
+                    paymentMode,
+                    price: itemTotalPrice,
+                    razorpay_payment_id: paymentMode === "online" ? payment.order_id : null, 
+                });
+    
+                checkoutRecords.push(checkoutRecord);
+            } else {
+                
+                const cartItems = await cartModel.find({ user_id });
+                if (!cartItems.length) {
+                    throw { error: "Cart is empty" };
+                }
+    
+                for (const cartItem of cartItems) {
+                    const product = await Product.findById(cartItem.product_id);
+                    if (!product) {
+                        throw { error: `Product not found` };
+                    }
+    
+                    const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
+                    totalPrice += itemTotalPrice;
+    
+                    if (paymentMode === "online") {
+                        payment = await adminService.payment({
+                            amount: itemTotalPrice,
+                            name,
+                            email,
+                        });
+        
+                        if (!payment.success) {
+                            throw { error: "Payment failed" };
+                        }
+                    }
+    
+                    // Create Order Entry
+                    const checkoutRecord = await checkoutModel.create({
+                        user_id,
+                        product_id: product._id,
+                        product_img: product.images,
+                        size: cartItem.size,
+                        quantity: cartItem.quantity,
+                        address,
+                        phone_number,
+                        paymentMode,
+                        price: itemTotalPrice,
+                        razorpay_payment_id: paymentMode === "online" ? payment.order_id : null, 
+                    });
+    
+                    checkoutRecords.push(checkoutRecord);
+    
+                    // Remove item from cart
+                    await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
+                }
+            }
+    
+            return {
+                message: "Checkout completed successfully",
+                checkoutRecords,
+                totalPrice,
+            };
+        } catch (error) {
+            console.error("Error during checkout:", error);
+            throw error;
+        }
+    },
+    
+
+    // ========================
+    Invoice: async (data) => {
+        try {
+            console.log("datass", data.checkoutRecords);
+            const validData = data.checkoutRecords;
+            const invoices = [];
+
+            const currentDate = new Date();
+            const random = Math.floor(Math.random() * (1000 - 100 + 1)) + 1000;
+
+            const year = currentDate.getFullYear();
+            const month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
+            const date = currentDate.getDate().toString().padStart(2, "0");
+
+            for (const record of validData) {
+                // console.log("product_size", record.product_size);
+
+                const invoiceNumber = `${year}${month}${date}-${random}`;
+
+                const createInvoice = await invoiceModel.create({
+                    checkout_id: record._id,
+                    invoiceNumber,
+                    size: record.size,
+                    price: record.price,
+                });
+                console.log("createInvoice", createInvoice);
+                invoices.push(createInvoice);
+            }
+
+            return invoices;
+        } catch (error) {
+            throw {
+                error: "something wrong",
+            };
+        }
+    },
+    //   =========================
+    whishlist: async (data) => {
+        const { user_id, product_id } = data
+        try {
+            const exist = await FavoriteModel.findOne({ product_id });
+            if (exist) {
+                throw error("this product already exist")
+            }
+            const createWishlist = await FavoriteModel.create({ user_id, product_id })
+            return createWishlist
+        } catch (error) {
+            throw error
+        }
+    },
+    // =======================
+    deleteWhishlist: async (data) => {
+        const { product_id, user_id } = data
+        console.log(product_id, "ppppp")
+        try {
+            const deleteWhishlist = await FavoriteModel.findOneAndDelete({ user_id, product_id });
+            if (!deleteWhishlist) {
+                throw error({ message: "Product removed from favorites" })
+            }
+            return deleteWhishlist
+        } catch (error) {
+            throw error
+        }
+    },
+
 
 }
 
