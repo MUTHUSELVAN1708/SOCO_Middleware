@@ -17,7 +17,7 @@ export const getDashboardFeed = async (req, res) => {
             page = 1,
             limit: requestedLimit = 15
         } = req.body;
-console.log(req.body,"body")
+   console.log(req.body,"body")
         const limit = 15;
         let user = isBusinessAccount
             ? await businessregisterModel.findOne({user_id})
@@ -28,21 +28,21 @@ console.log(req.body,"body")
             return res.status(404).json({ message: "User not found" });
         }
 
-        const tracking = await trackingModel.findOne({
-            user_id: new mongoose.Types.ObjectId(user_id)
-        });
-        console.log(tracking, "tracking")
+        // const tracking = await trackingModel.findOne({
+        //     user_id: new mongoose.Types.ObjectId(user_id)
+        // });
+        // console.log(tracking, "tracking")
 
-        const trackedPostIds = tracking?.sentPosts?.map(post =>
-            new mongoose.Types.ObjectId(post.post_id)
-        ) || [];
+        // const trackedPostIds = tracking?.sentPosts?.map(post =>
+        //     new mongoose.Types.ObjectId(post.post_id)
+        // ) || [];
 
-        console.log(trackedPostIds, "trackedPostIds")
+        // console.log(trackedPostIds, "trackedPostIds")
         const baseFilters = {
             status: "published",
             // isProductPost: false,
             creator_id: { $ne: user_id },
-            _id: { $nin: trackedPostIds }
+            // _id: { $nin: trackedPostIds }
         };
 
         console.log(baseFilters, "baseFilters");
@@ -99,7 +99,7 @@ console.log(req.body,"body")
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
             const trendingPosts = await createPostModel.find({
                 ...baseFilters,
-                _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
+                _id: { $nin: [ ...posts.map(p => p._id)] }, //...trackedPostIds
                 $or: [
                     { tags: { $in: user.interest } },
                     { description: { $regex: user.interest.join("|"), $options: "i" } }

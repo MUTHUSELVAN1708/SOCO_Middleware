@@ -250,7 +250,7 @@ const adminService = {
             }
 
             return {
-                success: true,
+                
                 message: "OTP verified successfully",
             };
         } catch (error) {

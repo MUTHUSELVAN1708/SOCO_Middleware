@@ -43,45 +43,50 @@ const adminController = {
     verifyOtp: async (req, res, next) => {
         try {
             const { email, enteredOtp } = req.body;
-
+    
             if (!email || !enteredOtp) {
-                const error = new Error("Email and OTP are required");
-                error.statuscode = 400;
-                error.errorType = "ValidationError";
-                throw error;
+                return res.status(400).json({
+                    status: 400,
+                    msg: "Email and OTP are required",
+                    errorType: "ValidationError",
+                });
             }
-
+    
             if (!/^\d+$/.test(enteredOtp)) {
-                const error = new Error("OTP must contain only numeric values");
-                error.statuscode = 400;
-                error.errorType = "ValidationError";
-                throw error;
+                return res.status(400).json({
+                    status: 400,
+                    msg: "OTP must contain only numeric values",
+                    errorType: "ValidationError",
+                });
             }
-
+    
             console.log(req.body);
-
+    
             const verifyOtp = await adminService.verifingOtp(req.body);
-
-            res.status(200).json({
+    
+            if (!verifyOtp.success) {
+                return res.status(400).json({
+                    status: 400,
+                    msg: verifyOtp.message || "Invalid OTP",
+                    errorType: "OtpVerificationError",
+                });
+            }
+    
+            return res.status(200).json({
                 status: 200,
                 verifyOtp,
             });
         } catch (error) {
-            error.error = error.message;
-            console.error(error);
-            const statusCode = error.statuscode || 500;
-
-            // Add specific error type for OTP verification failure
-            const errorType = error.errorType ||
-                (statusCode === 400 ? "OtpVerificationError" : "ServerError");
-
-            res.status(statusCode).json({
-                status: statusCode,
-                msg: error.message || "An unexpected error occurred",
-                errorType: errorType,
+            console.error("OTP Verification Error:", error.message);
+    
+            return res.status(500).json({
+                status: 500,
+                msg: "An unexpected error occurred",
+                errorType: "ServerError",
             });
         }
     },
+    
 
     // ==========
     registerUserWithBusiness: async (req, res, next) => {
