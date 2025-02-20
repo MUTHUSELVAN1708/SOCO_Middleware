@@ -2988,18 +2988,22 @@ const adminService = {
     //   ===========================
     getCart: async (user_id) => {
         try {
-            console.log("user", user_id);
-
-            const getCart = await cartModel.find({
-                user_id: user_id,
-            });
+            console.log("Fetching cart for user:", user_id);
+    
+            const getCart = await cartModel.find({ user_id });
+    
+            if (!getCart.length) { 
+                throw new Error("Cart is empty");
+            }
+    
             return getCart;
         } catch (error) {
-            throw {
-                error: "something wrong",
-            };
+            console.error("Error fetching cart:", error.message);
+    
+            throw new Error("Something went wrong while fetching the cart");
         }
     },
+    
     // ================================
 
     sendMessage: async (io, socket, from, to, message) => {

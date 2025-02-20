@@ -98,6 +98,7 @@ const formatResponse = (success, message, data = null, errors = null) => {
         categories: product.basicInfo.categories,
         tags: product.basicInfo.tags || [],
         images: product.images,
+        unit:product.unit,
         description: product.descriptionHighlights.description,
         highlights: product.descriptionHighlights.highlights,
         pricing: {

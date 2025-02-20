@@ -158,6 +158,9 @@ const productSchema = new mongoose.Schema({
     enum: ['draft', 'published', 'archived'],
     default: 'draft'
   },
+  unit:{type:String,
+    required:true
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
