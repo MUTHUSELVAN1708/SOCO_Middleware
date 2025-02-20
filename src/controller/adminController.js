@@ -43,25 +43,33 @@ const adminController = {
     verifyOtp: async (req, res, next) => {
         try {
             const { email, enteredOtp } = req.body;
-
+    
             if (!email || !enteredOtp) {
                 const error = new Error("Email and OTP are required");
-                error.statuscode = 400;
+                error.statusCode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-
+    
             if (!/^\d+$/.test(enteredOtp)) {
                 const error = new Error("OTP must contain only numeric values");
-                error.statuscode = 400;
+                error.statusCode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-
+    
             console.log(req.body);
-
+    
             const verifyOtp = await adminService.verifingOtp(req.body);
-
+    
+            if (!verifyOtp.success) {
+                return res.status(400).json({
+                    status: 400,
+                    msg: verifyOtp.message || "Invalid OTP entered",
+                    errorType: "OtpVerificationError",
+                });
+            }
+    
             res.status(200).json({
                 status: 200,
                 verifyOtp,
@@ -69,19 +77,16 @@ const adminController = {
         } catch (error) {
             error.error = error.message;
             console.error(error);
-            const statusCode = error.statuscode || 500;
-
-            // Add specific error type for OTP verification failure
-            const errorType = error.errorType ||
-                (statusCode === 400 ? "OtpVerificationError" : "ServerError");
-
+            const statusCode = error.statusCode || 500;
+    
             res.status(statusCode).json({
                 status: statusCode,
                 msg: error.message || "An unexpected error occurred",
-                errorType: errorType,
+                errorType: error.errorType || "ServerError",
             });
         }
     },
+    
 
     // ==========
     registerUserWithBusiness: async (req, res, next) => {
