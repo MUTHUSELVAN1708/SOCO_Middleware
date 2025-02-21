@@ -2957,72 +2957,90 @@ const adminService = {
 updateCart: async (data) => {
     try {
       if (Array.isArray(data)) {
-        const bulkOps = data.map((item) => ({
-          updateOne: {
-            filter: {
-              _id: item.cart_id,
-              user_id: item.user_id,
-            },
-            update: {
-              $set: {
-                quantity: Number(item.quantity),
-                price: Number(item.price),
+        
+        const bulkOps = await Promise.all(
+          data.map(async (item) => {
+            const cartItem = await cartModel.findOne({ _id: item.cart_id, user_id: item.user_id });
+            if (!cartItem) {
+              throw { error: `Cart item with ID ${item.cart_id} not found` };
+            }
+  
+            const product = await Product.findById(item.product_id);
+            if (!product) {
+              throw { error: `Product with ID ${item.product_id} not found` };
+            }
+  
+            const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
+            const newQuantity = cartItem.quantity + Number(item.quantity); 
+            if (newQuantity <= 0) throw { error: "Quantity cannot be less than 1" };
+  
+            const totalPrice = newQuantity * Number(productPrice); 
+  
+            return {
+              updateOne: {
+                filter: { _id: item.cart_id, user_id: item.user_id },
+                update: {
+                  $set: {
+                    quantity: newQuantity,
+                    price: totalPrice,
+                  },
+                },
               },
-            },
-          },
-        }));
-
+            };
+          })
+        );
+  
         const result = await cartModel.bulkWrite(bulkOps);
-
+  
         if (result.matchedCount === 0) {
-          throw {
-            error: "No matching documents found",
-          };
+          throw { error: "No matching documents found" };
         }
-
-        // Fetch the updated documents
+  
         const updatedDocuments = await cartModel.find({
-          _id: {
-            $in: data.map((item) => item.cart_id),
-          },
-          user_id: {
-            $in: data.map((item) => item.user_id),
-          },
+          _id: { $in: data.map((item) => item.cart_id) },
+          user_id: { $in: data.map((item) => item.user_id) },
         });
         return updatedDocuments;
       } else {
-        // Single update
-        const {
-          user_id,
-          cart_id,
-          quantity,
-          price
-        } = data;
-
-        // Find the user's cart item by user_id and cart_id
-        const update = await cartModel.findOneAndUpdate({
-            _id: cart_id,
-            user_id,
-          }, {
-            quantity: Number(quantity), // Convert to Number
-            price: Number(price), // Convert to Number
-          }, {
-            new: true,
-          } // Return the updated document
-        );
-
-        if (!update) {
-          throw {
-            error: "User or Cart ID not found",
-          };
+        const { cart_id, product_id, user_id, quantity } = data;
+  
+        const cartItem = await cartModel.findOne({ _id: cart_id, user_id });
+        if (!cartItem) {
+          throw { error: "Cart item not found" };
         }
-        return update;
+  
+        const product = await Product.findById(product_id);
+        if (!product) {
+          throw { error: "Product not found" };
+        }
+  
+        const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
+        const newQuantity = cartItem.quantity + Number(quantity); 
+        if (newQuantity <= 0) throw { error: "Quantity cannot be less than 1" };
+  
+        const totalPrice = newQuantity * Number(productPrice); 
+  
+        const updatedCart = await cartModel.findOneAndUpdate(
+          { _id: cart_id, user_id },
+          {
+            quantity: newQuantity,
+            price: totalPrice,
+          },
+          { new: true }
+        );
+  
+        if (!updatedCart) {
+          throw { error: "User or Cart ID not found" };
+        }
+        return updatedCart;
       }
     } catch (error) {
-      // console.error("Error updating cart:", error);
+      console.error("Error updating cart:", error);
       throw error;
     }
   },
+  
+  
     // =======================
     removeFromCart: async (data) => {
         const { user_id, cart_id } = data;
