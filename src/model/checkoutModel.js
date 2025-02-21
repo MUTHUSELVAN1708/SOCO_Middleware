@@ -22,15 +22,15 @@ const checkoutSchema = new mongoose.Schema({
     }],
     size: {
         type: String,
-        required: true
+        // required: true
     },
     phone_number: {
         type: Number,
-        required: true
+        // required: true
     },
     price: {
         type: Number,
-        required: true
+        // required: true
     },
     address: {
         street: {
@@ -60,7 +60,7 @@ const checkoutSchema = new mongoose.Schema({
     
     paymentMode:{
         type: String,
-        required: true  
+        // required: true  
     },
     razorpay_order_id: {
         type: String,
