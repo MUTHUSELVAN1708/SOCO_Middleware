@@ -40,7 +40,7 @@ console.log(req.body,"body")
         console.log(trackedPostIds, "trackedPostIds")
         const baseFilters = {
             status: "published",
-            // isProductPost: false,
+            isProductPost: false,
             creator_id: { $ne: user_id },
             _id: { $nin: trackedPostIds }
         };
@@ -53,7 +53,7 @@ console.log(req.body,"body")
         const followingIds = following.map(f => f.following_id);
         console.log(following, "following")
         let posts = [];
-        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId ";
+        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId timestamp ";
         // console.log(baseSelect, "baseSelect")
         if (followingIds.length) {
             const followingPosts = await createPostModel.find({
