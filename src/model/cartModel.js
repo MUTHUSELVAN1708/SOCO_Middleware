@@ -22,21 +22,21 @@ const cartSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        required: true
+        required: false
     },
     
     colors: {
         type: String,
-        required: true
+        required: false
     },
     size: {
         type: String,
-        required: true
+        required: false
     },
     
     quantity: {
         type: Number,
-        required: true
+        required: false
     },
     price: {
         type: Number,
@@ -44,7 +44,7 @@ const cartSchema = new mongoose.Schema({
     },
     gst: {
         type: Number,
-        required: true
+        required: false
     },
     originalPrice: {
         type: Number,
@@ -56,7 +56,7 @@ const cartSchema = new mongoose.Schema({
     },
     unit:{
         type: String,
-        required: true 
+        required: false 
     },
 
     timestamp: { type: Date, default: Date.now },

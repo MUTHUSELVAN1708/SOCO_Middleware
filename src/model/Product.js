@@ -82,7 +82,7 @@ const productSchema = new mongoose.Schema({
     quantity: Number,
     sku: { 
       type: String,
-      required: true  // Make SKU required
+      required: false  // Make SKU required
     },
     variantImages: [String]
   }],
@@ -159,7 +159,7 @@ const productSchema = new mongoose.Schema({
     default: 'draft'
   },
   unit:{type:String,
-    required:true
+    required:false
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
