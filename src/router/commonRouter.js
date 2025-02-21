@@ -293,10 +293,11 @@ router.get("/getDynamicFollowers/:id",adminController.getDynamicFollowers);
 router.get("/getDynamicFeed",adminController.getDynamicFeed)
 
 
-router.post("/notifyuser",adminController.notifyuser)
+router.post("/notifyuser",adminController.notifyuser);
+
 
 router.post("/cart",adminController.cart);
-
+router.put("/updateCart",adminController.updateCart)
 router.delete("/removeFromCart",adminController.removeFromCart);
 
 router.get("/getCart/:id",adminController.getCart);

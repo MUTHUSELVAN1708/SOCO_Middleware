@@ -826,6 +826,19 @@ const adminController = {
             next(error);
         }
     },
+
+    // =================
+    updateCart:async (req, res, next) => {
+        try {
+          const updateCart = await adminService.updateCart(req.body);
+          res.json(updateCart);
+        } catch (error) {
+          error.message = error.error;
+          // console.log(error);
+          error.statuscode = 500;
+          next(error);
+        }
+      },
     // =======================
     removeFromCart: async (req, res, next) => {
         try {

@@ -2953,7 +2953,76 @@ const adminService = {
             throw { error: "Something went wrong" };
         }
     },
+// =================
+updateCart: async (data) => {
+    try {
+      if (Array.isArray(data)) {
+        const bulkOps = data.map((item) => ({
+          updateOne: {
+            filter: {
+              _id: item.cart_id,
+              user_id: item.user_id,
+            },
+            update: {
+              $set: {
+                quantity: Number(item.quantity),
+                price: Number(item.price),
+              },
+            },
+          },
+        }));
 
+        const result = await cartModel.bulkWrite(bulkOps);
+
+        if (result.matchedCount === 0) {
+          throw {
+            error: "No matching documents found",
+          };
+        }
+
+        // Fetch the updated documents
+        const updatedDocuments = await cartModel.find({
+          _id: {
+            $in: data.map((item) => item.cart_id),
+          },
+          user_id: {
+            $in: data.map((item) => item.user_id),
+          },
+        });
+        return updatedDocuments;
+      } else {
+        // Single update
+        const {
+          user_id,
+          cart_id,
+          quantity,
+          price
+        } = data;
+
+        // Find the user's cart item by user_id and cart_id
+        const update = await cartModel.findOneAndUpdate({
+            _id: cart_id,
+            user_id,
+          }, {
+            quantity: Number(quantity), // Convert to Number
+            price: Number(price), // Convert to Number
+          }, {
+            new: true,
+          } // Return the updated document
+        );
+
+        if (!update) {
+          throw {
+            error: "User or Cart ID not found",
+          };
+        }
+        return update;
+      }
+    } catch (error) {
+      // console.error("Error updating cart:", error);
+      throw error;
+    }
+  },
     // =======================
     removeFromCart: async (data) => {
         const { user_id, cart_id } = data;
