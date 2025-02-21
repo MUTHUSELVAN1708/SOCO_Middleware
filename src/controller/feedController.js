@@ -28,21 +28,21 @@ export const getDashboardFeed = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // const tracking = await trackingModel.findOne({
-        //     user_id: new mongoose.Types.ObjectId(user_id)
-        // });
-        // console.log(tracking, "tracking")
+        const tracking = await trackingModel.findOne({
+            user_id: new mongoose.Types.ObjectId(user_id)
+        });
+        console.log(tracking, "tracking")
 
-        // const trackedPostIds = tracking?.sentPosts?.map(post =>
-        //     new mongoose.Types.ObjectId(post.post_id)
-        // ) || [];
+        const trackedPostIds = tracking?.sentPosts?.map(post =>
+            new mongoose.Types.ObjectId(post.post_id)
+        ) || [];
 
         // console.log(trackedPostIds, "trackedPostIds")
         const baseFilters = {
             status: "published",
-            // isProductPost: false,
+            isProductPost: false,
             creator_id: { $ne: user_id },
-            // _id: { $nin: trackedPostIds }
+            _id: { $nin: trackedPostIds }
         };
 
         console.log(baseFilters, "baseFilters");
@@ -53,7 +53,7 @@ export const getDashboardFeed = async (req, res) => {
         const followingIds = following.map(f => f.following_id);
         console.log(following, "following")
         let posts = [];
-        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId ";
+        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId timestamp ";
         // console.log(baseSelect, "baseSelect")
         if (followingIds.length) {
             const followingPosts = await createPostModel.find({
