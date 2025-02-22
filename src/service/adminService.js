@@ -2964,8 +2964,8 @@ updateCart: async (data) => {
             if (!product) {
               throw { error: `Product with ID ${item.product_id} not found` };
             }
-            const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
-            const totalPrice = Number(item.quantity) * Number(productPrice); // Update total price
+            // const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
+            // const totalPrice = Number(item.quantity) * Number(productPrice); // Update total price
   
             return {
               updateOne: {
@@ -2973,7 +2973,7 @@ updateCart: async (data) => {
                 update: {
                   $set: {
                     quantity: Number(item.quantity),
-                    price: totalPrice, // Adjusted price based on new quantity
+                    // price: totalPrice, // Adjusted price based on new quantity
                   },
                 },
               },
@@ -3003,14 +3003,14 @@ updateCart: async (data) => {
         }
   console.log("000000")
         const productPrice = product.pricing.salePrice;
-        const totalPrice = Number(quantity) * Number(productPrice); // Adjust total price
+        // const totalPrice = Number(quantity) * Number(productPrice); // Adjust total price
   
         // Update the cart with the correct price
         const updatedCart = await cartModel.findOneAndUpdate(
           { _id: cart_id, user_id },
           {
             quantity: Number(quantity),
-            price: totalPrice, // Adjusted price based on new quantity
+            // price: totalPrice, // Adjusted price based on new quantity
           },
           { new: true }
         );
