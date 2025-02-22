@@ -3845,7 +3845,7 @@ updateCart: async (data) => {
     // ===========================
     getWishLish: async (user_id) => {
         try {
-            const getWishLish = await FavoriteModel.find({ user_id });
+            const getWishLish = await FavoriteModel.find( user_id );
             if (!getWishLish) {
                 throw error({ message: " no Product stored in favorites" })
             }

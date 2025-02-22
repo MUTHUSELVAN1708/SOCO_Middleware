@@ -1066,7 +1066,7 @@ const adminController = {
             const getWishLish = await adminService.getWishLish(req.body);
             console.log(getWishLish, "getWishLish")
 
-            res.status(200).json({message: "Product fetched from favorites"});
+            res.status(200).json({message: "Product fetched from favorites",getWishLish});
 
         } catch (error) {
             error.message = error.error;
