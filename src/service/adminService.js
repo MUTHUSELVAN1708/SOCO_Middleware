@@ -2957,32 +2957,23 @@ const adminService = {
 updateCart: async (data) => {
     try {
       if (Array.isArray(data)) {
-        
+        // Bulk update for multiple cart items
         const bulkOps = await Promise.all(
           data.map(async (item) => {
-            const cartItem = await cartModel.findOne({ _id: item.cart_id, user_id: item.user_id });
-            if (!cartItem) {
-              throw { error: `Cart item with ID ${item.cart_id} not found` };
-            }
-  
             const product = await Product.findById(item.product_id);
             if (!product) {
               throw { error: `Product with ID ${item.product_id} not found` };
             }
-  
             const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
-            const newQuantity = cartItem.quantity + Number(item.quantity); 
-            if (newQuantity <= 0) throw { error: "Quantity cannot be less than 1" };
-  
-            const totalPrice = newQuantity * Number(productPrice); 
+            const totalPrice = Number(item.quantity) * Number(productPrice); // Update total price
   
             return {
               updateOne: {
                 filter: { _id: item.cart_id, user_id: item.user_id },
                 update: {
                   $set: {
-                    quantity: newQuantity,
-                    price: totalPrice,
+                    quantity: Number(item.quantity),
+                    price: totalPrice, // Adjusted price based on new quantity
                   },
                 },
               },
@@ -2991,40 +2982,35 @@ updateCart: async (data) => {
         );
   
         const result = await cartModel.bulkWrite(bulkOps);
-  
+  console.log(result,"pouuu")
         if (result.matchedCount === 0) {
           throw { error: "No matching documents found" };
         }
   
+        // Fetch the updated documents
         const updatedDocuments = await cartModel.find({
           _id: { $in: data.map((item) => item.cart_id) },
           user_id: { $in: data.map((item) => item.user_id) },
         });
         return updatedDocuments;
       } else {
+        // Single update
         const { cart_id, product_id, user_id, quantity } = data;
-  
-        const cartItem = await cartModel.findOne({ _id: cart_id, user_id });
-        if (!cartItem) {
-          throw { error: "Cart item not found" };
-        }
   
         const product = await Product.findById(product_id);
         if (!product) {
           throw { error: "Product not found" };
         }
+  console.log("000000")
+        const productPrice = product.pricing.salePrice;
+        const totalPrice = Number(quantity) * Number(productPrice); // Adjust total price
   
-        const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
-        const newQuantity = cartItem.quantity + Number(quantity); 
-        if (newQuantity <= 0) throw { error: "Quantity cannot be less than 1" };
-  
-        const totalPrice = newQuantity * Number(productPrice); 
-  
+        // Update the cart with the correct price
         const updatedCart = await cartModel.findOneAndUpdate(
           { _id: cart_id, user_id },
           {
-            quantity: newQuantity,
-            price: totalPrice,
+            quantity: Number(quantity),
+            price: totalPrice, // Adjusted price based on new quantity
           },
           { new: true }
         );
