@@ -3846,10 +3846,26 @@ updateCart: async (data) => {
     getWishLish: async (user_id) => {
         try {
             const getWishLish = await FavoriteModel.find( user_id );
+            const product = await cartModel.findOne({prouduct_id:getWishLish.product_id})
+            console.log(product,"llll")
             if (!getWishLish) {
                 throw error({ message: " no Product stored in favorites" })
             }
-            return getWishLish
+            return {
+                user_id:getWishLish.user_id,
+        product_id: product._id,
+        productName:product?.productName,
+        images: product.images,
+        category:product?.category ,
+        colors:product?.colors ,
+        size:product?.size,
+        quantity: product?.quantity,
+        price: product?.price,
+        gst: product?.gst,
+        originalPrice: product?.originalPrice,
+        discount:product?.discount,
+        unit:product?.unit 
+            }
         } catch (error) {
             throw error
         }
