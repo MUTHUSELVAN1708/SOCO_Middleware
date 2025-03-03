@@ -1,82 +1,80 @@
 import createPostModel from "../model/createPostModel.js";
 import trackingModel from "../model/TrackingModel.js";
-import businessregisterModel from "../model/BusinessModel.js";
+import businessRegisterModel from "../model/BusinessModel.js";
 import registerModel from "../model/registerModel.js";
 import followerModel from "../model/followerModel.js";
 import mongoose from "mongoose";
+import FavoriteModel from "../model/favoriteModel.js";
+import BookmarkModel from "../model/BookmarkModel.js";
 
 export const getDashboardFeed = async (req, res) => {
     try {
-        const {
-            user_id,
-            lat,
-            lon,
-            pincode,
-            address,
+        const { 
+            user_id, 
+            lat, 
+            lon, 
+            pinCode, 
+            address, 
             isBusinessAccount,
-            page = 1,
-            limit: requestedLimit = 15
+            page = 1, 
+            limit: requestedLimit = 15 
         } = req.body;
-console.log(req.body,"body")
-        const limit = 15;
+
+        const limit = 15; 
         let user = isBusinessAccount
-            ? await businessregisterModel.findOne({user_id})
+            ? await businessRegisterModel.findById(user_id)
             : await registerModel.findById(user_id);
 
-        console.log(user, "user")
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const tracking = await trackingModel.findOne({
-            user_id: new mongoose.Types.ObjectId(user_id)
+        const tracking = await trackingModel.findOne({ 
+            user_id: new mongoose.Types.ObjectId(user_id) 
         });
-        console.log(tracking, "tracking")
-
-        const trackedPostIds = tracking?.sentPosts?.map(post =>
+        
+        const trackedPostIds = tracking?.sentPosts?.map(post => 
             new mongoose.Types.ObjectId(post.post_id)
         ) || [];
 
-        console.log(trackedPostIds, "trackedPostIds")
         const baseFilters = {
             status: "published",
-            isProductPost: false,
+            // isProductPost: false,
             creator_id: { $ne: user_id },
             _id: { $nin: trackedPostIds }
         };
 
-        console.log(baseFilters, "baseFilters");
+        console.log(baseFilters);
 
         const following = await followerModel.find({ follower_id: user_id })
             .select('following_id')
             .limit(100);
         const followingIds = following.map(f => f.following_id);
-        console.log(following, "following")
+
         let posts = [];
-        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId timestamp ";
-        // console.log(baseSelect, "baseSelect")
+        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId ";
+
         if (followingIds.length) {
             const followingPosts = await createPostModel.find({
                 ...baseFilters,
                 creator_id: { $in: followingIds },
                 language: { $in: [...(user.languages || []), null] }
             })
-                .sort({ timestamp: -1 })
-                .limit(Math.ceil(limit * 0.25))
-                .select(baseSelect);
+            .sort({ timestamp: -1 })
+            .limit(Math.ceil(limit * 0.25))
+            .select(baseSelect);
 
             posts = [...posts, ...followingPosts];
-            console.log(followingPosts,"followingPosts")
         }
 
-        if (posts.length < limit && pincode) {
-            const pincodeVariations = generateNeighboringPincodes(pincode);
+        if (posts.length < limit && pinCode) {
+            const pinCodeVariations = generateNeighboringPinCodes(pinCode);
             const locationPosts = await createPostModel.find({
                 ...baseFilters,
                 _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
                 $or: [
-                    {
-                        pinCode: { $in: pincodeVariations },
+                    { 
+                        pinCode: { $in: pinCodeVariations },
                         language: { $in: user.languages || [] }
                     },
                     {
@@ -88,48 +86,47 @@ console.log(req.body,"body")
                     }
                 ]
             })
-                .sort({ timestamp: -1, viewsCount: -1 })
-                .limit(Math.ceil((limit - posts.length) * 0.35))
-                .select(baseSelect);
-
+            .sort({ timestamp: -1, viewsCount: -1 })
+            .limit(Math.ceil((limit - posts.length) * 0.35))
+            .select(baseSelect);
+            
             posts = [...posts, ...locationPosts];
         }
 
-        if (posts.length < limit && user.interest?.length) {
+        if (posts.length < limit && user.interestField?.length) {
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            const trendingPosts = await createPostModel.find({
+            const trendingPosts = await createPostModel.find({ 
                 ...baseFilters,
                 _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
                 $or: [
-                    { tags: { $in: user.interest } },
-                    { description: { $regex: user.interest.join("|"), $options: "i" } }
+                    { tags: { $in: user.interestField } },
+                    { description: { $regex: user.interestField.join("|"), $options: "i" } }
                 ],
                 language: { $in: [...(user.languages || []), null] },
                 timestamp: { $gte: weekAgo }
             })
-                .sort({ viewsCount: -1, likesCount: -1 })
-                .limit(limit - posts.length)
-                .select(baseSelect);
-
-            posts = [...posts, ...trendingPosts];
-            console.log(posts,"po post")
+            .sort({ viewsCount: -1, likesCount: -1 })
+            .limit(limit - posts.length)
+            .select(baseSelect);
             
+            posts = [...posts, ...trendingPosts];
         }
+
         if (posts.length < limit) {
             const fallbackPosts = await createPostModel.find({
                 ...baseFilters,
                 _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
                 language: { $in: [...(user.languages || []), null] }
             })
-                .sort({ viewsCount: -1, timestamp: -1 })
-                .limit(limit - posts.length)
-                .select(baseSelect);
+            .sort({ viewsCount: -1, timestamp: -1 })
+            .limit(limit - posts.length)
+            .select(baseSelect);
 
             posts = [...posts, ...fallbackPosts];
         }
 
         posts = shuffleArray(posts);
-        console.log(posts, "posts")
+
         if (posts.length > 0) {
             const bulkOps = posts.map(post => ({
                 updateOne: {
@@ -146,7 +143,7 @@ console.log(req.body,"body")
             viewedAt: new Date(),
             isWatched: false
         }));
-        console.log(newViewedPosts, "newViewedPosts")
+
         if (newViewedPosts.length > 0) {
             await trackingModel.updateOne(
                 { user_id: new mongoose.Types.ObjectId(user_id) },
@@ -155,13 +152,24 @@ console.log(req.body,"body")
                         sentPosts: {
                             $each: newViewedPosts,
                             $sort: { viewedAt: -1 },
-                            $slice: 1000
+                            $slice: 1000  
                         }
                     }
                 },
                 { upsert: true }
             );
         }
+
+        const favoritePosts = await FavoriteModel.find({ user_id }).select("post_id");
+     const bookmarkedPosts = await BookmarkModel.find({ user_id }).select("post_id");
+
+      const favoritePostIds = new Set(favoritePosts.map(fav => fav.post_id.toString()));
+      const bookmarkedPostIds = new Set(bookmarkedPosts.map(bookmark => bookmark.post_id.toString()));
+      posts = posts.map(post => ({
+        ...post.toObject(),
+        isFavorite: favoritePostIds.has(post._id.toString()),
+        isBookmarked: bookmarkedPostIds.has(post._id.toString())
+    }));
 
         return res.json({
             posts,
@@ -178,9 +186,9 @@ console.log(req.body,"body")
     }
 };
 
-function generateNeighboringPincodes(pincode) {
-    const pincodeNum = parseInt(pincode);
-    return [pincodeNum, pincodeNum - 1, pincodeNum + 1, pincodeNum - 2, pincodeNum + 2].map(num => num.toString().padStart(6, '0'));
+function generateNeighboringPinCodes(pinCode) {
+    const pinCodeNum = parseInt(pinCode);
+    return [pinCodeNum, pinCodeNum - 1, pinCodeNum + 1, pinCodeNum - 2, pinCodeNum + 2].map(num => num.toString().padStart(6, '0'));
 }
 
 function escapeRegExp(string) {
