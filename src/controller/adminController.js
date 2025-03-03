@@ -1061,9 +1061,9 @@ const adminController = {
     },
     // =:=========================
     getWishLish:async (req, res, next) => {
-
+const{id}=req.params
         try {
-            const getWishLish = await adminService.getWishLish(req.body);
+            const getWishLish = await adminService.getWishLish(req.params);
             console.log(getWishLish, "getWishLish")
 
             res.status(200).json({message: "Product fetched from favorites",getWishLish});

@@ -2916,8 +2916,8 @@ const adminService = {
                 cartItem.size = size || product.size;
                 cartItem.images = images || product.images;
                 cartItem.category = category || product.category;
-                cartItem.discount =  product.pricing?.discount;
-                cartItem.originalPrice =  product.pricing?.regularPrice;
+                cartItem.discount = product.pricing?.discount;
+                cartItem.originalPrice = product.pricing?.regularPrice;
                 cartItem.gst = product.pricing?.gstDetails?.gstPercentage;
             } else {
                 cartItem = await cartModel.create({
@@ -2931,9 +2931,9 @@ const adminService = {
                     quantity: Number(quantity),
                     price: salePrice,
                     colors: colors || product.colors,
-                    gst:product.pricing.gstDetails.gstPercentage,
-                    discount : product.pricing?.discount,
-                    originalPrice :  product.pricing?.regularPrice,
+                    gst: product.pricing.gstDetails.gstPercentage,
+                    discount: product.pricing?.discount,
+                    originalPrice: product.pricing?.regularPrice,
                 });
             }
 
@@ -2953,80 +2953,80 @@ const adminService = {
             throw { error: "Something went wrong" };
         }
     },
-// =================
-updateCart: async (data) => {
-    try {
-      if (Array.isArray(data)) {
-        // Bulk update for multiple cart items
-        const bulkOps = await Promise.all(
-          data.map(async (item) => {
-            const product = await Product.findById(item.product_id);
-            if (!product) {
-              throw { error: `Product with ID ${item.product_id} not found` };
+    // =================
+    updateCart: async (data) => {
+        try {
+            if (Array.isArray(data)) {
+                // Bulk update for multiple cart items
+                const bulkOps = await Promise.all(
+                    data.map(async (item) => {
+                        const product = await Product.findById(item.product_id);
+                        if (!product) {
+                            throw { error: `Product with ID ${item.product_id} not found` };
+                        }
+                        // const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
+                        // const totalPrice = Number(item.quantity) * Number(productPrice); // Update total price
+
+                        return {
+                            updateOne: {
+                                filter: { _id: item.cart_id, user_id: item.user_id },
+                                update: {
+                                    $set: {
+                                        quantity: Number(item.quantity),
+                                        // price: totalPrice, // Adjusted price based on new quantity
+                                    },
+                                },
+                            },
+                        };
+                    })
+                );
+
+                const result = await cartModel.bulkWrite(bulkOps);
+                console.log(result, "pouuu")
+                if (result.matchedCount === 0) {
+                    throw { error: "No matching documents found" };
+                }
+
+                // Fetch the updated documents
+                const updatedDocuments = await cartModel.find({
+                    _id: { $in: data.map((item) => item.cart_id) },
+                    user_id: { $in: data.map((item) => item.user_id) },
+                });
+                return updatedDocuments;
+            } else {
+                // Single update
+                const { cart_id, product_id, user_id, quantity } = data;
+
+                const product = await Product.findById(product_id);
+                if (!product) {
+                    throw { error: "Product not found" };
+                }
+                console.log("000000")
+                const productPrice = product.pricing.salePrice;
+                // const totalPrice = Number(quantity) * Number(productPrice); // Adjust total price
+
+                // Update the cart with the correct price
+                const updatedCart = await cartModel.findOneAndUpdate(
+                    { _id: cart_id, user_id },
+                    {
+                        quantity: Number(quantity),
+                        // price: totalPrice, // Adjusted price based on new quantity
+                    },
+                    { new: true }
+                );
+
+                if (!updatedCart) {
+                    throw { error: "User or Cart ID not found" };
+                }
+                return updatedCart;
             }
-            // const productPrice = product.pricing.salePrice || product.pricing.regularPrice;
-            // const totalPrice = Number(item.quantity) * Number(productPrice); // Update total price
-  
-            return {
-              updateOne: {
-                filter: { _id: item.cart_id, user_id: item.user_id },
-                update: {
-                  $set: {
-                    quantity: Number(item.quantity),
-                    // price: totalPrice, // Adjusted price based on new quantity
-                  },
-                },
-              },
-            };
-          })
-        );
-  
-        const result = await cartModel.bulkWrite(bulkOps);
-  console.log(result,"pouuu")
-        if (result.matchedCount === 0) {
-          throw { error: "No matching documents found" };
+        } catch (error) {
+            console.error("Error updating cart:", error);
+            throw error;
         }
-  
-        // Fetch the updated documents
-        const updatedDocuments = await cartModel.find({
-          _id: { $in: data.map((item) => item.cart_id) },
-          user_id: { $in: data.map((item) => item.user_id) },
-        });
-        return updatedDocuments;
-      } else {
-        // Single update
-        const { cart_id, product_id, user_id, quantity } = data;
-  
-        const product = await Product.findById(product_id);
-        if (!product) {
-          throw { error: "Product not found" };
-        }
-  console.log("000000")
-        const productPrice = product.pricing.salePrice;
-        // const totalPrice = Number(quantity) * Number(productPrice); // Adjust total price
-  
-        // Update the cart with the correct price
-        const updatedCart = await cartModel.findOneAndUpdate(
-          { _id: cart_id, user_id },
-          {
-            quantity: Number(quantity),
-            // price: totalPrice, // Adjusted price based on new quantity
-          },
-          { new: true }
-        );
-  
-        if (!updatedCart) {
-          throw { error: "User or Cart ID not found" };
-        }
-        return updatedCart;
-      }
-    } catch (error) {
-      console.error("Error updating cart:", error);
-      throw error;
-    }
-  },
-  
-  
+    },
+
+
     // =======================
     removeFromCart: async (data) => {
         const { user_id, cart_id } = data;
@@ -3843,33 +3843,57 @@ updateCart: async (data) => {
         }
     },
     // ===========================
-    getWishLish: async (user_id) => {
+  getWishLish: async (user_id) => {
+        console.log(user_id, "iiiiiiiii");
         try {
-            const getWishLish = await FavoriteModel.find( user_id );
-            const product = await cartModel.findOne({prouduct_id:getWishLish.product_id})
-            console.log(product,"llll")
-            if (!getWishLish) {
-                throw error({ message: " no Product stored in favorites" })
+            const userId = user_id?.id ? user_id.id.toString() : user_id;
+            console.log(userId, "userId");
+    
+            if (!userId) {
+                throw new Error("Invalid user_id provided");
             }
-            return {
-                user_id:getWishLish.user_id,
-        product_id: product._id,
-        productName:product?.productName,
-        images: product.images,
-        category:product?.category ,
-        colors:product?.colors ,
-        size:product?.size,
-        quantity: product?.quantity,
-        price: product?.price,
-        gst: product?.gst,
-        originalPrice: product?.originalPrice,
-        discount:product?.discount,
-        unit:product?.unit 
+    
+            const getWishList = await FavoriteModel.find({ user_id: userId });
+            console.log(getWishList, "get");
+    
+            if (getWishList.length === 0) {
+                return [];
             }
+    
+            
+            const products = await cartModel.find({
+                product_id: { $in: getWishList.map(item => item.product_id) }
+            });
+    console.log(products,"products")
+            
+            const result = products.map(fav => ({
+                user_id: fav.user_id,
+                product_id: fav?._id || null,
+                productName: fav?.productName || "Unknown",
+                images: fav?.images || null,
+                category: fav?.category || null,
+                colors: fav?.colors || null,
+                size: fav?.size || null,
+                quantity: fav?.quantity || 0,
+                price: fav?.price || 0,
+                gst: fav?.gst || 0,
+                originalPrice: fav?.originalPrice || 0,
+                discount: fav?.discount || 0,
+                unit: fav?.unit || "N/A"
+            }));
+            
+            // console.log(result, "formatted products");
+            
+               return result
+    
+           
+            
         } catch (error) {
-            throw error
+            console.error("Error in getWishList:", error);
+            throw error;
         }
     },
+    
     // =====================
     getOrderHistory: async (user_id) => {
         console.log(user_id)
@@ -3891,10 +3915,10 @@ updateCart: async (data) => {
         try {
             const order = await checkoutModel.findById(checkout_id);
             if (!order) throw new Error("Order not found");
-    
+
             order.status = newStatus;
             order.tracking_updates.push({ status: newStatus, timestamp: new Date() });
-    
+
             await order.save();
             return order;
         } catch (error) {

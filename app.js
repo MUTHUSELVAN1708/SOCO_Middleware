@@ -5,7 +5,7 @@ import "dotenv/config";
 import { fileURLToPath } from "url";
 import path from "path";
 
-import "./src/db/db.js"; // Ensure the database connection is properly handled
+import "./src/db/db.js"; 
 import adminRouter from "./src/router/adminRouter.js";
 import commonRouter from "./src/router/commonRouter.js";
 import productRoutes from "./src/router/productRoutes.js";
