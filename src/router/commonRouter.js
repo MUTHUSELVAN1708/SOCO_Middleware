@@ -329,6 +329,14 @@ router.get("/getDeliveryAddress/:user_id",adminController.getDeliveryAddress);
 
 router.delete("/deleteAddress/:id",adminController.deleteAddress)
 
+///  fav
+
+router.post("/toggleFav",adminController.toggleFav);
+router.post("/toggleBookmark",adminController.toggleBookmark);
+
+router.get("/getUserFavorites",adminController.getUserFavorites );
+router.get("/getUserBookmarks",adminController.getUserBookmarks );
+
 
 
 

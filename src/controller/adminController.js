@@ -469,7 +469,7 @@ const adminController = {
     getPosts: async (req, res, next) => {
         const { id } = req.params;
         const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 25;
+        const limit = parseInt(req.query.limit, 10) || 5;
 
         try {
             const getPosts = await adminService.getPosts(id, page, limit);
@@ -1043,6 +1043,74 @@ const adminController = {
             next(error);
         }
     },
+
+    toggleBookmark: async (req, res, next) => {
+        try {
+            const response = await adminService.toggleBookmark(req.body);
+    
+            res.status(200).json({
+                success: true,
+                message: response.message,
+                bookmarked: response.bookmarked,
+            });
+    
+        } catch (error) {
+            console.error("Error in toggleBookmark:", error);
+            next({
+                statusCode: 500,
+                message: error.message || "Something went wrong while processing your request.",
+            });
+        }
+    },
+
+    toggleFav: async (req, res, next) => {
+        try {
+            const response = await adminService.toggleFav(req.body);
+            console.log(response, "toggleFavorite");
+    
+            res.status(200).json({
+                success: true,
+                message: response.message,
+                liked: response.liked,
+                data: response.data || null,
+            });
+    
+        } catch (error) {
+            console.error("Error in toggleLike:", error);
+            next({
+                statusCode: 500,
+                message: error.message || "Something went wrong while processing your request.",
+            });
+        }
+    },
+
+    getUserFavorites: async (req, res, next) => {
+        try {
+            const { user_id, page, limit } = req.query; // Use req.query for query parameters
+            console.log(req.query);
+    
+            if (!user_id || !page) {
+                return res.status(400).json({ message: "Missing required parameters" });
+            }
+    
+            const response = await adminService.getUserFavorites(user_id, page, limit);
+            res.status(200).json(response);
+        } catch (error) {
+            next({ statusCode: 500, message: error.message });
+        }
+    },
+
+    getUserBookmarks : async (req, res, next) => {
+        try {
+            const { user_id,page, limit } = req.query; 
+            const response = await adminService.getUserBookmarks(user_id,page,limit);
+            
+            res.status(200).json(response);
+        } catch (error) {
+            next({ statusCode: 500, message: error.message });
+        }
+    },
+    
     // ====================
     deleteWhishlist:async (req, res, next) => {
 

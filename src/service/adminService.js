@@ -31,6 +31,7 @@ import Razorpay from "razorpay";
 import checkoutModel from "../model/checkoutModel.js";
 import invoiceModel from "../model/invoiceModel.js";
 import FavoriteModel from "../model/favoriteModel.js";
+import BookmarkModel from "../model/BookmarkModel.js";
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
 
@@ -1992,19 +1993,19 @@ const adminService = {
     //   ==================
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
-            const skip = (page - 1) * limit;
-
-            // Fetch posts with pagination, sorting, and filter out isProductPost = true
+            const skip = (page - 1) * 10;
+    
+            // Fetch posts sorted by likesCount in descending order
             const posts = await createPostModel.find({ user_id, isProductPost: false })
-                .sort({ timestamp: -1 })
+                .sort({ likesCount: -1 }) // Sort by likesCount (highest first)
                 .skip(skip)
-                .limit(limit)
-                .select('imageUrl caption likes tags timestamp isVideo thumbnailFile');
-
-            // Count total results for pagination (excluding isProductPost: true)
+                .limit(10)
+                .select('imageUrl likesCount caption likes tags timestamp isVideo thumbnailFile aspectRatio viewsCount');
+    
+            // Count total results for pagination
             const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
-            const totalPages = Math.ceil(totalResults / limit);
-
+            const totalPages = Math.ceil(totalResults / 10);
+    
             return {
                 posts,
                 pagination: {
@@ -2020,6 +2021,7 @@ const adminService = {
             throw error;
         }
     },
+    
 
     getPostDetails: async (postId, isBusinessAccount) => {
         try {
@@ -3828,6 +3830,120 @@ const adminService = {
             throw error
         }
     },
+
+    toggleBookmark: async (data) => {
+        const { user_id, post_id, isBusinessAccount, isProduct } = data;
+        try {
+            const existingLike = await BookmarkModel.findOne({ user_id, post_id });
+    
+            if (existingLike) {
+                await BookmarkModel.findOneAndDelete({ user_id, post_id });
+                return { message: "Removed from Bookmark", marked: false };
+            }
+    
+            const newMark = await BookmarkModel.create({ user_id, post_id, isBusinessAccount,isProduct });
+            return { message: "Added to Bookmark", marked: true, data: newMark };
+        } catch (error) {
+            throw new Error(error.message || "Something went wrong while processing your request.");
+        }
+    },
+
+    getUserBookmarks: async (user_id, page = 1, limit = 15) => {
+        try {
+            if (!user_id) return { success: false, message: "Invalid user ID" };
+    
+            const skip = (page - 1) * limit;
+    
+            const bookmarkedPosts = await BookmarkModel.find({ user_id })
+                .select("post_id")
+                .skip(skip)
+                .limit(limit);
+    
+            const postIds = bookmarkedPosts.map(bookmark => bookmark.post_id);
+    
+            const totalBookmarks = await BookmarkModel.countDocuments({ user_id });
+    
+            const posts = await createPostModel.find({ _id: { $in: postIds } })
+                .select("productId likesCount imageUrl thumbnailFile isVideo aspectRatio isBusinessPost isUserPost isProductPost viewsCount")
+                .lean();
+    
+            return {
+                success: true,
+                data: posts,
+                pagination: {
+                    totalResults: totalBookmarks,
+                    totalPages: Math.ceil(totalBookmarks / limit),
+                    currentPage: Number(page),
+                    limit,
+                    hasNextPage: page < Math.ceil(totalBookmarks / limit),
+                    hasPreviousPage: page > 1,
+                },
+            };
+        } catch (error) {
+            throw new Error(error.message || "Failed to fetch bookmarked posts.");
+        }
+    },
+    
+    toggleFav: async (data) => {
+        const { user_id, post_id, isBusinessAccount, isProduct } = data;
+        try {
+            const existingLike = await FavoriteModel.findOne({ user_id, post_id });
+    
+            if (existingLike) {
+                await FavoriteModel.findOneAndDelete({ user_id, post_id });
+                await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
+    
+                return { message: "Removed from favorites", liked: false };
+            }
+    
+            const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
+            await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
+    
+            return { message: "Added to favorites", liked: true, data: newLike };
+        } catch (error) {
+            throw new Error(error.message || "Something went wrong while processing your request.");
+        }
+    },
+    
+
+    getUserFavorites : async (user_id, page = 1, limit = 15) => {
+        try {
+            if (!user_id) return { success: false, message: "Invalid user ID" };
+            
+            const skip = (page - 1) * limit;
+            
+            const favoritePosts = await FavoriteModel.find({ user_id })
+                .select("post_id")
+                .skip(skip)
+                .limit(limit);
+
+                console.log(favoritePosts);
+            
+            const postIds = favoritePosts.map(fav => fav.post_id);
+            
+            const totalFavorites = await FavoriteModel.countDocuments({ user_id });
+            
+            const posts = await createPostModel.find({ _id: { $in: postIds } })
+                .select("productId likesCount imageUrl thumbnailFile isVideo aspectRatio isBusinessPost isUserPost isProductPost viewsCount")
+                .lean();
+            
+            return {
+                success: true,
+                data: posts,
+                pagination: {
+                    totalResults: totalFavorites,
+                    totalPages: Math.ceil(totalFavorites / limit),
+                    currentPage: Number(page),
+                    limit,
+                    hasNextPage: page < Math.ceil(totalFavorites / limit),
+                    hasPreviousPage: page > 1,
+                },
+            };
+        } catch (error) {
+            throw new Error(error.message || "Failed to fetch favorite posts.");
+        }
+    },
+
     // =======================
     deleteWhishlist: async (data) => {
         const { product_id, user_id } = data

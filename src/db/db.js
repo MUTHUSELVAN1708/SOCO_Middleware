@@ -7,4 +7,3 @@ const db= mongoose.connect("mongodb://localhost:27017/soco")
     console.log("error to conect db")
 })
 export default db
-
