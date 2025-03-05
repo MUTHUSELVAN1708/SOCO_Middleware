@@ -12,3 +12,12 @@ export const handleSuccess = (res, { message, data, statusCode = 200 }) => {
       message
     });
   };
+
+  export const handleSuccessV1 = (res, statusCode = 200, message, data = null) => {
+    return res.status(statusCode).json({
+      success: true,
+      message,
+      data
+    });
+  };
+  

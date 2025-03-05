@@ -11,6 +11,7 @@ import commonRouter from "./src/router/commonRouter.js";
 import productRoutes from "./src/router/productRoutes.js";
 import commentRoutes from "./src/router/commentRoutes.js";
 import feedRoutes from "./src/router/feedRouter.js";
+import playlistsRoutes from "./src/router/playlistRoutes.js";
 import errorHandling from "./errorHandling.js";
 import  initializeSocket from "./socket.js";
 // import redisService from "./src/service/redisService.js";
@@ -34,6 +35,7 @@ app.use("/common", commonRouter);
 app.use('/api', productRoutes);
 app.use('/comment', commentRoutes);
 app.use('/feed', feedRoutes);
+app.use('/playlists', playlistsRoutes);
 
 // Error Handling
 app.use(errorHandling);

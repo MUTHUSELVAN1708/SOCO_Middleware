@@ -18,7 +18,7 @@ router.get("/user-playlists", getUserPlaylistsWithVideoStatus);
 router.get("/all", getAllPlaylists);
 router.get("/:playlistId", getPlaylistById);
 router.put("/add-video", addVideoToPlaylists);
-router.put("/:playlistId/remove-video", removeVideoFromPlaylist);
+router.put("/remove-video", removeVideoFromPlaylist);
 router.delete("/:playlistId", deletePlaylist);
 
 export default router;
