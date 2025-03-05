@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Playlist from "../model/playlistModel.js";
+import createPostModel from "../model/createPostModel.js";
 import { v4 as uuidv4 } from "uuid";
 import { handleSuccess, handleError,handleSuccessV1 } from "../utils/responseHandler.js";
 
@@ -133,17 +134,65 @@ const getUserPlaylistsWithVideoStatus = async (req, res) => {
 };
 
 
+const getAllPlaylists = async (req, res) => {
+    try {
+        const { userId } = req.query;
+
+        if (!userId) {
+            return handleError(res, 400, "User ID is required");
+        }
+
+        // Fetch playlists belonging to the given userId
+        const playlists = await Playlist.find({ userId }).select("name videos");
+
+        // Fetch video details for each playlist
+        const formattedPlaylists = await Promise.all(
+            playlists.map(async (playlist) => {
+                // Fetch video details from createPostModel
+                const videos = await createPostModel
+                    .find({ _id: { $in: playlist.videos } })
+                    .select("thumbnailFile videoDuration creatorName");
+
+                return {
+                    title: playlist.name || "Untitled",
+                    thumbnailUrl: videos.length > 0 ? videos[0].thumbnailFile || "" : "", 
+                    channelName: videos.length > 0 ? videos[0].creatorName || "Unknown" : "Unknown", // Use first video's creatorName
+                    videoCount: playlist.videos.length, 
+                    videoLength: formatTotalDuration(videos), 
+                };
+            })
+        );
+
+        // Sort playlists in descending order by videoCount
+        formattedPlaylists.sort((a, b) => b.videoCount - a.videoCount);
+
+        return handleSuccessV1(res, 200, "Playlists fetched successfully", formattedPlaylists);
+    } catch (error) {
+        return handleError(res, 500, error.message);
+    }
+};
+
+
+
+// Function to calculate total duration (optional)
+const formatTotalDuration = (videos) => {
+    const totalSeconds = videos.reduce((sum, video) => sum + (video.videoDuration || 0), 0);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+};
+
   
 
 // Get all playlists
-const getAllPlaylists = async (req, res) => {
-  try {
-    const playlists = await Playlist.find();
-    return handleSuccess(res, 200, "Playlists fetched successfully", playlists);
-  } catch (error) {
-    return handleError(res, 500, error.message);
-  }
-};
+// const getAllPlaylists = async (req, res) => {
+//   try {
+//     const playlists = await Playlist.find();
+//     return handleSuccess(res, 200, "Playlists fetched successfully", playlists);
+//   } catch (error) {
+//     return handleError(res, 500, error.message);
+//   }
+// };
 
 // Get a single playlist by ID
 const getPlaylistById = async (req, res) => {
