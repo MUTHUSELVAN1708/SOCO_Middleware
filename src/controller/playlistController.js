@@ -40,59 +40,99 @@ const addToWatchLater = async (req, res) => {
 // Create a new playlist
 const createPlaylist = async (req, res) => {
     const { userId, name } = req.body;
-  
+
     try {
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ success: false, status: 400, message: "Invalid userId format" });
-      }
-  
-      const existingPlaylist = await Playlist.findOne({ userId, name });
-      if (existingPlaylist) {
-        return res.status(409).json({ success: false, status: 409, message: "Playlist with this name already exists" });
-      }
-  
-      const newPlaylist = new Playlist({
-        playlistId: uuidv4(),
-        userId: new mongoose.Types.ObjectId(userId),
-        name,
-        videos: [],
-      });
-  
-      await newPlaylist.save();
-  
-      return res.status(201).json({
-        success: true,
-        status: 201,
-        message: "Playlist created successfully",
-        playlist: {
-          _id: newPlaylist._id,
-          playlistId: newPlaylist.playlistId,
-          userId: newPlaylist.userId,
-          name: newPlaylist.name,
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "Invalid userId format"
+            });
         }
-      });
+
+        const existingPlaylist = await Playlist.findOne({ userId, name });
+        if (existingPlaylist) {
+            return res.status(409).json({
+                success: false,
+                status: 409,
+                message: "A playlist with this name already exists for this user"
+            });
+        }
+
+        const newPlaylist = new Playlist({
+            playlistId: uuidv4(),
+            userId: new mongoose.Types.ObjectId(userId),
+            name,
+            videos: [],
+        });
+
+        await newPlaylist.save();
+
+        return res.status(201).json({
+            success: true,
+            status: 201,
+            message: "Playlist created successfully",
+            playlist: {
+                _id: newPlaylist._id,
+                playlistId: newPlaylist.playlistId,
+                userId: newPlaylist.userId,
+                name: newPlaylist.name,
+            }
+        });
     } catch (error) {
-      return res.status(500).json({ success: false, status: 500, message: error.message });
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: error.message
+        });
     }
-  };
+};
+
 
 const getUserPlaylistsWithVideoStatus = async (req, res) => {
-    const { userId, videoId } = req.body;
-  
-    try {
-      const playlists = await Playlist.find({ userId });
-  
-      const response = playlists.map(playlist => ({
-        playlistId: playlist.playlistId,
-        name: playlist.name,
-        isVideoInPlaylist: playlist.videos.includes(videoId)
-      }));
-  
-      return handleSuccessV1(res, 200, "Playlists fetched successfully", response);
-    } catch (error) {
-      return handleError(res, 500, error.message);
+    const { userId, videoId } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return handleError(res, 400, "Invalid userId format");
     }
-  };
+
+    try {
+        let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Watch Later" });
+
+        if (!watchLaterPlaylist) {
+            watchLaterPlaylist = new Playlist({
+                playlistId: uuidv4(),
+                userId: new mongoose.Types.ObjectId(userId),
+                name: "Watch Later",
+                videos: [],
+            });
+            await watchLaterPlaylist.save();
+        }
+
+        const playlists = await Playlist.find({ userId }).sort({ _id: -1 });
+
+        const formattedPlaylists = playlists.map(playlist => ({
+            playlistId: playlist.playlistId,
+            name: playlist.name,
+            isVideoInPlaylist: playlist.videos.includes(videoId),
+        }));
+
+        // Sorting logic
+        formattedPlaylists.sort((a, b) => {
+            if (a.name === "Watch Later") return -1; // Watch Later first
+            if (b.name === "Watch Later") return 1;
+            if (a.isVideoInPlaylist && !b.isVideoInPlaylist) return -1; // Videos that contain the video come next
+            if (!a.isVideoInPlaylist && b.isVideoInPlaylist) return 1;
+            return 0; // Maintain original date order for others
+        });
+
+        return handleSuccessV1(res, 200, "Playlists fetched successfully", formattedPlaylists);
+    } catch (error) {
+        return handleError(res, 500, error.message);
+    }
+};
+
+
   
 
 // Get all playlists
@@ -159,20 +199,27 @@ const addVideoToPlaylists = async (req, res) => {
 
 // Remove a video from a playlist
 const removeVideoFromPlaylist = async (req, res) => {
-  const { playlistId } = req.params;
-  const { videoId } = req.body;
-  try {
-    const updatedPlaylist = await Playlist.findOneAndUpdate(
-      { playlistId },
-      { $pull: { videos: videoId } },
-      { new: true }
-    );
-    if (!updatedPlaylist) return handleError(res, 404, "Playlist not found");
-    return handleSuccess(res, 200, "Video removed from playlist", updatedPlaylist);
-  } catch (error) {
-    return handleError(res, 500, error.message);
-  }
-};
+    const { playlistId, videoId } = req.body;
+  
+    try {
+    //   if (!mongoose.Types.ObjectId.isValid(playlistId)) {
+    //     return handleError(res, 400, "Invalid Playlist ID");
+    //   }
+  
+      const updatedPlaylist = await Playlist.findOneAndUpdate(
+        { playlistId: playlistId },
+        { $pull: { videos: videoId } },
+        { new: true }
+      );
+  
+      if (!updatedPlaylist) return handleError(res, 404, "Playlist not found");
+  
+      return handleSuccessV1(res, 200, "Video removed from playlist", updatedPlaylist);
+    } catch (error) {
+      return handleError(res, 500, error.message);
+    }
+  };
+  
 
 // Delete a playlist
 const deletePlaylist = async (req, res) => {
