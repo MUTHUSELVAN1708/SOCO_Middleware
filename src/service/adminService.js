@@ -33,6 +33,7 @@ import invoiceModel from "../model/invoiceModel.js";
 import FavoriteModel from "../model/favoriteModel.js";
 import BookmarkModel from "../model/BookmarkModel.js";
 
+
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
 
 const razorpayInstance = new Razorpay({
@@ -3974,8 +3975,8 @@ const adminService = {
                 return [];
             }
     
-            
-            const products = await cartModel.find({
+        
+            const products = await Product.find({
                 product_id: { $in: getWishList.map(item => item.post_id) }
             });
     console.log(products,"products")
@@ -3985,10 +3986,10 @@ const adminService = {
                 product_id: fav?._id || null,
                 productName: fav?.productName || "Unknown",
                 images: fav?.images || null,
-                category: fav?.category || null,
-                colors: fav?.colors || null,
-                size: fav?.size || null,
-                quantity: fav?.quantity || 0,
+                category: fav?.basicInfo.categories || null,
+                colors: fav?.variants?.[0]?.color || null,
+                size: fav?.variants?.[0]?.variant || null,
+                quantity: fav?.variants?.[0]?.quantity || 0,
                 price: fav?.price || 0,
                 gst: fav?.gst || 0,
                 originalPrice: fav?.originalPrice || 0,
@@ -3996,7 +3997,7 @@ const adminService = {
                 unit: fav?.unit || "N/A"
             }));
             
-            // console.log(result, "formatted products");
+            console.log(result, "formatted products");
             
                return result
     
