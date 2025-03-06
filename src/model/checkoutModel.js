@@ -47,7 +47,7 @@ const checkoutSchema = new mongoose.Schema({
         },
         district: {
             type: String,
-            required: true
+            required: false
         }, state: {
             type: String,
             required: true

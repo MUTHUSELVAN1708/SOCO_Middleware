@@ -3680,7 +3680,7 @@ const adminService = {
             let payment = null; // Store payment info
 
             if (product_id) {
-                // ✅ "Buy Now" Mode - Fetch Single Product
+                
                 const product = await Product.findById(product_id);
                 console.log(product, "gggggg")
                 if (!product) throw { error: "Product not found" };
@@ -3762,7 +3762,7 @@ const adminService = {
 
                     checkoutRecords.push(checkoutRecord);
 
-                    // ✅ Remove item from cart after successful checkout
+                  
                     await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
                 }
             }
@@ -3777,8 +3777,6 @@ const adminService = {
             throw error;
         }
     },
-
-
 
     // ========================
     Invoice: async (data) => {
