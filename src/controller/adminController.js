@@ -1047,14 +1047,12 @@ const adminController = {
         }
     },
     // =========================\
-    whishlist: async (req, res, next) => {
-
+    wishlist: async (req, res, next) => {
         try {
-            const whishlist = await adminService.whishlist(req.body);
-            console.log(whishlist, "whishlist")
-
-            res.status(200).json(whishlist);
-
+            const wishlist = await adminService.wishlist(req.body);
+            console.log(wishlist, "wishlist");
+    
+            res.status(200).json(wishlist);
         } catch (error) {
             error.message = error.error;
             console.log(error);
@@ -1062,6 +1060,7 @@ const adminController = {
             next(error);
         }
     },
+    
 
     toggleBookmark: async (req, res, next) => {
         try {
@@ -1131,14 +1130,12 @@ const adminController = {
     },
     
     // ====================
-    deleteWhishlist:async (req, res, next) => {
-
+    deleteWishlist: async (req, res, next) => {
         try {
-            const deleteWhishlist = await adminService.deleteWhishlist(req.body);
-            console.log(deleteWhishlist, "deleteWhishlist")
-
-            res.status(200).json({message: "Product removed from favorites"});
-
+            const deleteWishlist = await adminService.deleteWishlist(req.body);
+            console.log(deleteWishlist, "deleteWishlist");
+    
+            res.status(200).json({ message: "Product removed from favorites" });
         } catch (error) {
             error.message = error.error;
             console.log(error);
@@ -1146,22 +1143,22 @@ const adminController = {
             next(error);
         }
     },
+    
     // =:=========================
-    getWishLish:async (req, res, next) => {
-const{id}=req.params
+    getWishlist: async (req, res, next) => {
+        const { id } = req.params;
         try {
-            const getWishLish = await adminService.getWishLish(req.params);
-            console.log(getWishLish, "getWishLish")
-
-            res.status(200).json({message: "Product fetched from favorites",getWishLish});
-
+            const wishlist = await adminService.getWishlist(req.params);
+            console.log(wishlist, "wishlist");
+    
+            res.status(200).json({ message: "Product fetched from favorites", wishlist });
         } catch (error) {
-            error.message = error.error;
             console.log(error);
             error.statuscode = 500;
             next(error);
         }
     },
+    
     // =====================
     getOrderHistory: async (req, res, next) => {
         try {

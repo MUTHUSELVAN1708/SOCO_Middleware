@@ -3815,14 +3815,14 @@ const adminService = {
         }
     },
     //   =========================
-    whishlist: async (data) => {
-        const { user_id, product_id } = data
+    wishlist: async (data) => {
+        const { user_id, post_id } = data
         try {
-            const exist = await FavoriteModel.findOne({ product_id });
+            const exist = await FavoriteModel.findOne({ post_id });
             if (exist) {
                 throw error("this product already exist")
             }
-            const createWishlist = await FavoriteModel.create({ user_id, product_id })
+            const createWishlist = await FavoriteModel.create({ user_id, post_id })
             return createWishlist
         } catch (error) {
             throw error
@@ -3943,21 +3943,21 @@ const adminService = {
     },
 
     // =======================
-    deleteWhishlist: async (data) => {
-        const { product_id, user_id } = data
-        console.log(product_id, "ppppp")
+    deleteWishlist: async (data) => {
+        const { post_id, user_id } = data
+        console.log(post_id, "ppppp")
         try {
-            const deleteWhishlist = await FavoriteModel.findOneAndDelete({ user_id, product_id });
-            if (!deleteWhishlist) {
+            const deleteWishlist = await FavoriteModel.findOneAndDelete({ user_id, post_id });
+            if (!deleteWishlist) {
                 throw error({ message: "Product removed from favorites" })
             }
-            return deleteWhishlist
+            return deleteWishlist
         } catch (error) {
             throw error
         }
     },
     // ===========================
-  getWishLish: async (user_id) => {
+    getWishlist: async (user_id) => {
         console.log(user_id, "iiiiiiiii");
         try {
             const userId = user_id?.id ? user_id.id.toString() : user_id;
@@ -3976,7 +3976,7 @@ const adminService = {
     
             
             const products = await cartModel.find({
-                product_id: { $in: getWishList.map(item => item.product_id) }
+                product_id: { $in: getWishList.map(item => item.post_id) }
             });
     console.log(products,"products")
             

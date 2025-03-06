@@ -18,9 +18,10 @@ router.post("/checkout",adminController.checkout);
 router.get("/getOrderHistory/:user_id",adminController.getOrderHistory);
 router.put("/updateOrderStatus/:checkout_id",adminController.updateOrderStatus);
 
-router.post("/whishlist",adminController.whishlist);
-router.get("/getWishLish/:id",adminController.getWishLish)
-router.delete("/deleteWhishlist",adminController.deleteWhishlist);
+
+router.post("/wishlist",adminController.wishlist);
+router.get("/getWishlist/:id",adminController.getWishlist)
+router.delete("/deleteWishlist",adminController.deleteWishlist);
 
 
 export default router
