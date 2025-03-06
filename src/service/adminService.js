@@ -2024,18 +2024,18 @@ const adminService = {
     },
     
 
-    getPostDetails: async (postId, isBusinessAccount) => {
+    getPostDetails: async (postId) => {
         try {
             console.log(postId);
 
             // Fetch post details
             const post = await createPostModel.findById(postId).select(
-                "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp"
+                "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp isBusinessPost"
             );
             if (!post) throw new Error("Post not found");
 
-            // Fetch user details
-            const user = isBusinessAccount
+            // // Fetch user details
+            const user = post.isBusinessPost
                 ? await businessregisterModel.findById(post.user_id)
                 : await registerModel.findById(post.user_id);
 
