@@ -3,6 +3,7 @@ import {
     addToWatchLater,
   createPlaylist,
   getUserPlaylistsWithVideoStatus,
+  getPlaylistDetails,
   getAllPlaylists,
   getPlaylistById,
   addVideoToPlaylists,
@@ -16,6 +17,7 @@ router.post("/addToWatchLater", addToWatchLater);
 router.post("/create", createPlaylist);
 router.get("/user-playlists", getUserPlaylistsWithVideoStatus);
 router.get("/all", getAllPlaylists);
+router.get("/getPlaylistDetails", getPlaylistDetails);
 router.get("/:playlistId", getPlaylistById);
 router.put("/add-video", addVideoToPlaylists);
 router.put("/remove-video", removeVideoFromPlaylist);

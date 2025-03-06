@@ -86,6 +86,7 @@ const uploadFiles = multer({
 router.post("/register", adminController.register);
 router.post("/verifyEmail/:email", adminController.verifyEmail);
 router.post("/verifyOtp", adminController.verifyOtp);
+router.get("/verifyName", adminController.verifyNameUnique);
 router.post("/login", adminController.login);
 router.post("/otpValidation", adminController.otpValidation);
 router.put('/updateRegister', adminController.updateRegister);

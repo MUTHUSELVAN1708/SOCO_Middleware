@@ -143,7 +143,7 @@ const getAllPlaylists = async (req, res) => {
         }
 
         // Fetch playlists belonging to the given userId
-        const playlists = await Playlist.find({ userId }).select("name videos");
+        const playlists = await Playlist.find({ userId }).select("playlistId name videos");
 
         // Fetch video details for each playlist
         const formattedPlaylists = await Promise.all(
@@ -151,13 +151,14 @@ const getAllPlaylists = async (req, res) => {
                 // Fetch video details from createPostModel
                 const videos = await createPostModel
                     .find({ _id: { $in: playlist.videos } })
-                    .select("thumbnailFile videoDuration creatorName");
+                    .select("thumbnailFile videoDuration creatorName ");
 
                 return {
                     title: playlist.name || "Untitled",
                     thumbnailUrl: videos.length > 0 ? videos[0].thumbnailFile || "" : "", 
                     channelName: videos.length > 0 ? videos[0].creatorName || "Unknown" : "Unknown", // Use first video's creatorName
                     videoCount: playlist.videos.length, 
+                    playlistId: playlist.playlistId,
                     videoLength: formatTotalDuration(videos), 
                 };
             })
@@ -171,6 +172,67 @@ const getAllPlaylists = async (req, res) => {
         return handleError(res, 500, error.message);
     }
 };
+
+
+const getPlaylistDetails = async (req, res) => {
+    try {
+        const { playlistId } = req.query;
+
+        if (!playlistId) {
+            return handleError(res, 400, "Playlist ID is required");
+        }
+
+        // Fetch the playlist details
+        const playlist = await Playlist.findOne({ playlistId });
+
+        if (!playlist) {
+            return handleError(res, 404, "Playlist not found");
+        }
+
+        // Fetch video details from createPostModel and sort by _id (assuming _id represents creation time)
+        const videos = await createPostModel
+            .find({ _id: { $in: playlist.videos } })
+            .sort({ _id: -1 }) // Sorting in descending order (newest first)
+            .select("caption creatorName thumbnailFile videoDuration viewsCount timestamp");
+
+        // Format video details
+        const videoDetails = videos.map(video => ({
+            title: video.caption || "Untitled",
+            channelName: video.creatorName || "Unknown",
+            viewsCount: video.viewsCount || 0,
+            timestamp: video.timestamp,
+            thumbnailUrl: video.thumbnailFile || "",
+            duration: formatDuration(video.videoDuration), // Helper function to format duration
+            isLikedVideo: false, // Placeholder (implement logic if needed)
+        }));
+
+        // Construct the response
+        const playlistDetails = {
+            playlistName: playlist.name,
+            thumbnailFile: videoDetails.length > 0 ? videoDetails[0].thumbnailUrl : "",
+            channelName: videoDetails.length > 0 ? videoDetails[0].channelName :  "",
+            totalVideos: videoDetails.length, // Total video count
+            isPrivate: true, 
+            videos: videoDetails,
+        };
+
+        return handleSuccessV1(res, 200, "Playlist details fetched successfully", playlistDetails);
+    } catch (error) {
+        return handleError(res, 500, error.message);
+    }
+};
+
+
+const formatDuration = (durationInSeconds) => {
+    if (!durationInSeconds || isNaN(durationInSeconds)) return "0:00";
+    
+    const minutes = Math.floor(durationInSeconds / 60);
+    const seconds = durationInSeconds % 60;
+    
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
+
+
 
 
 
@@ -286,6 +348,7 @@ export {
   addToWatchLater,
   createPlaylist,
   getUserPlaylistsWithVideoStatus,
+  getPlaylistDetails,
   getAllPlaylists,
   getPlaylistById,
   addVideoToPlaylists,
