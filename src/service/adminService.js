@@ -3959,52 +3959,53 @@ const adminService = {
     },
     // ===========================
     getWishlist: async (user_id) => {
-        console.log(user_id, "iiiiiiiii");
+        console.log(user_id, "Received user_id");
+    
         try {
             const userId = user_id?.id ? user_id.id.toString() : user_id;
-            console.log(userId, "userId");
+            console.log(userId, "Processed userId");
     
             if (!userId) {
                 throw new Error("Invalid user_id provided");
             }
     
-            const getWishList = await FavoriteModel.find({ user_id: userId });
-            console.log(getWishList, "get");
+            // Fetch wishlist items only for the given user_id
+            const getWishList = await FavoriteModel.find({ user_id: userId }).lean();
+            console.log(getWishList, "Fetched wishlist items");
     
             if (getWishList.length === 0) {
                 return [];
             }
     
-        
-            const products = await Product.find({
-                product_id: { $in: getWishList.map(item => item.post_id) }
-            });
-    console.log(products,"products")
-            
-            const result = products.map(fav => ({
-                user_id: fav.user_id,
-                product_id: fav?._id || null,
-                productName: fav?.productName || "Unknown",
-                images: fav?.images || null,
-                category: fav?.basicInfo.categories || null,
-                colors: fav?.variants?.[0]?.color || null,
-                size: fav?.variants?.[0]?.variant || null,
-                quantity: fav?.variants?.[0]?.quantity || 0,
-                price: fav?.price || 0,
-                gst: fav?.gst || 0,
-                originalPrice: fav?.originalPrice || 0,
-                discount: fav?.discount || 0,
-                unit: fav?.unit || "N/A"
-            }));
-            
-            console.log(result, "formatted products");
-            
-               return result
+            // Extract post_ids from the wishlist
+            const productIds = getWishList.map(item => item.post_id);
     
-           
-            
+            // Fetch products that match the wishlist items
+            const products = await Product.find({ _id: { $in: productIds } }).lean();
+            console.log(products, "Fetched products");
+    
+            // Format the response
+            const result = products.map(product => ({
+                user_id: userId,
+                product_id: product?._id || null,
+                productName: product?.productName || "Unknown",
+                images: product?.images || null,
+                category: product?.basicInfo?.categories || null,
+                colors: product?.variants?.[0]?.color || null,
+                size: product?.variants?.[0]?.variant || null,
+                quantity: product?.variants?.[0]?.quantity || 0,
+                price: product?.price || 0,
+                gst: product?.gst || 0,
+                originalPrice: product?.originalPrice || 0,
+                discount: product?.discount || 0,
+                unit: product?.unit || "N/A"
+            }));
+    
+            console.log(result, "Formatted wishlist response");
+            return result;
+    
         } catch (error) {
-            console.error("Error in getWishList:", error);
+            console.error("Error in getWishlist:", error);
             throw error;
         }
     },
