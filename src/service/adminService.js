@@ -3994,9 +3994,9 @@ const adminService = {
                 colors: product?.variants?.[0]?.color || null,
                 size: product?.variants?.[0]?.variant || null,
                 quantity: product?.variants?.[0]?.quantity || 0,
-                price: product?.price || 0,
-                gst: product?.gst || 0,
-                originalPrice: product?.originalPrice || 0,
+                price: product?.pricing.salePrice || 0,
+                gst: product?.pricing.gstDetails.gstPercentage || 0,
+                originalPrice: product?.pricing.regularPrice || 0,
                 discount: product?.discount || 0,
                 unit: product?.unit || "N/A"
             }));
