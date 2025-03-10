@@ -1,6 +1,7 @@
 import express from "express";
 import adminController from "../controller/adminController.js";
 import multer from "multer";
+import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid"; 
 import registerModel from '../model/registerModel.js';
 import businessRegisterModel from '../model/BusinessModel.js';
@@ -178,34 +179,59 @@ router.post(
   '/filesUpload',
   upload.any(),
   (req, res) => {
+    console.log('Upload request received');
+
+    if (!req.files || req.files.length === 0) {
+      console.log('No files received');
+      return res.status(400).json({ message: 'No files uploaded. Please select valid files.' });
+    }
+
     const fileUrls = [];
     const uploadedFiles = new Set(); // To track duplicate files
 
-    req.files.forEach((file) => {
-      // Use the filename as the key for the file
-      const fileKey = file.originalname;
+    console.log('Total files received:', req.files.length);
+
+    req.files.forEach((file, index) => {
+      if (!file) {
+        console.log(`Skipping invalid file at index ${index}`);
+        return;
+      }
+
+      // Generate a unique name if the original filename is missing
+      const fileKey = file.originalname
+        ? file.originalname.trim()
+        : `file_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+      console.log(`Processing file ${index + 1}:`, fileKey);
 
       // Check for duplicates based on the filename
       if (uploadedFiles.has(fileKey)) {
-        return res.status(400).json({ message: `Same image found: ${fileKey}. Please ensure all files are different.` });
+        console.log(`Duplicate found: ${fileKey}`);
+        return res.status(400).json({
+          message: `Same image found: ${fileKey}. Please ensure all files are different.`,
+        });
       }
-      
 
       uploadedFiles.add(fileKey);
+      console.log(`File added: ${fileKey}`);
 
       const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
       fileUrls.push(fileUrl);
+      console.log(`File URL generated: ${fileUrl}`);
     });
 
     console.log('Returned URLs:', fileUrls);
 
     if (fileUrls.length > 0) {
+      console.log('Files uploaded successfully');
       return res.status(200).json({ message: 'Files uploaded successfully!', urls: fileUrls });
     } else {
+      console.log('No valid files were uploaded');
       return res.status(400).json({ message: 'No valid files were uploaded.' });
     }
   }
 );
+
 
 
 // Media Upload Route (Images and Videos)

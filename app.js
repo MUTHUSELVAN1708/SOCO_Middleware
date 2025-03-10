@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import cors from "cors";
+import os from "os";
 import "dotenv/config";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -12,6 +13,7 @@ import productRoutes from "./src/router/productRoutes.js";
 import commentRoutes from "./src/router/commentRoutes.js";
 import feedRoutes from "./src/router/feedRouter.js";
 import playlistsRoutes from "./src/router/playlistRoutes.js";
+import orderRoutes from "./src/router/orderRoutes.js";
 import errorHandling from "./errorHandling.js";
 import  initializeSocket from "./socket.js";
 // import redisService from "./src/service/redisService.js";
@@ -36,6 +38,7 @@ app.use('/api', productRoutes);
 app.use('/comment', commentRoutes);
 app.use('/feed', feedRoutes);
 app.use('/playlists', playlistsRoutes);
+app.use('/order', orderRoutes);
 
 // Error Handling
 app.use(errorHandling);
@@ -50,6 +53,19 @@ const io = initializeSocket(server);
 // redisService.connect();
 
 // redisService.subscribeToNotifications(io);
-server.listen(PORT, () => {
-    console.log(`Server is running on ${PORT}`);
+
+function getLocalIP() {
+    const interfaces = os.networkInterfaces();
+    for (const interfaceName in interfaces) {
+      for (const iface of interfaces[interfaceName]) {
+        if (iface.family === "IPv4" && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+    return "localhost";
+  }
+server.listen(PORT, "0.0.0.0",() => {
+    const localIP = getLocalIP();
+  console.log(`🚀 Server is running on http://${localIP}:${PORT}`);
 });

@@ -1864,6 +1864,12 @@ const adminService = {
 
             const userPost = new createPostModel(newPost);
             await userPost.save();
+            
+            if (typeOfAccount === "business") {
+                await businessregisterModel.findByIdAndUpdate(user_id, { $inc: { postCount: 1 } });
+            } else {
+                await registerModel.findByIdAndUpdate(user_id, { $inc: { postCount: 1 } });
+            }
 
             return userPost;
         } catch (error) {
@@ -3670,8 +3676,8 @@ const adminService = {
             phone_number,
             name,
             email,
-            product_id, // Direct Buy Now product
-            quantity = 1, // Default quantity is 1
+            product_id, 
+            quantity = 1, 
             size,
         } = data;
 
@@ -3689,11 +3695,39 @@ const adminService = {
                 const trackingNumber = `TRACK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
                 const expectedDeliveryDate = product.availability?.deliveryTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
 
-                const itemTotalPrice = product.pricing?.salePrice * quantity;
-                totalPrice = itemTotalPrice;
+
+                const itemTotalPrice = parseFloat(product.pricing?.salePrice || 0) * quantity;
+                console.log(`Base Price: ${product.pricing?.salePrice}, Quantity: ${quantity}, Item Total Price: ${itemTotalPrice}`);
+                
+                let taxAmount = 0;
+                
+                // Add GST if applicable
+                if (product.pricing?.gstDetails?.gstIncluded) {
+                    const gstPercentage = parseFloat(product.pricing?.gstDetails?.gstPercentage || 0);
+                    const gstAmount = (itemTotalPrice * gstPercentage) / 100;
+                    taxAmount += gstAmount;
+                    console.log(`GST Applied (${gstPercentage}%): ${gstAmount}`);
+                }
+                
+                // Add additional taxes if any
+                if (product.pricing?.additionalTaxes?.length > 0) {
+                    product.pricing.additionalTaxes.forEach((tax) => {
+                        if (tax?.percentage) {
+                            const additionalTax = (itemTotalPrice * parseFloat(tax.percentage)) / 100;
+                            taxAmount += additionalTax;
+                            console.log(`Additional Tax (${tax.name} - ${tax.percentage}%): ${additionalTax}`);
+                        }
+                    });
+                }
+                
+                totalPrice = itemTotalPrice + taxAmount;
+                console.log(`Total Tax Amount: ${taxAmount}`);
+                console.log(`Final Total Price (including taxes): ${totalPrice}`);
+                
+                
 
                 if (paymentMode === "online") {
-                    payment = await adminService.payment({ amount: itemTotalPrice, name, email });
+                    payment = await adminService.payment({ amount: totalPrice, name, email });
                     if (!payment.success) throw { error: "Payment failed" };
                 }
 
@@ -3707,7 +3741,7 @@ const adminService = {
                     address,
                     phone_number,
                     paymentMode,
-                    price: itemTotalPrice,
+                    price: totalPrice,
                     razorpay_payment_id: paymentMode === "online" ? payment.order_id : null,
                     tracking_number: trackingNumber,
                     courier_service: "Delhivery",
@@ -3739,11 +3773,44 @@ const adminService = {
                 for (const cartItem of cartItems) {
                     const product = await Product.findById(cartItem.product_id);
                     if (!product) throw { error: `Product not found` };
-
-                    const itemTotalPrice = product.pricing?.salePrice * cartItem.quantity;
+                
+                    console.log(`Processing Product: ${product._id}, Name: ${product.name}`);
+                
+                    // Base price calculation
+                    const basePrice = parseFloat(product.pricing?.salePrice || 0) * cartItem.quantity;
+                    console.log(`Base Price: ${product.pricing?.salePrice}, Quantity: ${cartItem.quantity}, Item Total Price: ${basePrice}`);
+                
+                    let taxAmount = 0;
+                
+                    // Add GST if applicable
+                    if (product.pricing?.gstDetails?.gstIncluded) {
+                        const gstPercentage = parseFloat(product.pricing?.gstDetails?.gstPercentage || 0);
+                        const gstAmount = (basePrice * gstPercentage) / 100;
+                        taxAmount += gstAmount;
+                        console.log(`GST Applied (${gstPercentage}%): ${gstAmount}`);
+                    }
+                
+                    // Add additional taxes if any
+                    if (product.pricing?.additionalTaxes?.length > 0) {
+                        product.pricing.additionalTaxes.forEach((tax) => {
+                            if (tax?.percentage) {
+                                const additionalTax = (basePrice * parseFloat(tax.percentage)) / 100;
+                                taxAmount += additionalTax;
+                                console.log(`Additional Tax (${tax.name} - ${tax.percentage}%): ${additionalTax}`);
+                            }
+                        });
+                    }
+                
+                    // Final total price after adding taxes
+                    const totalPrice = basePrice + taxAmount;
+                    console.log(`Total Tax Amount: ${taxAmount}`);
+                    console.log(`Final Total Price (including taxes): ${totalPrice}`);
+                
+                    // Generate tracking details
                     const trackingNumber = `TRACK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`; // Unique tracking per product
                     const expectedDeliveryDate = product.availability?.deliveryTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
-
+                
+                    // Checkout record creation
                     const checkoutRecord = await checkoutModel.create({
                         user_id,
                         product_id: product._id,
@@ -3753,19 +3820,23 @@ const adminService = {
                         address,
                         phone_number,
                         paymentMode,
-                        price: itemTotalPrice,
+                        price: totalPrice,
                         razorpay_payment_id: paymentMode === "online" ? payment.order_id : null,
                         tracking_number: trackingNumber,
                         courier_service: "Delhivery",
                         expected_delivery_date: expectedDeliveryDate,
                         tracking_updates: [{ status: "Pending", timestamp: new Date() }]
                     });
-
+                
                     checkoutRecords.push(checkoutRecord);
-
-                  
+                
+                    console.log(`Checkout Record Created: ${checkoutRecord._id}`);
+                
+                    // Remove item from cart
                     await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
+                    console.log(`Removed item from cart: ${cartItem.product_id}`);
                 }
+                
             }
 
             return {

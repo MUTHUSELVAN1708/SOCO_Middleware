@@ -58,8 +58,17 @@ const BusinessregisterSchema = new mongoose.Schema(
     },
     unreadMessagesCount: {
       type: Number,
-      default: 0,  // Default to 0, indicating no unread messages
+      default: 0, 
       required: false
+    },
+    deviceToken: { 
+      type: String, 
+      required: false 
+    },
+    deviceType: { 
+      type: String, 
+      enum: ['android', 'ios', 'web'], 
+      required: false 
     },
     
     timestamp: { type: Date, default: Date.now },
