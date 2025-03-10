@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from "uuid";
+
 export const handleSuccess = (res, { message, data, statusCode = 200 }) => {
     return res.status(statusCode).json({
       success: true,
@@ -20,4 +22,12 @@ export const handleSuccess = (res, { message, data, statusCode = 200 }) => {
       data
     });
   };
+
+  export const generateTrackingNumber = () => {
+    const prefix = "TRK";
+    const datePart = new Date().toISOString().replace(/[-T:.Z]/g, "").slice(2, 12); // Extract YYYYMMDDHH format
+    const uniqueId = uuidv4().split("-")[0].toUpperCase(); // Use a portion of UUID for uniqueness
+
+    return `${prefix}${datePart}${uniqueId}`;
+};
   
