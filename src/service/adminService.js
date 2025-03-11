@@ -32,6 +32,8 @@ import checkoutModel from "../model/checkoutModel.js";
 import invoiceModel from "../model/invoiceModel.js";
 import FavoriteModel from "../model/favoriteModel.js";
 import BookmarkModel from "../model/BookmarkModel.js";
+import Friend from "../model/FriendModel.js";
+import Follow from "../model/FollowModel.js";
 
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
@@ -3426,39 +3428,85 @@ const adminService = {
     },
     // =================
 
-    getUserProfile: async (id, isBusinessAccount) => {
+    getUserProfile: async (id, isBusinessAccount, userId, accountBusinessType) => {
         try {
+            console.log(`Fetching user profile for ID: ${id}, isBusinessAccount: ${isBusinessAccount}`);
+    
             const user = isBusinessAccount
                 ? await businessregisterModel.findById(id)
                 : await registerModel.findById(id);
-
+    
             if (!user) {
+                console.log(`User not found for ID: ${id}`);
                 return null;
             }
-
-            const fullName = isBusinessAccount
-                ? user.ownerName || "Business Owner"
-                : user.full_Name || "";
-
-            return {
+    
+            console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.ownerName : user.full_Name}`);
+    
+            const fullName = isBusinessAccount ? user.businessName || "Business Owner" : user.full_Name || "";
+    
+            console.log(`Checking friendship status for userId: ${userId} and profileId: ${id}`);
+    
+            // Fetch friendship details
+            const friendRecord = await Friend.findOne({
+                userId,
+                userReference: accountBusinessType,
+                "friends.friendId": id,
+                "friends.friendReference": isBusinessAccount ? "businessRegister" : "User",
+            });
+    
+            let friendStatus = "Not Friends";
+            if (friendRecord) {
+                const friendEntry = friendRecord.friends.find(f => f.friendId === id);
+                if (friendEntry) {
+                    friendStatus = friendEntry.status;
+                }
+            }
+    
+            console.log(`Friendship status: ${friendStatus}`);
+    
+            console.log(`Checking follow status for userId: ${userId} and profileId: ${id}`);
+    
+            // Check if userId is already following
+            const isAlreadyFollow = await Follow.exists({
+                userId,
+                userReference: accountBusinessType,
+                followingId: id,
+                followingReference: isBusinessAccount ? "businessRegister" : "User",
+            });
+    
+            console.log(`Follow status: ${isAlreadyFollow ? "Already following" : "Not following"}`);
+    
+            const profileData = {
                 id: user._id.toString(),
                 username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
-                fullName: fullName,
+                fullName,
                 bio: isBusinessAccount ? user.natureOfBusiness || "This is a business account" : user.bio || "No bio",
                 profileImageUrl: isBusinessAccount ? user.brand_logo || "" : user.profile_url || "",
                 posts: user.postCount || 0,
                 followers: user.followerCount || 0,
                 following: user.followingCount || 0,
+                friendCount: user.friendCount || 0,
                 isVerified: user.isVerified || false,
                 isPrivate: user.accountIsPublic === undefined ? false : !user.accountIsPublic,
                 needPermissionForFollowing: user.needPermissionForFollowing,
                 highlights: user.highlights?.length ? user.highlights : [],
+                isAlreadyFollow: !!isAlreadyFollow,
+                isBusinessAccount, 
+                friendStatus, // ✅ Added friend status
             };
+    
+            console.log(`Returning profile data:`, profileData);
+    
+            return profileData;
         } catch (error) {
             console.error("Error fetching user profile:", error);
             return null;
         }
     },
+    
+    
+    
 
     fetchUserFriends: async (id) => {
         try {
