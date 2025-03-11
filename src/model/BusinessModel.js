@@ -21,6 +21,7 @@ const BusinessregisterSchema = new mongoose.Schema(
     postCount: { type: Number, default: 0 },
     followerCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
+    friendCount: { type: Number, default: 0 },
     needPermissionForFollowing: { type: Boolean, default: false },
     friendPermission: { type: Boolean, default: false },
     ownerName: { type: String, required: false },

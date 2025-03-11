@@ -534,10 +534,13 @@ const adminController = {
     getUserProfile: async (req, res, next) => {
         const id = req.body.id;
         const isBusinessAccount = req.body.isBusiness;
+        const userId = req.body.userId;
+        const accountBusinessType = req.body.accountBusinessType;
+
 
 
         try {
-            const getUserDetails = await adminService.getUserProfile(id, isBusinessAccount);
+            const getUserDetails = await adminService.getUserProfile(id, isBusinessAccount, userId ,accountBusinessType );
 
             res.status(200).json({
                 status: 200,
