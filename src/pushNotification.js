@@ -1,7 +1,7 @@
 import axios from "axios"
 
 // import OneSignal from '@onesignal/node-onesignal'
-import { Client } from 'onesignal-node'; // For ES Modules
+// import { Client } from 'onesignal-node'; // For ES Modules
 
 const ONE_SIGNAL_APP_ID = '46e90495-8cb8-4500-ae91-90edb10dd101';
 const ONE_SIGNAL_API_KEY = 'os_v2_app_i3uqjfmmxbcqblursdw3cdorafyrqb7hkaoeyv5yajysegzauje6orn5rqc5cqselsezfreyrd2rbvo46hpuq4j7hwjmn6ffxl5nv7i';
@@ -13,7 +13,7 @@ const ONE_SIGNAL_API_KEY = 'os_v2_app_i3uqjfmmxbcqblursdw3cdorafyrqb7hkaoeyv5yaj
 //   });
 //   const client = new OneSignal.DefaultApi(configuration);
 
-const client = new Client(ONE_SIGNAL_APP_ID, ONE_SIGNAL_API_KEY);
+// const client = new Client(ONE_SIGNAL_APP_ID, ONE_SIGNAL_API_KEY);
 
 
 const pushNotification={
@@ -75,38 +75,70 @@ const pushNotification={
 
 
 
- sendNotificationToDevice :async (message, playerIds) => {
-  console.log("Message:", message, "Player IDs:", playerIds); // Debugging logs
+//  sendNotificationToDevice :async (message, playerIds) => {
+//   console.log("Message:", message, "Player IDs:", playerIds); // Debugging logs
 
-  try {
-    if (!ONE_SIGNAL_APP_ID || !ONE_SIGNAL_API_KEY) {
-      throw new Error("Missing OneSignal configuration: App ID or API Key is not set.");
-    }
+//   try {
+//     if (!ONE_SIGNAL_APP_ID || !ONE_SIGNAL_API_KEY) {
+//       throw new Error("Missing OneSignal configuration: App ID or API Key is not set.");
+//     }
 
-    if (!Array.isArray(playerIds) || playerIds.length === 0) {
-      throw new Error("Player IDs are required and should be an array of valid OneSignal player IDs.");
-    }
+//     if (!Array.isArray(playerIds) || playerIds.length === 0) {
+//       throw new Error("Player IDs are required and should be an array of valid OneSignal player IDs.");
+//     }
 
     
-    const notification = {
-      app_id: ONE_SIGNAL_APP_ID, // App ID from OneSignal
-      contents: { en: message }, // Notification message
-      include_player_ids: playerIds, // Target specific users
-    };
+//     const notification = {
+//       app_id: ONE_SIGNAL_APP_ID, // App ID from OneSignal
+//       contents: { en: message }, // Notification message
+//       include_player_ids: playerIds, // Target specific users
+//     };
 
-    // Send the notification
-    const response = await client.createNotification(notification);
-    console.log("Notification sent successfully:", response.body); // Log the successful response
-    return response.body; // Return OneSignal's response
-  } catch (error) {
-    console.error("Error sending notification:", {
-      message: error.message,
-      stack: error.stack,
-      details: error.response?.data || error, // Include more details if available
-    });
-    throw new Error(`Failed to send notification: ${error.message}`);
+//     // Send the notification
+//     const response = await client.createNotification(notification);
+//     console.log("Notification sent successfully:", response.body); // Log the successful response
+//     return response.body; // Return OneSignal's response
+//   } catch (error) {
+//     console.error("Error sending notification:", {
+//       message: error.message,
+//       stack: error.stack,
+//       details: error.response?.data || error, // Include more details if available
+//     });
+//     throw new Error(`Failed to send notification: ${error.message}`);
+//   }
+// },
+
+
+
+
+sendNotificationToDevice : async (message, deviceTokens) => {
+    console.log(message, deviceTokens,"ppp")
+      try {
+          const response = await axios.post(
+              "https://onesignal.com/api/v1/notifications",
+              {
+                  app_id: ONE_SIGNAL_APP_ID,
+                  include_player_ids: deviceTokens,  // Use OneSignal Player IDs
+                  contents: { en: message },
+              },
+              {
+                  headers: {
+                      Authorization: Basic `${ONE_SIGNAL_API_KEY}`,
+                      "Content-Type": "application/json",
+                  },
+              }
+          );
+          console.log(deviceTokens,"dev")
+  
+          console.log("OneSignal Response:", response.data);
+          return response.data;
+      } catch (error) {
+          console.error("Failed to send notification:", error.response?.data || error.message);
+          throw new Error("Failed to send notification: " + (error.response?.data?.errors || error.message));
+      }
   }
-},
+  
+
 
 }
 
