@@ -5,7 +5,6 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid"; 
 import registerModel from '../model/registerModel.js';
 import businessRegisterModel from '../model/BusinessModel.js';
-import playerController from "../controller/playerController.js";
 
 const router = express.Router();
 
@@ -330,15 +329,6 @@ router.delete("/removeFromCart",adminController.removeFromCart);
 router.get("/getCart/:id",adminController.getCart);
 
 
-
-
-router.get("/getPlayers", playerController.getAllPlayers);
-
-
-router.get("/getPlayer/:playerId", playerController.getPlayerById);
-
-
-
 router.post("/sendMessage/:from/:to",adminController.sendMessage);
 
 router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
@@ -363,8 +353,5 @@ router.post("/toggleBookmark",adminController.toggleBookmark);
 
 router.get("/getUserFavorites",adminController.getUserFavorites );
 router.get("/getUserBookmarks",adminController.getUserBookmarks );
-
-
-
 
 export default router;

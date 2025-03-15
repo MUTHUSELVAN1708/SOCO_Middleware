@@ -19,7 +19,7 @@ import mongoose from "mongoose";
 import moment from "moment";
 import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
-import connectedUsers from "../../socket.js";
+import {connectedUsers} from "../../socket.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
 import MessageModel from "../model/chatModel.js";
@@ -34,6 +34,7 @@ import FavoriteModel from "../model/favoriteModel.js";
 import BookmarkModel from "../model/BookmarkModel.js";
 import Friend from "../model/FriendModel.js";
 import Follow from "../model/FollowModel.js";
+import redisService from "./redisService.js";
 
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
@@ -3096,23 +3097,24 @@ const adminService = {
 
     // ================================
 
-    sendMessage: async (io, socket, from, to, message) => {
-        console.log("Input data:", { from, to, message });
 
+    // ===================
+
+    sendMessage: async (io, socket, from, to, message) => {
+        console.log("📩 Input data:", { from, to, message });
+    
         if (!from || !to || !message) {
             socket.emit("sendedMsg", { success: false, message: "Missing required fields: from, to, or message" });
             throw new Error("Missing required fields: from, to, or message");
         }
-
+    
         const timestamp = new Date();
         const chatKey = `chat:${from}:${to}`;
-        const notificationKey = `notifications:${to}`;
-
+    
         try {
             const newMessage = await MessageModel.create({ from, to, message, timestamp });
-            console.log("New message created:", newMessage);
-
-            // Message object with MongoDB _id
+            console.log("✅ New message created:", newMessage);
+    
             const messageWithObjectId = {
                 _id: newMessage._id.toString(),
                 from,
@@ -3120,25 +3122,26 @@ const adminService = {
                 message,
                 timestamp,
             };
-
+    
             // Store message in Redis
             await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
-
+    
+            console.log("🟢 Checking connected users:", JSON.stringify(connectedUsers, null, 2));
             const receiverSocketId = connectedUsers[to];
-
+    
             if (receiverSocketId) {
-                console.log(`Receiver (${to}) is online. Sending message...`);
-                socket.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
+                console.log(`✅ Receiver (${to}) is online. Sending message...`);
+                io.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
             } else {
-                console.log(`Receiver (${to}) is offline. Storing message in Redis.`);
+                console.log(`❌ Receiver (${to}) is offline.`);
                 await redisService.getRedisClient().lPush(`offlineMessages:${to}`, JSON.stringify(messageWithObjectId));
             }
-
+    
             socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
-
+    
             return { success: true, message: "Message sent" };
         } catch (err) {
-            console.error(" Error in sendMessage:", err);
+            console.error("❌ Error in sendMessage:", err);
             socket.emit("sendedMsg", { success: false, message: "Error sending message" });
             throw new Error("Error sending message");
         }

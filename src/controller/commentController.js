@@ -131,17 +131,17 @@ const getCommentsByPost = async (req, res) => {
 
 const getReplies = async (req, res) => {
   const { commentId } = req.params;
-  const { page = 1, limit = 10, userId } = req.body; // Default limit set to 10
+  const { page = 1, limit = 10, userId } = req.body; 
 
   try {
-    // Fetch the parent comment
+    
     const parentCommentData = await Comment.findOne({ commentId }).populate('userInfo');
 
     if (!parentCommentData) {
       return handleError(res, 404, 'Parent comment not found');
     }
 
-    // Convert the parent comment into the required `Comment` type
+    
     const parentComment = {
       id: parentCommentData._id.toString(),
       commentId: parentCommentData.commentId.toString(),
@@ -150,10 +150,10 @@ const getReplies = async (req, res) => {
       createdAt: parentCommentData.createdAt,
       likes: parentCommentData.likes.map(like => like.toString()),
       likeCount: parentCommentData.likesCount,
-      replies: [], // Will be populated below
+      replies: [], 
       parentId: parentCommentData.parentCommentId?.toString() || null,
       replyCount: parentCommentData.replyCount || 0,
-      hasMoreReplies: false, // Will be set based on pagination
+      hasMoreReplies: false, 
       userInfo: parentCommentData.userInfo,
     };
 

@@ -16,16 +16,16 @@ import playlistsRoutes from "./src/router/playlistRoutes.js";
 import orderRoutes from "./src/router/orderRoutes.js";
 import PreferenceRouter from "./src/router/PreferenceRouter.js";
 import errorHandling from "./errorHandling.js";
-import  initializeSocket from "./socket.js";
+import  {initializeSocket} from "./socket.js";
 // import redisService from "./src/service/redisService.js";
 
 const app = express();
 
-// Middleware
+
 app.use(cors());
-app.use(express.json({ limit: '20mb' })); // Adjust the limit if needed
-app.use(express.urlencoded({ extended: true })); // URL-encoded form data
-app.use(express.raw({ type: 'text/plain', limit: '1mb' })); // Raw text payloads
+app.use(express.json({ limit: '20mb' })); 
+app.use(express.urlencoded({ extended: true })); 
+app.use(express.raw({ type: 'text/plain', limit: '1mb' })); 
 
 // Static files
 const __filename = fileURLToPath(import.meta.url);
