@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import moment from "moment-timezone"; 
 
 const orderSchema = new mongoose.Schema(
   {
@@ -21,16 +22,17 @@ const orderSchema = new mongoose.Schema(
     // Seller Review Section
     seller_review_status: {
       type: String,
-      enum: ["Pending", "Reviewed", "Rejected"],
+      enum: ["Pending", "Reviewed","Accepted", "Rejected"],
       default: "Pending",
     },
     seller_price_offer: { type: Number }, 
+    deliveryTimeInDays: { type: Number }, 
     seller_notes: { type: String }, 
 
     // Buyer Approval Section
     buyer_approval_status: {
       type: String,
-      enum: ["Pending", "Accepted", "Rejected"],
+      enum: ["Pending", "Accepted", "Rejected","Rejected By Seller"],
       default: "Pending",
     },
     final_price: { type: Number },
@@ -53,6 +55,8 @@ const orderSchema = new mongoose.Schema(
     },
     delivery_method: { type: String },
     cancel_reason: { type: String },
+    cancel_reason_by_buyer: { type: String },
+    reject_reason_by_buyer: { type: String },
     cancel_category: { type: String },
     additionalCommentsForCancel: { type: String },
     delivery_partner: {
@@ -79,6 +83,7 @@ const orderSchema = new mongoose.Schema(
         "Out for Delivery",
         "Delivered",
         "Cancelled",
+        "Rejected",
         "Confirmed", // Added Confirmed status
       ],
       default: "Pending",
@@ -92,11 +97,21 @@ const orderSchema = new mongoose.Schema(
     tracking_info: [
       {
         status: String,
-        timestamp: { type: Date, default: Date.now },
+        timestamp: {
+          type: Date,
+          default: () => moment().tz("Asia/Kolkata").toDate(),
+        },
       },
     ],
+    created_at: {
+      type: Date,
+      default: () => moment().tz("Asia/Kolkata").toDate(),
+    },
 
-    timestamp: { type: Date, default: Date.now },
+    timestamp: {
+      type: Date,
+      default: () => moment().tz("Asia/Kolkata").toDate(),
+    },
   },
   { versionKey: false }
 );

@@ -1,3 +1,5 @@
+0x9b16e7f5ce8ff7912863d2482bcc53e905c20b56c1d8d214d765802674d30205
+
 // import mongoose from "mongoose";
 // import Order from "../model/orderModel.js";
 // import Product from "../model/Product.js";
@@ -75,6 +77,7 @@ import Order from "../model/orderModel.js";
 import Product from "../model/Product.js";
 import User from "../model/registerModel.js";
 import BusinessModel from "../model/BusinessModel.js";
+import moment from "moment-timezone"; 
 import DeliveryAddressModel from "../model/deliveryAddressModel.js";
 import { handleSuccess, handleSuccessV1, handleError , generateTrackingNumber } from "../utils/responseHandler.js";
 import { sendPushNotification } from "../service/pushNotificationService.js";
@@ -82,167 +85,220 @@ import { sendPushNotification } from "../service/pushNotificationService.js";
 import { v4 as uuidv4, validate as isValidUUID } from "uuid";
 
 
-export const confirmOrderBySeller = async (req, res) => {
+export const cancelOrderByUser = async (req, res) => {
     try {
-        const {
-            orderId,
-            deliveryCharge = 0,
-            deliveryTimeInDays = 5,
-            returnType = "No Return",
-            deliveryType = "Standard",
-            specialInstructions = "",
-            trackingInfo,
-            needsSignature = false,
-            isFragile = false,
-            paymentMethod,
-      
-        } = req.body;
+        const { userId, orderId, cancelReason } = req.body;
 
-        if (!orderId) {
-            return handleError(res, 400, "Missing required field: orderId");
+        if (!userId || !orderId) {
+            return handleError(res, 400, "Missing required fields: userId or orderId");
         }
 
-        const order = await Order.findById(orderId);
+        const order = await Order.findOne({ _id: orderId, user_id: userId });
+
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
 
-        const product = await Product.findById(order.product_id);
-        console.log(product,"product")
-        if (!product) {
-            return handleError(res, 404, "Product not found");
+        if (order.order_status !== "Pending") {
+            return handleError(res, 400, `Sorry, the order cannot be canceled as its status has changed to ${order.order_status}.`);
+        }
+        
+        order.order_status = "Cancelled";
+        order.buyer_approval_status = "Rejected";
+
+        if (cancelReason) {
+            order.cancel_reason_by_buyer = cancelReason;
         }
 
-        let totalAmount = parseFloat(order.total_price) + parseFloat(deliveryCharge);
-        totalAmount = totalAmount.toFixed(2);
-
-        const estimatedDeliveryDate = new Date();
-        estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + parseInt(deliveryTimeInDays));
-        
-        // Convert to Indian Standard Time (IST - UTC+5:30)
-        const estimatedDeliveryDateIST = new Date(estimatedDeliveryDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-        
-
-        order.order_status = "Confirmed";
-        order.seller_review_status = "Reviewed";
-        order.buyer_approval_status = "Accepted";
-        order.total_price = totalAmount;
-        order.estimated_delivery_date = estimatedDeliveryDateIST;
-        order.delivery_method = deliveryType;
-        order.payment_mode = paymentMethod;
-        order.delivery_charge = parseFloat(deliveryCharge);
-        order.return_type = returnType;
-        order.special_instructions = specialInstructions;
-        order.needs_signature = needsSignature;
-        order.is_fragile = isFragile;
-
-        // Ensure delivery_partner exists
-        if (!order.delivery_partner) {
-            order.delivery_partner = {};
-        }
-        order.delivery_partner.tracking_number = trackingInfo || generateTrackingNumber();
-
-        order.tracking_info.push({ status: "Order Confirmed", timestamp: new Date() });
+        order.tracking_info.push({ status: "Cancelled", timestamp: moment().tz("Asia/Kolkata").toDate() });
 
         await order.save();
-        const business = await BusinessModel.findById(product.createdBy);
-console.log(business,"business")
-        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
-      
-              // Move this check **after** validPlayerIds is initialized
-              if (validPlayerIds.length === 0) {
-                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-              }
-      
-              console.log(validPlayerIds);
-      
-              const notificationPayload = { 
-                playerIds: validPlayerIds, 
-                title: "Order Confirmed ✅", 
-                message: `Your order for ${product.basicInfo.productTitle.trim()} has been confirmed! Processing will begin shortly.`, 
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            };
-            
-      
-              await sendPushNotification(notificationPayload);
-      
 
-        return handleSuccessV1(res, 200, "Order confirmed successfully", {
-            orderId: order._id,
-            totalAmount,
-            estimatedDeliveryDate,
-            trackingNumber: order.delivery_partner.tracking_number,
-            status: order.order_status
-        });
+        return handleSuccessV1(res, 200, "Order canceled successfully", order);
+    } catch (error) {
+        return handleError(res, 500, `Error canceling order: ${error.message}`);
+    }
+};
+
+// Confirm Order by User
+export const confirmOrderByUser = async (req, res) => {
+    try {
+        const { userId, orderId } = req.body;
+
+        if (!userId || !orderId) {
+            return handleError(res, 400, "Missing required fields: userId or orderId");
+        }
+
+        const order = await Order.findOne({ _id: orderId, user_id: userId });
+
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        // if (order.order_status !== "Pending") {
+        //     return handleError(res, 400, `Order status has already changed to ${order.order_status}. Confirmation is not allowed.`);
+        // }
+
+        order.order_status = "Confirmed";
+        order.buyer_approval_status = "Accepted";
+
+        order.tracking_info.push({ status: "Confirmed", timestamp: moment().tz("Asia/Kolkata").toDate() });
+
+        await order.save();
+
+        return handleSuccessV1(res, 200, "Order confirmed successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error confirming order: ${error.message}`);
     }
 };
 
-export const cancelOrderBySeller = async (req, res) => {
+// Reject Order by User
+export const rejectOrderByUser = async (req, res) => {
     try {
-        const { orderId, cancelReason ,additionalComments,category} = req.body;
+        const { userId, orderId, rejectReason } = req.body;
 
-        if (!orderId) {
-            return handleError(res, 400, "Missing required field: orderId");
-        }
-        if (!cancelReason) {
-            return handleError(res, 400, "Missing required field: cancelReason");
+        if (!userId || !orderId || !rejectReason) {
+            return handleError(res, 400, "Missing required fields: userId, orderId, or rejectReason");
         }
 
-        const order = await Order.findById(orderId);
+        const order = await Order.findOne({ _id: orderId, user_id: userId });
+
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
 
-        if (order.order_status === "Cancelled") {
-            return handleError(res, 400, "Order is already cancelled");
-        }
+        // if (order.order_status !== "Pending") {
+        //     return handleError(res, 400, `Order status has already changed to ${order.order_status}. Rejection is not allowed.`);
+        // }
 
-        order.order_status = "Cancelled";
-        order.seller_review_status = "Rejected";
+        order.order_status = "Rejected";
         order.buyer_approval_status = "Rejected";
-        order.cancel_reason = cancelReason;
-        order.cancel_category = category;
-        order.additionalCommentsForCancel = additionalComments;
-        order.tracking_info.push({ status: "Order Cancelled", reason: cancelReason, timestamp: new Date() });
+        order.reject_reason_by_buyer = rejectReason;
+
+        order.tracking_info.push({ status: "Rejected", timestamp: moment().tz("Asia/Kolkata").toDate(), reason: rejectReason });
 
         await order.save();
-        const product = await Product.findById(order.product_id);
-        console.log(product,"product")
-        if (!product) {
-            return handleError(res, 404, "Product not found");
-        }
-        
-        const business = await BusinessModel.findById(product.createdBy);
-console.log(business,"business")
-        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
-      
-             
-              if (validPlayerIds.length === 0) {
-                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-              }
-      
-              console.log(validPlayerIds);
-      
-              const notificationPayload = { 
-                playerIds: validPlayerIds, 
-                title: "Order Canceled ", 
-                message: `Your order for ${product.basicInfo.productTitle.trim()} has been Canceled! `, 
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            };
-            
-      
-              await sendPushNotification(notificationPayload);
-        return handleSuccessV1(res, 200, "Order cancelled successfully", {
-            orderId: order._id,
-            status: order.order_status,
-            cancelReason: order.cancel_reason
-        });
+
+        return handleSuccessV1(res, 200, "Order rejected successfully", order);
     } catch (error) {
-        return handleError(res, 500, `Error cancelling order: ${error.message}`);
+        return handleError(res, 500, `Error rejecting order: ${error.message}`);
     }
 };
+
+
+
+export const getPendingApprovedOrderList = async (req, res) => {
+    try {
+        console.log("Received request for pending and approved orders:", req.query);
+
+        const { user_id, page = 1, limit = 10 } = req.query;
+
+        if (!user_id) {
+            console.error("Missing required field: user_id");
+            return handleError(res, 400, "Missing required field: user_id");
+        }
+
+        const pageNumber = parseInt(page, 10);
+        const pageSize = parseInt(limit, 10);
+        const skip = (pageNumber - 1) * pageSize;
+
+        console.log(`Fetching orders for user_id: ${user_id}, Page: ${pageNumber}, Limit: ${pageSize}, Skip: ${skip}`);
+
+        // Updated query filter to include both "Accepted" and "Pending" orders
+        const queryFilter = { user_id, order_status: { $in: ["Accepted", "Pending"] } , seller_review_status: { $in: ["Accepted", "Pending"] } };
+
+        const totalItems = await Order.countDocuments(queryFilter);
+        console.log(`Total orders found: ${totalItems}`);
+
+        const totalPages = Math.ceil(totalItems / pageSize);
+
+        const orders = await Order.find(queryFilter)
+            .skip(skip)
+            .limit(pageSize)
+            .populate("product_id")
+            .populate("delivery_address_id");
+
+        console.log(`Orders fetched: ${orders.length}`);
+
+        const orderRequests = await Promise.all(
+            orders.map(async (order) => {
+                console.log(`Processing order ID: ${order._id}`);
+
+                const product = await Product.findById(order.product_id);
+                if (!product) {
+                    console.warn(`Product not found for product_id: ${order.product_id}`);
+                }
+
+                const address = await DeliveryAddressModel.findById(order.delivery_address_id);
+                if (!address) {
+                    console.warn(`Address not found for address_id: ${order.delivery_address_id}`);
+                }
+
+                let finalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
+                if (product?.pricing?.gstDetails?.gstIncluded) {
+                    finalPrice += (finalPrice * product.pricing.gstDetails.gstPercentage) / 100;
+                }
+                if (product?.pricing?.additionalTaxes?.length > 0) {
+                    product.pricing.additionalTaxes.forEach(tax => {
+                        finalPrice += (finalPrice * tax.percentage) / 100;
+                    });
+                }
+                finalPrice = parseFloat(finalPrice.toFixed(2));
+
+                console.log(`Final price calculated for product_id ${product?._id}: ${finalPrice}`);
+
+                const orderTotalPrice = parseFloat(order.total_price);
+                const isIncrement = orderTotalPrice > finalPrice;
+                const priceDifference = Math.abs(orderTotalPrice - finalPrice).toFixed(2);
+                const percentageDifference = ((priceDifference / finalPrice) * 100).toFixed(2);
+
+                // Calculate estimated delivery date
+                const currentDate = new Date();
+                const estimatedDeliveryDate = new Date(currentDate.setDate(currentDate.getDate() + (order.deliveryTimeInDays || 0))).toISOString().split("T")[0];
+
+                return {
+                    id: order._id,
+                    trackId: order.delivery_partner?.tracking_number || "N/A",
+                    productName: product?.basicInfo?.productTitle || "Unknown Product",
+                    productId: `${product?._id}`,
+                    estimated_delivery_date: estimatedDeliveryDate,
+                    price: `${order.total_price} ${product?.pricing?.currency || "INR"}`,
+                    productImage: product?.images?.length > 0 ? product.images[0] : "",
+                    buyerAddress: address
+                    ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}`
+                    : "Address Not Found",                
+                    requestDate: order.timestamp,
+                    status: order.order_status, // Updated to return the correct buyer_approval_status
+                    isIncrement,
+                    incrementAmount: isIncrement ? priceDifference : "0",
+                    decrementAmount: !isIncrement ? priceDifference : "0",
+                    incrementPercentage: isIncrement ? percentageDifference : "0",
+                    decrementPercentage: !isIncrement ? percentageDifference : "0",
+                };
+            })
+        );
+
+        console.log(`Final order response prepared with ${orderRequests.length} items`);
+
+        const pagination = {
+            totalResults: totalItems,
+            totalPages,
+            currentPage: pageNumber,
+            limit: pageSize,
+            hasNextPage: pageNumber < totalPages,
+            hasPreviousPage: pageNumber > 1,
+        };
+
+        console.log("Pagination details:", pagination);
+
+        return handleSuccessV1(res, 200, "Pending and approved orders retrieved successfully", { orders: orderRequests, pagination });
+    } catch (error) {
+        console.error("Error fetching pending and approved orders:", error);
+        return handleError(res, 500, `Error fetching pending and approved orders: ${error.message}`);
+    }
+};
+
+
 
 
 
@@ -296,8 +352,8 @@ export const getPendingOrders = async (req, res) => {
                     req_id: `REQ${1000 + skip + index}`,
                     buyerName: buyer?.org_name || buyer?.full_Name || "Unknown Buyer",
                     buyerAddress: address 
-                        ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}` 
-                        : "Address Not Found",
+                    ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}` 
+                    : "Address Not Found",                               
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `PROD${product?._id}`,
                     price: `${finalPrice} ${product?.pricing?.currency || "INR"}`,
@@ -322,6 +378,123 @@ export const getPendingOrders = async (req, res) => {
         return handleError(res, 500, `Error fetching pending orders: ${error.message}`);
     }
 };
+
+
+export const confirmOrderBySeller = async (req, res) => {
+    try {
+        const {
+            orderId,
+            deliveryCharge = 0,
+            deliveryTimeInDays = 5,
+            returnType = "No Return",
+            deliveryType = "Standard",
+            specialInstructions = "",
+            trackingInfo,
+            needsSignature = false,
+            isFragile = false,
+            paymentMethod
+        } = req.body;
+
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        const product = await Product.findById(order.product_id);
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
+
+        let totalAmount = parseFloat(order.total_price) + parseFloat(deliveryCharge);
+        totalAmount = totalAmount.toFixed(2);
+
+        const estimatedDeliveryDate = new Date();
+        estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + parseInt(deliveryTimeInDays));
+        
+        // Convert to Indian Standard Time (IST - UTC+5:30)
+        const estimatedDeliveryDateIST = new Date(estimatedDeliveryDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        
+
+        order.order_status = "Accepted";
+        order.seller_review_status = "Accepted";
+        order.total_price = totalAmount;
+        order.deliveryTimeInDays= deliveryTimeInDays;
+        order.estimated_delivery_date = estimatedDeliveryDateIST;
+        order.delivery_method = deliveryType;
+        order.payment_mode = paymentMethod;
+        order.delivery_charge = parseFloat(deliveryCharge);
+        order.return_type = returnType;
+        order.special_instructions = specialInstructions;
+        order.needs_signature = needsSignature;
+        order.is_fragile = isFragile;
+
+        // Ensure delivery_partner exists
+        if (!order.delivery_partner) {
+            order.delivery_partner = {};
+        }
+        order.delivery_partner.tracking_number = trackingInfo || generateTrackingNumber();
+
+        order.tracking_info.push({ status: "Order Accepted", timestamp: new Date() });
+
+        await order.save();
+
+        return handleSuccessV1(res, 200, "Order Accepted successfully", {
+            orderId: order._id,
+            totalAmount,
+            estimatedDeliveryDate,
+            trackingNumber: order.delivery_partner.tracking_number,
+            status: order.order_status
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error confirming order: ${error.message}`);
+    }
+};
+
+export const cancelOrderBySeller = async (req, res) => {
+    try {
+        const { orderId, cancelReason ,additionalComments,category} = req.body;
+
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
+        }
+        if (!cancelReason) {
+            return handleError(res, 400, "Missing required field: cancelReason");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        if (order.order_status === "Cancelled") {
+            return handleError(res, 400, "Order is already cancelled");
+        }
+
+        order.order_status = "Cancelled";
+        order.seller_review_status = "Rejected";
+        order.buyer_approval_status = "Rejected By Seller";
+        order.cancel_reason = cancelReason;
+        order.cancel_category = category;
+        order.additionalCommentsForCancel = additionalComments;
+        order.tracking_info.push({ status: "Order Cancelled", reason: cancelReason, timestamp: new Date() });
+
+        await order.save();
+
+        return handleSuccessV1(res, 200, "Order cancelled successfully", {
+            orderId: order._id,
+            status: order.order_status,
+            cancelReason: order.cancel_reason
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error cancelling order: ${error.message}`);
+    }
+};
+
+
 
 
 export const createOrder = async (req, res) => { 
@@ -500,3 +673,4 @@ export const deleteOrder = async (req, res) => {
         return handleError(res, 500, `Error deleting order: ${error.message}`);
     }
 };
+
