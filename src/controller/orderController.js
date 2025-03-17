@@ -257,6 +257,8 @@ export const getPendingApprovedOrderList = async (req, res) => {
                 return {
                     id: order._id,
                     trackId: order.delivery_partner?.tracking_number || "N/A",
+                    delivery_type:order.delivery_type,
+                    delivery_charge:order.delivery_charge,
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `${product?._id}`,
                     estimated_delivery_date: estimatedDeliveryDate,
@@ -327,6 +329,8 @@ export const getPendingOrders = async (req, res) => {
                     buyer = await BusinessModel.findById(order.user_id);
                 }
 
+                console.log(buyer);
+
                 let finalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
                 if (product?.pricing?.gstDetails?.gstIncluded) {
                     finalPrice += (finalPrice * product.pricing.gstDetails.gstPercentage) / 100;
@@ -342,7 +346,7 @@ export const getPendingOrders = async (req, res) => {
                     id: order._id,
                     trackId: order.delivery_partner.tracking_number,
                     req_id: `REQ${1000 + skip + index}`,
-                    buyerName: buyer?.org_name || buyer?.full_Name || "Unknown Buyer",
+                    buyerName: buyer?.businessName || buyer?.full_Name || "Unknown Buyer",
                     buyerAddress: address 
                     ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}` 
                     : "Address Not Found",                               
@@ -572,7 +576,7 @@ export const createOrder = async (req, res) => {
             } 
         };
 
-        await sendPushNotification(notificationPayload);
+        sendPushNotification(notificationPayload);
 
         return handleSuccessV1(res, 201, "Order placed successfully", {
             order: savedOrder,
