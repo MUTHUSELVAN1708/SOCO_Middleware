@@ -293,6 +293,8 @@ export const createOrder = async (req, res) => {
             ? await BusinessModel.findById(user_id) 
             : await User.findById(user_id);
 
+        const business = await BusinessModel.findById(product.createdBy);
+
         if (!user) {
             return handleError(res, 404, isBusinessAccount ? "Business account not found" : "User not found");
         }
@@ -330,6 +332,35 @@ export const createOrder = async (req, res) => {
         const estimatedDelivery = new Date();
         estimatedDelivery.setDate(estimatedDelivery.getDate() + 5);
 
+        // ✅ Validate `subscriptionIDs`
+        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+
+        // Move this check **after** validPlayerIds is initialized
+        if (validPlayerIds.length === 0) {
+            return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+        }
+
+        console.log(validPlayerIds);
+
+        const notificationPayload = { 
+            playerIds: validPlayerIds, 
+            title: "New Order Received! 🎉", 
+            message: `${product.basicInfo.productTitle.trim()} just ordered! Please confirm to start processing.`, 
+            productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            appLogoUrl: isBusinessAccount ? user.brand_logo : user.profile_url,
+            additionalData: { 
+                order_id: savedOrder._id.toString(), 
+                tracking_number: trackingNumber, 
+                product_name: product.caption,
+                customer_name: isBusinessAccount ? user.businessName : user.full_Name || "Customer",
+                order_value: `${totalPrice} ${product.currency || "INR"}`,
+                order_date: new Date().toISOString(),
+                needs_confirmation: true
+            } 
+        };
+
+        await sendPushNotification(notificationPayload);
+
         return handleSuccessV1(res, 201, "Order placed successfully", {
             order: savedOrder,
             tracking: {
@@ -341,6 +372,7 @@ export const createOrder = async (req, res) => {
         return handleError(res, 500, `Error creating order: ${error.message}`); 
     } 
 };
+
 
 
 
