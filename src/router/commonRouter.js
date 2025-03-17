@@ -33,7 +33,7 @@ const mediaStorage = multer.diskStorage({
 // File Upload Configuration (Images and Videos)
 const uploadMedia = multer({
   storage: mediaStorage,
-  limits: { fileSize: 1024 * 1024 * 500 },
+  // limits: { fileSize: 1024 * 1024 * 500 },
    // Fix here
   fileFilter: (req, file, cb) => {
     const allowedMimeTypes = [

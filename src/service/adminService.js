@@ -19,7 +19,7 @@ import mongoose from "mongoose";
 import moment from "moment";
 import cron from "node-cron";
 import mentionModel from "../model/mentionModel.js";
-import {connectedUsers} from "../../socket.js";
+import { connectedUsers } from "../../socket.js";
 import pushnotofication from "../pushNotification.js"
 import cartModel from "../model/cartModel.js";
 import MessageModel from "../model/chatModel.js";
@@ -1318,6 +1318,10 @@ const adminService = {
         }
 
         try {
+            const random = Math.random().toString(36).slice(2, 8);
+            console.log(random, "kkk");
+            const sendmail = await adminService.sendMail(email, random)
+            console.log(sendmail, "sendmail")
             const hashedPassword = await bcrypt.hash(password, 10);
 
             const update = await registerModel.findOneAndUpdate(
@@ -1334,6 +1338,68 @@ const adminService = {
         } catch (error) {
             console.error("Error in forgotPassword:", error);
             throw error;
+        }
+    },
+
+    // ======================
+    sendMail: async (email, code) => {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Your Email Verification Code",
+            html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background-color: #0066cc; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">Verify Your Email</h1>
+    </div>
+    
+    <div style="padding: 20px; background-color: #ffffff;">
+        <h2 style="color: #333333;">Welcome to Soco</h2>
+        
+        <p>Dear User,</p>
+        
+        <p>You recently requested to reset your password for your Soco account. To proceed, please enter the verification code below:</p>
+        
+        <div style="background-color: #f5f5f5; padding: 15px; margin: 20px 0; text-align: center; border-radius: 5px;">
+            <h2 style="color: #0066cc; margin: 0;">Your Verification Code</h2>
+            <div style="font-size: 32px; font-weight: bold; color: #333333; margin: 10px 0;">${code}</div>
+        </div>
+        
+
+
+        <p style="color: #666666; font-size: 12px; margin-top: 20px;">For security reasons, please do not share this code with anyone. If you need assistance, feel free to contact our support team.</p>
+    </div>
+    
+    <div style="background-color: #f5f5f5; padding: 20px; text-align: center;">
+        <p style="margin: 0; color: #666666;">
+            Stay connected with us:
+            <a href="#" style="color: #0066cc; text-decoration: none;">LinkedIn</a> |
+            <a href="#" style="color: #0066cc; text-decoration: none;">Twitter</a> |
+            <a href="#" style="color: #0066cc; text-decoration: none;">Instagram</a>
+        </p>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #666666;">
+            Soco | 800 Broadway Suite 1500, New York, NY 000423, USA | Support: 0800 000 900
+        </p>
+        <p style="font-size: 12px; color: #666666;">
+            © ${new Date().getFullYear()} Soco. All rights reserved.
+        </p>
+    </div>
+</div>
+ `,
+        };
+        try {
+            await transporter.sendMail(mailOptions);
+            console.log(`Email sent to ${email} with code: ${code}`);
+        } catch (error) {
+            console.error("Error sending email:", error);
+            throw new Error("Failed to send email");
         }
     },
     // ====================
@@ -1963,7 +2029,7 @@ const adminService = {
 
             const userPost = new createPostModel(newPost);
             await userPost.save();
-            
+
             if (typeOfAccount === "business") {
                 await businessregisterModel.findByIdAndUpdate(user_id, { $inc: { postCount: 1 } });
             } else {
@@ -2100,18 +2166,18 @@ const adminService = {
     getPosts: async (user_id, page = 1, limit = 25) => {
         try {
             const skip = (page - 1) * 10;
-    
+
             // Fetch posts sorted by likesCount in descending order
             const posts = await createPostModel.find({ user_id, isProductPost: false })
                 .sort({ likesCount: -1 }) // Sort by likesCount (highest first)
                 .skip(skip)
                 .limit(10)
                 .select('imageUrl likesCount caption likes tags timestamp isVideo thumbnailFile aspectRatio viewsCount');
-    
+
             // Count total results for pagination
             const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
             const totalPages = Math.ceil(totalResults / 10);
-    
+
             return {
                 posts,
                 pagination: {
@@ -2127,7 +2193,7 @@ const adminService = {
             throw error;
         }
     },
-    
+
 
     getPostDetails: async (postId) => {
         try {
@@ -3198,19 +3264,19 @@ const adminService = {
 
     sendMessage: async (io, socket, from, to, message) => {
         console.log("📩 Input data:", { from, to, message });
-    
+
         if (!from || !to || !message) {
             socket.emit("sendedMsg", { success: false, message: "Missing required fields: from, to, or message" });
             throw new Error("Missing required fields: from, to, or message");
         }
-    
+
         const timestamp = new Date();
         const chatKey = `chat:${from}:${to}`;
-    
+
         try {
             const newMessage = await MessageModel.create({ from, to, message, timestamp });
             console.log("✅ New message created:", newMessage);
-    
+
             const messageWithObjectId = {
                 _id: newMessage._id.toString(),
                 from,
@@ -3218,13 +3284,13 @@ const adminService = {
                 message,
                 timestamp,
             };
-    
+
             // Store message in Redis
             await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
-    
+
             console.log("🟢 Checking connected users:", JSON.stringify(connectedUsers, null, 2));
             const receiverSocketId = connectedUsers[to];
-    
+
             if (receiverSocketId) {
                 console.log(`✅ Receiver (${to}) is online. Sending message...`);
                 io.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
@@ -3232,9 +3298,9 @@ const adminService = {
                 console.log(`❌ Receiver (${to}) is offline.`);
                 await redisService.getRedisClient().lPush(`offlineMessages:${to}`, JSON.stringify(messageWithObjectId));
             }
-    
+
             socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
-    
+
             return { success: true, message: "Message sent" };
         } catch (err) {
             console.error("❌ Error in sendMessage:", err);
@@ -3530,22 +3596,22 @@ const adminService = {
     getUserProfile: async (id, isBusinessAccount, userId, accountBusinessType) => {
         try {
             console.log(`Fetching user profile for ID: ${id}, isBusinessAccount: ${isBusinessAccount}`);
-    
+
             const user = isBusinessAccount
                 ? await businessregisterModel.findById(id)
                 : await registerModel.findById(id);
-    
+
             if (!user) {
                 console.log(`User not found for ID: ${id}`);
                 return null;
             }
-    
+
             console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.ownerName : user.full_Name}`);
-    
+
             const fullName = isBusinessAccount ? user.businessName || "Business Owner" : user.full_Name || "";
-    
+
             console.log(`Checking friendship status for userId: ${userId} and profileId: ${id}`);
-    
+
             // Fetch friendship details
             const friendRecord = await Friend.findOne({
                 userId,
@@ -3553,7 +3619,7 @@ const adminService = {
                 "friends.friendId": id,
                 "friends.friendReference": isBusinessAccount ? "businessRegister" : "User",
             });
-    
+
             let friendStatus = "Not Friends";
             if (friendRecord) {
                 const friendEntry = friendRecord.friends.find(f => f.friendId === id);
@@ -3561,11 +3627,11 @@ const adminService = {
                     friendStatus = friendEntry.status;
                 }
             }
-    
+
             console.log(`Friendship status: ${friendStatus}`);
-    
+
             console.log(`Checking follow status for userId: ${userId} and profileId: ${id}`);
-    
+
             // Check if userId is already following
             const isAlreadyFollow = await Follow.exists({
                 userId,
@@ -3573,9 +3639,9 @@ const adminService = {
                 followingId: id,
                 followingReference: isBusinessAccount ? "businessRegister" : "User",
             });
-    
+
             console.log(`Follow status: ${isAlreadyFollow ? "Already following" : "Not following"}`);
-    
+
             const profileData = {
                 id: user._id.toString(),
                 username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
@@ -3591,21 +3657,21 @@ const adminService = {
                 needPermissionForFollowing: user.needPermissionForFollowing,
                 highlights: user.highlights?.length ? user.highlights : [],
                 isAlreadyFollow: !!isAlreadyFollow,
-                isBusinessAccount, 
+                isBusinessAccount,
                 friendStatus, // ✅ Added friend status
             };
-    
+
             console.log(`Returning profile data:`, profileData);
-    
+
             return profileData;
         } catch (error) {
             console.error("Error fetching user profile:", error);
             return null;
         }
     },
-    
-    
-    
+
+
+
 
     fetchUserFriends: async (id) => {
         try {
@@ -3823,8 +3889,8 @@ const adminService = {
             phone_number,
             name,
             email,
-            product_id, 
-            quantity = 1, 
+            product_id,
+            quantity = 1,
             size,
         } = data;
 
@@ -3834,7 +3900,7 @@ const adminService = {
             let payment = null; // Store payment info
 
             if (product_id) {
-                
+
                 const product = await Product.findById(product_id);
                 console.log(product, "gggggg")
                 if (!product) throw { error: "Product not found" };
@@ -3845,9 +3911,9 @@ const adminService = {
 
                 const itemTotalPrice = parseFloat(product.pricing?.salePrice || 0) * quantity;
                 console.log(`Base Price: ${product.pricing?.salePrice}, Quantity: ${quantity}, Item Total Price: ${itemTotalPrice}`);
-                
+
                 let taxAmount = 0;
-                
+
                 // Add GST if applicable
                 if (product.pricing?.gstDetails?.gstIncluded) {
                     const gstPercentage = parseFloat(product.pricing?.gstDetails?.gstPercentage || 0);
@@ -3855,7 +3921,7 @@ const adminService = {
                     taxAmount += gstAmount;
                     console.log(`GST Applied (${gstPercentage}%): ${gstAmount}`);
                 }
-                
+
                 // Add additional taxes if any
                 if (product.pricing?.additionalTaxes?.length > 0) {
                     product.pricing.additionalTaxes.forEach((tax) => {
@@ -3866,12 +3932,12 @@ const adminService = {
                         }
                     });
                 }
-                
+
                 totalPrice = itemTotalPrice + taxAmount;
                 console.log(`Total Tax Amount: ${taxAmount}`);
                 console.log(`Final Total Price (including taxes): ${totalPrice}`);
-                
-                
+
+
 
                 if (paymentMode === "online") {
                     payment = await adminService.payment({ amount: totalPrice, name, email });
@@ -3920,15 +3986,15 @@ const adminService = {
                 for (const cartItem of cartItems) {
                     const product = await Product.findById(cartItem.product_id);
                     if (!product) throw { error: `Product not found` };
-                
+
                     console.log(`Processing Product: ${product._id}, Name: ${product.name}`);
-                
+
                     // Base price calculation
                     const basePrice = parseFloat(product.pricing?.salePrice || 0) * cartItem.quantity;
                     console.log(`Base Price: ${product.pricing?.salePrice}, Quantity: ${cartItem.quantity}, Item Total Price: ${basePrice}`);
-                
+
                     let taxAmount = 0;
-                
+
                     // Add GST if applicable
                     if (product.pricing?.gstDetails?.gstIncluded) {
                         const gstPercentage = parseFloat(product.pricing?.gstDetails?.gstPercentage || 0);
@@ -3936,7 +4002,7 @@ const adminService = {
                         taxAmount += gstAmount;
                         console.log(`GST Applied (${gstPercentage}%): ${gstAmount}`);
                     }
-                
+
                     // Add additional taxes if any
                     if (product.pricing?.additionalTaxes?.length > 0) {
                         product.pricing.additionalTaxes.forEach((tax) => {
@@ -3947,16 +4013,16 @@ const adminService = {
                             }
                         });
                     }
-                
+
                     // Final total price after adding taxes
                     const totalPrice = basePrice + taxAmount;
                     console.log(`Total Tax Amount: ${taxAmount}`);
                     console.log(`Final Total Price (including taxes): ${totalPrice}`);
-                
+
                     // Generate tracking details
                     const trackingNumber = `TRACK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`; // Unique tracking per product
                     const expectedDeliveryDate = product.availability?.deliveryTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
-                
+
                     // Checkout record creation
                     const checkoutRecord = await checkoutModel.create({
                         user_id,
@@ -3974,16 +4040,16 @@ const adminService = {
                         expected_delivery_date: expectedDeliveryDate,
                         tracking_updates: [{ status: "Pending", timestamp: new Date() }]
                     });
-                
+
                     checkoutRecords.push(checkoutRecord);
-                
+
                     console.log(`Checkout Record Created: ${checkoutRecord._id}`);
-                
+
                     // Remove item from cart
                     await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
                     console.log(`Removed item from cart: ${cartItem.product_id}`);
                 }
-                
+
             }
 
             return {
@@ -4052,13 +4118,13 @@ const adminService = {
         const { user_id, post_id, isBusinessAccount, isProduct } = data;
         try {
             const existingLike = await BookmarkModel.findOne({ user_id, post_id });
-    
+
             if (existingLike) {
                 await BookmarkModel.findOneAndDelete({ user_id, post_id });
                 return { message: "Removed from Bookmark", marked: false };
             }
-    
-            const newMark = await BookmarkModel.create({ user_id, post_id, isBusinessAccount,isProduct });
+
+            const newMark = await BookmarkModel.create({ user_id, post_id, isBusinessAccount, isProduct });
             return { message: "Added to Bookmark", marked: true, data: newMark };
         } catch (error) {
             throw new Error(error.message || "Something went wrong while processing your request.");
@@ -4068,22 +4134,22 @@ const adminService = {
     getUserBookmarks: async (user_id, page = 1, limit = 15) => {
         try {
             if (!user_id) return { success: false, message: "Invalid user ID" };
-    
+
             const skip = (page - 1) * limit;
-    
+
             const bookmarkedPosts = await BookmarkModel.find({ user_id })
                 .select("post_id")
                 .skip(skip)
                 .limit(limit);
-    
+
             const postIds = bookmarkedPosts.map(bookmark => bookmark.post_id);
-    
+
             const totalBookmarks = await BookmarkModel.countDocuments({ user_id });
-    
+
             const posts = await createPostModel.find({ _id: { $in: postIds } })
                 .select("productId likesCount imageUrl thumbnailFile isVideo aspectRatio isBusinessPost isUserPost isProductPost viewsCount")
                 .lean();
-    
+
             return {
                 success: true,
                 data: posts,
@@ -4100,50 +4166,50 @@ const adminService = {
             throw new Error(error.message || "Failed to fetch bookmarked posts.");
         }
     },
-    
+
     toggleFav: async (data) => {
         const { user_id, post_id, isBusinessAccount, isProduct } = data;
         try {
             const existingLike = await FavoriteModel.findOne({ user_id, post_id });
-    
+
             if (existingLike) {
                 await FavoriteModel.findOneAndDelete({ user_id, post_id });
                 await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
-    
+
                 return { message: "Removed from favorites", liked: false };
             }
-    
+
             const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
             await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
-    
+
             return { message: "Added to favorites", liked: true, data: newLike };
         } catch (error) {
             throw new Error(error.message || "Something went wrong while processing your request.");
         }
     },
-    
 
-    getUserFavorites : async (user_id, page = 1, limit = 15) => {
+
+    getUserFavorites: async (user_id, page = 1, limit = 15) => {
         try {
             if (!user_id) return { success: false, message: "Invalid user ID" };
-            
+
             const skip = (page - 1) * limit;
-            
+
             const favoritePosts = await FavoriteModel.find({ user_id })
                 .select("post_id")
                 .skip(skip)
                 .limit(limit);
 
-                console.log(favoritePosts);
-            
+            console.log(favoritePosts);
+
             const postIds = favoritePosts.map(fav => fav.post_id);
-            
+
             const totalFavorites = await FavoriteModel.countDocuments({ user_id });
-            
+
             const posts = await createPostModel.find({ _id: { $in: postIds } })
                 .select("productId likesCount imageUrl thumbnailFile isVideo aspectRatio isBusinessPost isUserPost isProductPost viewsCount")
                 .lean();
-            
+
             return {
                 success: true,
                 data: posts,
@@ -4178,30 +4244,30 @@ const adminService = {
     // ===========================
     getWishlist: async (user_id) => {
         console.log(user_id, "Received user_id");
-    
+
         try {
             const userId = user_id?.id ? user_id.id.toString() : user_id;
             console.log(userId, "Processed userId");
-    
+
             if (!userId) {
                 throw new Error("Invalid user_id provided");
             }
-    
+
             // Fetch wishlist items only for the given user_id
             const getWishList = await FavoriteModel.find({ user_id: userId }).lean();
             console.log(getWishList, "Fetched wishlist items");
-    
+
             if (getWishList.length === 0) {
                 return [];
             }
-    
+
             // Extract post_ids from the wishlist
             const productIds = getWishList.map(item => item.post_id);
-    
+
             // Fetch products that match the wishlist items
             const products = await Product.find({ _id: { $in: productIds } }).lean();
             console.log(products, "Fetched products");
-    
+
             // Format the response
             const result = products.map(product => ({
                 user_id: userId,
@@ -4218,16 +4284,16 @@ const adminService = {
                 discount: product?.discount || 0,
                 unit: product?.unit || "N/A"
             }));
-    
+
             console.log(result, "Formatted wishlist response");
             return result;
-    
+
         } catch (error) {
             console.error("Error in getWishlist:", error);
             throw error;
         }
     },
-    
+
     // =====================
     getOrderHistory: async (user_id) => {
         console.log(user_id)
