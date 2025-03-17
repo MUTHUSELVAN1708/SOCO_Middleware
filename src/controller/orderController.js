@@ -95,7 +95,7 @@ export const confirmOrderBySeller = async (req, res) => {
             needsSignature = false,
             isFragile = false,
             paymentMethod,
-           isBusinessAccount 
+      
         } = req.body;
 
         if (!orderId) {
@@ -218,7 +218,7 @@ export const cancelOrderBySeller = async (req, res) => {
 console.log(business,"business")
         const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
       
-              // Move this check **after** validPlayerIds is initialized
+             
               if (validPlayerIds.length === 0) {
                   return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
               }
