@@ -94,7 +94,8 @@ export const confirmOrderBySeller = async (req, res) => {
             trackingInfo,
             needsSignature = false,
             isFragile = false,
-            paymentMethod
+            paymentMethod,
+           isBusinessAccount 
         } = req.body;
 
         if (!orderId) {
@@ -107,6 +108,7 @@ export const confirmOrderBySeller = async (req, res) => {
         }
 
         const product = await Product.findById(order.product_id);
+        console.log(product,"product")
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
@@ -143,6 +145,27 @@ export const confirmOrderBySeller = async (req, res) => {
         order.tracking_info.push({ status: "Order Confirmed", timestamp: new Date() });
 
         await order.save();
+        const business = await BusinessModel.findById(product.createdBy);
+console.log(business,"business")
+        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+      
+              // Move this check **after** validPlayerIds is initialized
+              if (validPlayerIds.length === 0) {
+                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+              }
+      
+              console.log(validPlayerIds);
+      
+              const notificationPayload = { 
+                playerIds: validPlayerIds, 
+                title: "Order Confirmed ✅", 
+                message: `Your order for ${product.basicInfo.productTitle.trim()} has been confirmed! Processing will begin shortly.`, 
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+            
+      
+              await sendPushNotification(notificationPayload);
+      
 
         return handleSuccessV1(res, 200, "Order confirmed successfully", {
             orderId: order._id,
@@ -185,7 +208,32 @@ export const cancelOrderBySeller = async (req, res) => {
         order.tracking_info.push({ status: "Order Cancelled", reason: cancelReason, timestamp: new Date() });
 
         await order.save();
-
+        const product = await Product.findById(order.product_id);
+        console.log(product,"product")
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
+        
+        const business = await BusinessModel.findById(product.createdBy);
+console.log(business,"business")
+        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+      
+              // Move this check **after** validPlayerIds is initialized
+              if (validPlayerIds.length === 0) {
+                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+              }
+      
+              console.log(validPlayerIds);
+      
+              const notificationPayload = { 
+                playerIds: validPlayerIds, 
+                title: "Order Canceled ", 
+                message: `Your order for ${product.basicInfo.productTitle.trim()} has been Canceled! `, 
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+            
+      
+              await sendPushNotification(notificationPayload);
         return handleSuccessV1(res, 200, "Order cancelled successfully", {
             orderId: order._id,
             status: order.order_status,
