@@ -14,7 +14,7 @@ const orderSchema = new mongoose.Schema(
     },
     product_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "products",
+      ref: "Product",
       required: true,
     },
 
@@ -51,15 +51,23 @@ const orderSchema = new mongoose.Schema(
       ref: "DeliveryAddress",
       required: true,
     },
-    delivery_method: {
-      type: String,
-      required: false,
-    },
+    delivery_method: { type: String },
+    cancel_reason: { type: String },
+    cancel_category: { type: String },
+    additionalCommentsForCancel: { type: String },
     delivery_partner: {
       name: { type: String },
       tracking_number: { type: String, default: null },
     },
     estimated_delivery_date: { type: Date },
+    delivery_charge: { type: Number, default: 0 }, // Added delivery charge field
+
+    // New Fields
+    return_type: { type: String, default: "No Return" }, // Return type: No Return, 7 Days, etc.
+    delivery_type: { type: String, default: "Standard" }, // Delivery type: Standard, Express
+    special_instructions: { type: String }, // Extra instructions from seller
+    needs_signature: { type: Boolean, default: false }, // Whether signature is required
+    is_fragile: { type: Boolean, default: false }, // If the product is fragile
 
     // Order Tracking
     order_status: {
@@ -71,9 +79,11 @@ const orderSchema = new mongoose.Schema(
         "Out for Delivery",
         "Delivered",
         "Cancelled",
+        "Confirmed", // Added Confirmed status
       ],
       default: "Pending",
     },
+    total_price: { type: Number, default: 0 },
     seller_delivery_status: {
       type: String,
       enum: ["Not Started", "In Transit", "Delivered"],

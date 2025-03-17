@@ -100,6 +100,11 @@ const registerSchema = new mongoose.Schema(
       required: false
     },
 
+    // Notification fields
+    oneSignalIDs: { type: [String], default: [] },
+    subscriptionIDs: { type: [String], default: [] },
+    
+
     // bio Details
     bio: { type: String, default: '', required: false },
     title: { type: String, default: '', required: false },

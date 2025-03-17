@@ -1,81 +1,87 @@
-import axios from 'axios';
-import Notification from '../model/orderNotificationModel.js';
-import BusinessModel from '../model/BusinessModel.js';
+import axios from "axios";
 
-const ONESIGNAL_APP_ID = '46e90495-8cb8-4500-ae91-90edb10dd101'; 
-const ONESIGNAL_API_KEY = 'os_v2_app_i3uqjfmmxbcqblursdw3cdorafyrqb7hkaoeyv5yajysegzauje6orn5rqc5cqselsezfreyrd2rbvo46hpuq4j7hwjmn6ffxl5nv7i'; 
+const ONE_SIGNAL_API_URL = "https://onesignal.com/api/v1/notifications";
+const ONE_SIGNAL_APP_ID = "5e250119-1cc5-42e6-ab67-43d03443819b";
+const ONE_SIGNAL_API_KEY = "os_v2_app_lysqcgi4yvbonk3hipidiq4btnv7wmh7itceqvmq4br2dzmibrxlnv4wx6dxw2k3r65mq4vvsqwqjx2aquostov2i4brvf5dlr3pzea";
 
-// Store device tokens
-export const registerDeviceToken = async (userId, deviceToken, deviceType) => {
-  try {
-    await BusinessModel.findByIdAndUpdate(userId, {
-      $set: {
-        deviceToken,
-        deviceType // 'android' or 'ios'
-      }
-    });
-    return { success: true };
-  } catch (error) {
-    console.error('Error registering device token:', error);
-    throw error;
-  }
-};
-
-// Send push notification
-export const sendPushNotification = async (recipientId, title, message, data = {}) => {
-  try {
-    // First, find the seller and get their device token
-    const seller = await BusinessModel.findById(recipientId);
-    if (!seller || !seller.deviceToken) {
-      console.log(`No device token found for seller: ${recipientId}`);
-      return false;
+/**
+ * Send a push notification using OneSignal with properly configured icons for Flutter
+ * and support for expanded text messages
+ * @param {Object} payload - Notification payload
+ * @param {Array} payload.playerIds - Array of OneSignal player IDs
+ * @param {string} payload.title - Notification title
+ * @param {string} payload.appLogoUrl - application logo url
+ * @param {string} payload.message - Notification message
+ * @param {string} [payload.productImageUrl] - URL to the product image
+ * @param {Object} [payload.additionalData] - Additional data to send with notification
+ */
+export const sendPushNotification = async ({
+    playerIds,
+    title,
+    message,
+    productImageUrl,
+    appLogoUrl,
+    additionalData = {}
+}) => {
+    // const appLogoUrl = "http://192.168.1.33:2007/uploads/1740664119907-scaled_download%20(1).png";
+    
+    try {
+        const notificationPayload = {
+            app_id: ONE_SIGNAL_APP_ID,
+            include_player_ids: playerIds,
+            headings: { en: title },
+            contents: { en: message },
+            data: {
+                ...additionalData,
+                timestamp: new Date().toISOString()
+            },
+            
+            // Enable expanded text for Android
+            android_group: title,
+            big_picture: productImageUrl || null,
+            
+            // Critical: This enables expanded text view in notifications
+            big_text: message,
+            
+            // Android specific settings
+            android_accent_color: "FFFFFF",
+            small_icon: "ic_notification_icon",
+            large_icon: appLogoUrl,
+            
+            // iOS specific settings
+            ios_badgeType: "Increase",
+            ios_badgeCount: 1,
+            ios_attachments: productImageUrl ? { "id1": productImageUrl } : undefined,
+            
+            // Web specific settings
+            chrome_web_icon: appLogoUrl,
+            firefox_icon: appLogoUrl,
+            
+            // Make notification prominent
+            priority: 10,
+            ttl: 259200,
+            
+            // Optional buttons
+            buttons: [
+                { id: "view", text: "View Details" }
+            ]
+        };
+        
+        const response = await axios.post(
+            ONE_SIGNAL_API_URL,
+            notificationPayload,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Basic ${ONE_SIGNAL_API_KEY}`,
+                },
+            }
+        );
+        
+        console.log("✅ Enhanced Push Notification Sent:", response.data);
+        return { success: true, data: response.data };
+    } catch (error) {
+        console.error("❌ Error Sending Notification:", error.response?.data || error.message);
+        throw new Error(`Notification failed: ${error.response?.data?.errors?.[0] || error.message}`);
     }
-
-    // OneSignal notification payload
-    const payload = {
-      app_id: ONESIGNAL_APP_ID,
-      include_player_ids: [seller.deviceToken],
-      headings: { en: title },
-      contents: { en: message },
-      data: data,
-      android_channel_id: "order_notifications",
-      ios_sound: "notification.wav",
-      android_sound: "notification"
-    };
-
-    // Send to OneSignal
-    const response = await axios.post(
-      'https://onesignal.com/api/v1/notifications',
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${ONESIGNAL_API_KEY}`
-        }
-      }
-    );
-
-    if (response.status === 200) {
-      console.log('Push notification sent successfully');
-      
-      // Also save the notification in our database
-      const notification = new Notification({
-        recipient_id: recipientId,
-        recipient_type: 'seller',
-        title,
-        message,
-        order_id: data.order_id,
-        product_id: data.product_id
-      });
-      await notification.save();
-      
-      return true;
-    } else {
-      console.error('Failed to send push notification:', response.data);
-      return false;
-    }
-  } catch (error) {
-    console.error('Error sending push notification:', error);
-    return false;
-  }
 };

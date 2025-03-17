@@ -35,6 +35,8 @@ const BusinessregisterSchema = new mongoose.Schema(
     accountIsPublic: { type: Boolean, default: false },
     natureOfBusiness: { type: String, required: false },
     businessName: { type: String, required: false },
+    oneSignalIDs: { type: [String], default: [] },
+    subscriptionIDs: { type: [String], default: [] },
     
     // Chat-related fields
     onlineStatus: { 
