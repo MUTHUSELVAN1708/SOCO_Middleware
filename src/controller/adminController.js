@@ -107,6 +107,24 @@ const adminController = {
     },
 
     // ==========
+    updateNotificationDetails: async (req, res, next) => {
+        try {
+            const register = await adminService.updateNotificationDetails(req.body);
+            res.status(200).json({
+                status: 200,
+                msg: "Successfully created",
+                // data: register,
+            });
+        } catch (error) {
+            console.error(error);
+            // Ensure error structure is consistent
+            error.status = error.status || 400; // Default to 400 if no status set
+            error.message = error.message || 'Something went wrong';
+
+            // Pass the error to the next middleware
+            next(error);
+        }
+    },
     registerUserWithBusiness: async (req, res, next) => {
         try {
             const register = await adminService.registerUserWithBusiness(req.body);

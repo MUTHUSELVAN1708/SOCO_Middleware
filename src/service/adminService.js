@@ -268,6 +268,102 @@ const adminService = {
     },
 
 
+    updateNotificationDetails: async (data) => {
+        try {
+            const { userId, oneSignalID, subscriptionID } = data;
+    
+            if (!userId || !oneSignalID || !subscriptionID) {
+                throw { status: 400, message: "User ID, OneSignal ID, and Subscription ID are required." };
+            }
+    
+            let userToUpdate = await registerModel.findById(userId);
+            let businessToUpdate = await businessregisterModel.findOne({ user_id: userId });
+            let linkedUserId = null;
+            let relatedBusinesses = []; // Declare it outside to avoid "not defined" error
+    
+            if (!userToUpdate && !businessToUpdate) {
+                throw { status: 404, message: "User or Business account not found." };
+            }
+    
+            if (businessToUpdate) {
+                linkedUserId = businessToUpdate.user_id;
+    
+                const businessUpdateFields = {
+                    oneSignalIDs: businessToUpdate.oneSignalIDs || [],
+                    subscriptionIDs: businessToUpdate.subscriptionIDs || []
+                };
+    
+                if (!businessUpdateFields.oneSignalIDs.includes(oneSignalID)) {
+                    businessUpdateFields.oneSignalIDs.push(oneSignalID);
+                }
+                if (!businessUpdateFields.subscriptionIDs.includes(subscriptionID)) {
+                    businessUpdateFields.subscriptionIDs.push(subscriptionID);
+                }
+    
+                await businessregisterModel.findByIdAndUpdate(
+                    businessToUpdate._id,
+                    { $set: businessUpdateFields },
+                    { new: true }
+                );
+    
+                relatedBusinesses = await businessregisterModel.find({ user_id: linkedUserId });
+    
+                for (let business of relatedBusinesses) {
+                    const updateFields = {
+                        oneSignalIDs: business.oneSignalIDs || [],
+                        subscriptionIDs: business.subscriptionIDs || []
+                    };
+                    if (!updateFields.oneSignalIDs.includes(oneSignalID)) {
+                        updateFields.oneSignalIDs.push(oneSignalID);
+                    }
+                    if (!updateFields.subscriptionIDs.includes(subscriptionID)) {
+                        updateFields.subscriptionIDs.push(subscriptionID);
+                    }
+                    await businessregisterModel.findByIdAndUpdate(
+                        business._id,
+                        { $set: updateFields },
+                        { new: true }
+                    );
+                }
+    
+                userToUpdate = await registerModel.findById(linkedUserId);
+            }
+    
+            if (userToUpdate) {
+                const userUpdateFields = {
+                    oneSignalIDs: userToUpdate.oneSignalIDs || [],
+                    subscriptionIDs: userToUpdate.subscriptionIDs || []
+                };
+                if (!userUpdateFields.oneSignalIDs.includes(oneSignalID)) {
+                    userUpdateFields.oneSignalIDs.push(oneSignalID);
+                }
+                if (!userUpdateFields.subscriptionIDs.includes(subscriptionID)) {
+                    userUpdateFields.subscriptionIDs.push(subscriptionID);
+                }
+                await registerModel.findByIdAndUpdate(
+                    userToUpdate._id,
+                    { $set: userUpdateFields },
+                    { new: true }
+                );
+            }
+    
+            return {
+                success: true,
+                updatedUser: userToUpdate,
+                updatedBusiness: businessToUpdate,
+                updatedRelatedBusinesses: relatedBusinesses.length
+            };
+        } catch (error) {
+            console.error("Error in updateNotificationDetails:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+    
+    
+    
+
+
+
 
     //   ==========
     registerUserWithBusiness: async (data) => {

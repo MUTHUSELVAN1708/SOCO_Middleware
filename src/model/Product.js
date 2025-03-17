@@ -54,7 +54,7 @@ const productSchema = new mongoose.Schema({
     currency: { type: String, default: 'INR' },
     gstDetails: {
       gstIncluded: { type: Boolean, default: false },
-      gstPercentage: { type: Number, default: 18 }
+      gstPercentage: { type: Number, default: 5 }
     },
     additionalTaxes: [
       {
@@ -163,7 +163,7 @@ const productSchema = new mongoose.Schema({
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'businessRegister',
     required: false
   }
 }, {

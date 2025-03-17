@@ -73,44 +73,276 @@
 import mongoose from "mongoose";
 import Order from "../model/orderModel.js";
 import Product from "../model/Product.js";
+import User from "../model/registerModel.js";
+import BusinessModel from "../model/BusinessModel.js";
+import DeliveryAddressModel from "../model/deliveryAddressModel.js";
 import { handleSuccess, handleSuccessV1, handleError , generateTrackingNumber } from "../utils/responseHandler.js";
+import { sendPushNotification } from "../service/pushNotificationService.js";
 
-// ✅ Create New Order
-export const createOrder = async (req, res) => {
+import { v4 as uuidv4, validate as isValidUUID } from "uuid";
+
+
+export const confirmOrderBySeller = async (req, res) => {
     try {
-        const { product_id, delivery_address_id, user_id } = req.body;
+        const {
+            orderId,
+            deliveryCharge = 0,
+            deliveryTimeInDays = 5,
+            returnType = "No Return",
+            deliveryType = "Standard",
+            specialInstructions = "",
+            trackingInfo,
+            needsSignature = false,
+            isFragile = false,
+            paymentMethod
+        } = req.body;
 
-        if (!product_id || !delivery_address_id || !user_id) {
-            return handleError(res, 400, "Missing required fields");
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
         }
 
-        // Fetch seller_id from Product model
-        const product = await Product.findById(product_id);
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        const product = await Product.findById(order.product_id);
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
 
-        const seller_id = product.createdBy;
+        let totalAmount = parseFloat(order.total_price) + parseFloat(deliveryCharge);
+        totalAmount = totalAmount.toFixed(2);
 
-        // Generate a better tracking number
-        const trackingNumber = generateTrackingNumber();
+        const estimatedDeliveryDate = new Date();
+        estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + parseInt(deliveryTimeInDays));
+        
+        // Convert to Indian Standard Time (IST - UTC+5:30)
+        const estimatedDeliveryDateIST = new Date(estimatedDeliveryDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        
 
-        const newOrder = new Order({
-            user_id,
-            seller_id,
-            product_id,
-            delivery_address_id,
-            delivery_partner: {
-                tracking_number: trackingNumber,
-            },
+        order.order_status = "Confirmed";
+        order.seller_review_status = "Reviewed";
+        order.buyer_approval_status = "Accepted";
+        order.total_price = totalAmount;
+        order.estimated_delivery_date = estimatedDeliveryDateIST;
+        order.delivery_method = deliveryType;
+        order.payment_mode = paymentMethod;
+        order.delivery_charge = parseFloat(deliveryCharge);
+        order.return_type = returnType;
+        order.special_instructions = specialInstructions;
+        order.needs_signature = needsSignature;
+        order.is_fragile = isFragile;
+
+        // Ensure delivery_partner exists
+        if (!order.delivery_partner) {
+            order.delivery_partner = {};
+        }
+        order.delivery_partner.tracking_number = trackingInfo || generateTrackingNumber();
+
+        order.tracking_info.push({ status: "Order Confirmed", timestamp: new Date() });
+
+        await order.save();
+
+        return handleSuccessV1(res, 200, "Order confirmed successfully", {
+            orderId: order._id,
+            totalAmount,
+            estimatedDeliveryDate,
+            trackingNumber: order.delivery_partner.tracking_number,
+            status: order.order_status
         });
-
-        await newOrder.save();
-        return handleSuccessV1(res, 201, "Order placed successfully", newOrder);
     } catch (error) {
-        return handleError(res, 500, `Error creating order: ${error.message}`);
+        return handleError(res, 500, `Error confirming order: ${error.message}`);
     }
 };
+
+export const cancelOrderBySeller = async (req, res) => {
+    try {
+        const { orderId, cancelReason ,additionalComments,category} = req.body;
+
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
+        }
+        if (!cancelReason) {
+            return handleError(res, 400, "Missing required field: cancelReason");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        if (order.order_status === "Cancelled") {
+            return handleError(res, 400, "Order is already cancelled");
+        }
+
+        order.order_status = "Cancelled";
+        order.seller_review_status = "Rejected";
+        order.buyer_approval_status = "Rejected";
+        order.cancel_reason = cancelReason;
+        order.cancel_category = category;
+        order.additionalCommentsForCancel = additionalComments;
+        order.tracking_info.push({ status: "Order Cancelled", reason: cancelReason, timestamp: new Date() });
+
+        await order.save();
+
+        return handleSuccessV1(res, 200, "Order cancelled successfully", {
+            orderId: order._id,
+            status: order.order_status,
+            cancelReason: order.cancel_reason
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error cancelling order: ${error.message}`);
+    }
+};
+
+
+
+
+
+export const getPendingOrders = async (req, res) => {
+    try {
+        const { seller_id, page = 1, limit = 10 } = req.query;
+
+        if (!seller_id) {
+            return handleError(res, 400, "Missing required field: seller_id");
+        }
+
+        const pageNumber = parseInt(page, 10);
+        const pageSize = parseInt(limit, 10);
+        const skip = (pageNumber - 1) * pageSize;
+
+        const totalItems = await Order.countDocuments({ seller_id, order_status: "Pending" });
+        const totalPages = Math.ceil(totalItems / pageSize);
+
+        const orders = await Order.find({ seller_id, order_status: "Pending" })
+            .skip(skip)
+            .limit(pageSize)
+            .populate("product_id")
+            .populate("delivery_address_id");
+
+        const orderRequests = await Promise.all(
+            orders.map(async (order, index) => {
+                const product = await Product.findById(order.product_id);
+                const address = await DeliveryAddressModel.findById(order.delivery_address_id);
+                
+                let buyer = await User.findById(order.user_id);
+                if (!buyer) {
+                    buyer = await BusinessModel.findById(order.user_id);
+                }
+
+                let finalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
+                if (product?.pricing?.gstDetails?.gstIncluded) {
+                    finalPrice += (finalPrice * product.pricing.gstDetails.gstPercentage) / 100;
+                }
+                if (product?.pricing?.additionalTaxes?.length > 0) {
+                    product.pricing.additionalTaxes.forEach(tax => {
+                        finalPrice += (finalPrice * tax.percentage) / 100;
+                    });
+                }
+                finalPrice = finalPrice.toFixed(2);
+
+                return {
+                    id: order._id,
+                    trackId: order.delivery_partner.tracking_number,
+                    req_id: `REQ${1000 + skip + index}`,
+                    buyerName: buyer?.org_name || buyer?.full_Name || "Unknown Buyer",
+                    buyerAddress: address 
+                        ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}` 
+                        : "Address Not Found",
+                    productName: product?.basicInfo?.productTitle || "Unknown Product",
+                    productId: `PROD${product?._id}`,
+                    price: `${finalPrice} ${product?.pricing?.currency || "INR"}`,
+                    productImage: product?.images?.length > 0 ? product.images[0] : "https://picsum.photos/200",
+                    requestDate: order.timestamp,
+                    status: order.order_status.toLowerCase(),
+                };
+            })
+        );
+
+        const pagination = {
+            totalResults: totalItems,
+            totalPages,
+            currentPage: pageNumber,
+            limit: pageSize,
+            hasNextPage: pageNumber < totalPages,
+            hasPreviousPage: pageNumber > 1,
+        };
+
+        return handleSuccessV1(res, 200, "Pending orders retrieved successfully", { orders: orderRequests, pagination });
+    } catch (error) {
+        return handleError(res, 500, `Error fetching pending orders: ${error.message}`);
+    }
+};
+
+
+export const createOrder = async (req, res) => { 
+    try { 
+        const { product_id, delivery_address_id, user_id, isBusinessAccount } = req.body;
+ 
+        if (!product_id || !delivery_address_id || !user_id) { 
+            return handleError(res, 400, "Missing required fields"); 
+        } 
+
+        const product = await Product.findById(product_id);
+        if (!product) { 
+            return handleError(res, 404, "Product not found"); 
+        } 
+
+        const user = isBusinessAccount 
+            ? await BusinessModel.findById(user_id) 
+            : await User.findById(user_id);
+
+        if (!user) {
+            return handleError(res, 404, isBusinessAccount ? "Business account not found" : "User not found");
+        }
+
+        const seller_id = product.createdBy; 
+        const trackingNumber = generateTrackingNumber(); 
+
+        let totalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
+
+        if (product?.pricing?.gstDetails?.gstIncluded) {
+            totalPrice += (totalPrice * product.pricing.gstDetails.gstPercentage) / 100;
+        }
+
+        if (product?.pricing?.additionalTaxes?.length > 0) {
+            product.pricing.additionalTaxes.forEach(tax => {
+                totalPrice += (totalPrice * tax.percentage) / 100;
+            });
+        }
+
+        totalPrice = totalPrice.toFixed(2);
+
+        const newOrder = new Order({ 
+            user_id, 
+            seller_id, 
+            product_id, 
+            delivery_address_id, 
+            delivery_partner: { tracking_number: trackingNumber },
+            order_date: new Date(),
+            order_status: "Pending",
+            total_price: totalPrice
+        }); 
+ 
+        const savedOrder = await newOrder.save();
+        
+        const estimatedDelivery = new Date();
+        estimatedDelivery.setDate(estimatedDelivery.getDate() + 5);
+
+        return handleSuccessV1(res, 201, "Order placed successfully", {
+            order: savedOrder,
+            tracking: {
+                number: trackingNumber,
+                estimated_delivery: estimatedDelivery
+            }
+        }); 
+    } catch (error) { 
+        return handleError(res, 500, `Error creating order: ${error.message}`); 
+    } 
+};
+
+
 
 
 // ✅ Get Order by ID
