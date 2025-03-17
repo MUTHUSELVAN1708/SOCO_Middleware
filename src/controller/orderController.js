@@ -185,8 +185,6 @@ export const rejectOrderByUser = async (req, res) => {
     }
 };
 
-
-
 export const getPendingApprovedOrderList = async (req, res) => {
     try {
         console.log("Received request for pending and approved orders:", req.query);
@@ -297,12 +295,6 @@ export const getPendingApprovedOrderList = async (req, res) => {
         return handleError(res, 500, `Error fetching pending and approved orders: ${error.message}`);
     }
 };
-
-
-
-
-
-
 
 export const getPendingOrders = async (req, res) => {
     try {
@@ -442,6 +434,8 @@ export const confirmOrderBySeller = async (req, res) => {
 
         await order.save();
 
+
+
         return handleSuccessV1(res, 200, "Order Accepted successfully", {
             orderId: order._id,
             totalAmount,
@@ -493,8 +487,6 @@ export const cancelOrderBySeller = async (req, res) => {
         return handleError(res, 500, `Error cancelling order: ${error.message}`);
     }
 };
-
-
 
 
 export const createOrder = async (req, res) => { 
@@ -593,10 +585,6 @@ export const createOrder = async (req, res) => {
         return handleError(res, 500, `Error creating order: ${error.message}`); 
     } 
 };
-
-
-
-
 
 // ✅ Get Order by ID
 export const getOrderById = async (req, res) => {
