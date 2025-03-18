@@ -72,7 +72,8 @@ const orderSchema = new mongoose.Schema(
     special_instructions: { type: String }, // Extra instructions from seller
     needs_signature: { type: Boolean, default: false }, // Whether signature is required
     is_fragile: { type: Boolean, default: false }, // If the product is fragile
-
+    is_Shipped: { type: Boolean, default: false }, 
+    is_Delivered: { type: Boolean, default: false }, 
     // Order Tracking
     order_status: {
       type: String,

@@ -130,6 +130,8 @@ export const getOrderDetails = async (req, res) => {
             trackingInfo: order.tracking_info || [],
             createdAt: order.created_at,
             deliveryTimeInDays: order.deliveryTimeInDays,
+            is_Shipped: order.is_Shipped,
+            is_Delivered: order.is_Delivered,
         };
 
         return handleSuccessV1(res, 200, "Order retrieved successfully", orderDetails);
