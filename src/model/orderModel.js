@@ -68,7 +68,7 @@ const orderSchema = new mongoose.Schema(
 
     // New Fields
     return_type: { type: String, default: "No Return" }, // Return type: No Return, 7 Days, etc.
-    delivery_type: { type: String, default: "Standard" }, // Delivery type: Standard, Express
+    delivery_type: { type: String, default: "India Post" }, 
     special_instructions: { type: String }, // Extra instructions from seller
     needs_signature: { type: Boolean, default: false }, // Whether signature is required
     is_fragile: { type: Boolean, default: false }, // If the product is fragile
