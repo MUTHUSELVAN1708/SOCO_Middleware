@@ -83,6 +83,64 @@ import { sendPushNotification } from "../service/pushNotificationService.js";
 import { v4 as uuidv4, validate as isValidUUID } from "uuid";
 
 
+export const getOrderDetails = async (req, res) => {
+    try {
+        const { orderId } = req.query;
+
+        if (!orderId || !mongoose.Types.ObjectId.isValid(orderId)) {
+            return handleError(res, 400, "Invalid order ID");
+        }
+
+        const order = await Order.findOne({ _id: orderId }).populate("product_id");
+
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        const product = await Product.findById(order.product_id);
+        
+        const orderDetails = {
+            orderId: order._id,
+            userId: order.user_id,
+            sellerId: order.seller_id,
+            product: product ? {
+                productId: product._id,
+                name: product.basicInfo?.productTitle || "Unknown Product",
+                price: product.pricing?.salePrice || product.pricing?.regularPrice || "N/A",
+                currency: product.pricing?.currency || "INR",
+                image: product.images?.[0] || "",
+            } : null,
+            status: order.order_status,
+            totalPrice: order.total_price,
+            paymentStatus: order.payment_status,
+            paymentMode: order.payment_mode,
+            deliveryType: order.delivery_type,
+            deliveryMethod: order.delivery_method,
+            deliveryCharge: order.delivery_charge,
+            deliveryPartner: order.delivery_partner?.tracking_number || "N/A",
+            deliveryAddressId: order.delivery_address_id,
+            returnType: order.return_type,
+            needsSignature: order.needs_signature,
+            isFragile: order.is_fragile,
+            estimatedDeliveryDate: order.estimated_delivery_date,
+            sellerReviewStatus: order.seller_review_status,
+            buyerApprovalStatus: order.buyer_approval_status,
+            sellerDeliveryStatus: order.seller_delivery_status,
+            specialInstructions: order.special_instructions || "",
+            trackingInfo: order.tracking_info || [],
+            createdAt: order.created_at,
+            deliveryTimeInDays: order.deliveryTimeInDays,
+        };
+
+        return handleSuccessV1(res, 200, "Order retrieved successfully", orderDetails);
+    } catch (error) {
+        return handleError(res, 500, `Error fetching order: ${error.message}`);
+    }
+};
+
+
+
+
 export const cancelOrderByUser = async (req, res) => {
     try {
         const { userId, orderId, cancelReason } = req.body;
@@ -140,7 +198,7 @@ export const confirmOrderByUser = async (req, res) => {
         order.order_status = "Confirmed";
         order.buyer_approval_status = "Accepted";
 
-        order.tracking_info.push({ status: "Confirmed", timestamp: moment().tz("Asia/Kolkata").toDate() });
+        order.tracking_info.push({ status: "The creator has confirmed this product for the order", timestamp: moment().tz("Asia/Kolkata").toDate() });
 
         await order.save();
 
@@ -173,7 +231,7 @@ export const rejectOrderByUser = async (req, res) => {
         order.buyer_approval_status = "Rejected";
         order.reject_reason_by_buyer = rejectReason;
 
-        order.tracking_info.push({ status: "Rejected", timestamp: moment().tz("Asia/Kolkata").toDate(), reason: rejectReason });
+        order.tracking_info.push({ status: "Rejected by order creator", timestamp: moment().tz("Asia/Kolkata").toDate(), reason: rejectReason });
 
         await order.save();
 
@@ -201,7 +259,7 @@ export const getPendingApprovedOrderList = async (req, res) => {
         console.log(`Fetching orders for user_id: ${user_id}, Page: ${pageNumber}, Limit: ${pageSize}, Skip: ${skip}`);
 
         // Updated query filter to include both "Accepted" and "Pending" orders
-        const queryFilter = { user_id, order_status: { $in: ["Accepted"] }  };
+        const queryFilter = { user_id, order_status: { $in: ["Pending", "Accepted"] } };
 
         const totalItems = await Order.countDocuments(queryFilter);
         console.log(`Total orders found: ${totalItems}`);
@@ -256,6 +314,7 @@ export const getPendingApprovedOrderList = async (req, res) => {
                     id: order._id,
                     trackId: order.delivery_partner?.tracking_number || "N/A",
                     delivery_type:order.delivery_type,
+                    return_type:order.return_type,
                     delivery_charge:order.delivery_charge,
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `${product?._id}`,
@@ -432,7 +491,7 @@ export const confirmOrderBySeller = async (req, res) => {
         }
         order.delivery_partner.tracking_number = trackingInfo || generateTrackingNumber();
 
-        order.tracking_info.push({ status: "Order Accepted", timestamp: new Date() });
+        order.tracking_info.push({ status: "Order Accepted By Seller", timestamp: new Date() });
 
         await order.save();
 
@@ -476,7 +535,7 @@ export const cancelOrderBySeller = async (req, res) => {
         order.cancel_reason = cancelReason;
         order.cancel_category = category;
         order.additionalCommentsForCancel = additionalComments;
-        order.tracking_info.push({ status: "Order Cancelled", reason: cancelReason, timestamp: new Date() });
+        order.tracking_info.push({ status: "Order Cancelled By Seller", reason: cancelReason, timestamp: new Date() });
 
         await order.save();
 
@@ -539,7 +598,13 @@ export const createOrder = async (req, res) => {
             delivery_partner: { tracking_number: trackingNumber },
             order_date: new Date(),
             order_status: "Pending",
-            total_price: totalPrice
+            total_price: totalPrice,
+            tracking_info: [
+                {
+                    status: `Order created by ${isBusinessAccount ? user.businessName : user.full_Name || "Customer"}`,
+                    timestamp: moment().tz("Asia/Kolkata").toDate(),
+                }
+            ]
         }); 
  
         const savedOrder = await newOrder.save();
@@ -547,10 +612,8 @@ export const createOrder = async (req, res) => {
         const estimatedDelivery = new Date();
         estimatedDelivery.setDate(estimatedDelivery.getDate() + 5);
 
-        // ✅ Validate `subscriptionIDs`
         const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
 
-        // Move this check **after** validPlayerIds is initialized
         if (validPlayerIds.length === 0) {
             return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
         }
@@ -587,6 +650,7 @@ export const createOrder = async (req, res) => {
         return handleError(res, 500, `Error creating order: ${error.message}`); 
     } 
 };
+
 
 // ✅ Get Order by ID
 export const getOrderById = async (req, res) => {
