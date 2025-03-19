@@ -14,7 +14,8 @@ import {
     updateOrderStatus,
     deleteOrder,
     shippedOrderBySeller,
-    DeliveredBySellerOrBuyer
+    DeliveredBySellerOrBuyer,
+    changePaymentBySeller
 } from "../controller/orderController.js";
 
 const router = express.Router();
@@ -35,5 +36,6 @@ router.delete("/:orderId", deleteOrder);
 
 router.post("/shippedOrderBySeller", shippedOrderBySeller); 
 router.post("/DeliveredBySellerOrBuyer", DeliveredBySellerOrBuyer); 
+router.post("/changePaymentBySeller", changePaymentBySeller);
 
 export default router;

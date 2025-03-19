@@ -1010,4 +1010,66 @@ export const DeliveredBySellerOrBuyer = async (req, res) => {
 };
 
 
+export const changePaymentBySeller = async (req, res) => {
+    try {
+        const { orderId, seller_id } = req.body;
 
+        if (!orderId || !seller_id) {
+            return handleError(res, 400, "Missing required fields: orderId, seller_id");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        if (order.seller_id.toString() !== seller_id) {
+            return handleError(res, 403, "Unauthorized: You are not the seller of this order");
+        }
+
+        const product = await Product.findById(order.product_id);
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
+        
+        order.payment_status="Completed";
+        order.is_Payment = true;  
+        order.tracking_info.push({
+            status: "Payment Completed",
+            timestamp: new Date(),
+        });
+
+        await order.save();
+
+        
+        const user = await registerModel.findById(order.user_id);
+        if (!user) {
+            return handleError(res, 404, "User not found");
+        }
+
+        
+        const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
+        if (validPlayerIds.length > 0) {
+            console.log("Valid Player IDs:", validPlayerIds);
+
+            
+            const notificationPayload = {
+                playerIds: validPlayerIds,
+                title: "Payment Completed",
+                message: `The payment for your order (${product.basicInfo.productTitle.trim()}) has been successfully processed.`,
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+
+            await sendPushNotification(notificationPayload);
+        } else {
+            console.warn("Warning: No valid player IDs for push notifications.");
+        }
+
+        return handleSuccessV1(res, 200, "Payment status updated successfully", {
+            orderId: order._id,
+            is_Payment: order.is_Payment,
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error updating payment status: ${error.message}`);
+    }
+};
