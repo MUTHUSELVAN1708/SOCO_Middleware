@@ -924,6 +924,90 @@ export const shippedOrderBySeller = async (req, res) => {
         });
     } catch (error) {
         return handleError(res, 500, `Error shipping order: ${error.message}`);
+    };
+};
+
+
+export const getConfirmedOrders = async (req, res) => {
+    try {
+        console.log("Received request for confirmed orders:", req.query);
+
+        const { id, isBusiness = false, page = 1, limit = 10 } = req.query;
+
+        if (!id) {
+            console.error("Missing required field: id");
+            return handleError(res, 400, "Missing required field: id");
+        }
+
+        const pageNumber = parseInt(page, 10);
+        const pageSize = parseInt(limit, 10);
+        const skip = (pageNumber - 1) * pageSize;
+
+        console.log(`Fetching confirmed orders for ID: ${id}, Page: ${pageNumber}, Limit: ${pageSize}, Skip: ${skip}`);
+
+        const queryFilter = {
+            order_status: isBusiness === "true" ? { $in: ["Accepted", "Confirmed"] } : "Confirmed",
+            [isBusiness === "true" ? "seller_id" : "user_id"]: id,
+        };
+
+        const totalItems = await Order.countDocuments(queryFilter);
+        console.log(`Total confirmed orders found: ${totalItems}`);
+
+        const totalPages = Math.ceil(totalItems / pageSize);
+
+        const orders = await Order.find(queryFilter)
+            .skip(skip)
+            .limit(pageSize)
+            .populate("product_id")
+            .populate("delivery_address_id");
+
+        // ✅ Custom sort: "Confirmed" first, then "Accepted"
+        orders.sort((a, b) => (a.order_status === "Confirmed" ? -1 : 1));
+
+        console.log(`Confirmed orders fetched: ${orders.length}`);
+
+        const orderRequests = await Promise.all(
+            orders.map(async (order) => {
+                const product = await Product.findById(order.product_id);
+                const address = await DeliveryAddressModel.findById(order.delivery_address_id);
+
+                return {
+                    id: order._id,
+                    trackId: order.delivery_partner?.tracking_number || "N/A",
+                    delivery_type: order.delivery_type,
+                    return_type: order.return_type,
+                    delivery_charge: order.delivery_charge,
+                    productName: product?.basicInfo?.productTitle || "Unknown Product",
+                    productId: `${product?._id}`,
+                    estimated_delivery_date: order.estimated_delivery_date,
+                    price: `${product?.pricing?.currency === "INR" ? "₹" : product?.pricing?.currency || ""} ${order.total_price}`,
+                    productImage: product?.images?.length > 0 ? product.images[0] : "",
+                    buyerAddress: address
+                        ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}`
+                        : "Address Not Found",
+                    requestDate: order.timestamp,
+                    status: order.order_status,
+                };
+            })
+        );
+
+        console.log(`Final confirmed order response prepared with ${orderRequests.length} items`);
+
+        const pagination = {
+            totalResults: totalItems,
+            totalPages,
+            currentPage: pageNumber,
+            limit: pageSize,
+            hasNextPage: pageNumber < totalPages,
+            hasPreviousPage: pageNumber > 1,
+        };
+
+        console.log("Pagination details:", pagination);
+
+        return handleSuccessV1(res, 200, "Confirmed orders retrieved successfully", { orders: orderRequests, pagination });
+    } catch (error) {
+        console.error("Error fetching confirmed orders:", error);
+        return handleError(res, 500, `Error fetching confirmed orders: ${error.message}`);
     }
 };
 
