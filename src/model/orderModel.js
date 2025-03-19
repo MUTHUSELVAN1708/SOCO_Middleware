@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema(
     // Seller Review Section
     seller_review_status: {
       type: String,
-      enum: ["Pending", "Reviewed","Accepted", "Rejected"],
+      enum: ["Pending","Shipped", "Reviewed","Accepted", "Delivered","Rejected"],
       default: "Pending",
     },
     seller_price_offer: { type: Number }, 
@@ -81,6 +81,7 @@ const orderSchema = new mongoose.Schema(
         "Pending",
         "Accepted",
         "Processing",
+        "Shipped",
         "Out for Delivery",
         "Delivered",
         "Cancelled",

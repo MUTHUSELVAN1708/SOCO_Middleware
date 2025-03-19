@@ -12,7 +12,9 @@ import {
     getOrderById,
     getOrdersByUser,
     updateOrderStatus,
-    deleteOrder
+    deleteOrder,
+    shippedOrderBySeller,
+    DeliveredBySellerOrBuyer
 } from "../controller/orderController.js";
 
 const router = express.Router();
@@ -30,5 +32,8 @@ router.get("/:orderId", getOrderById);
 router.get("/user/:userId", getOrdersByUser); 
 router.put("/:orderId", updateOrderStatus); 
 router.delete("/:orderId", deleteOrder); 
+
+router.post("/shippedOrderBySeller", shippedOrderBySeller); 
+router.post("/DeliveredBySellerOrBuyer", DeliveredBySellerOrBuyer); 
 
 export default router;
