@@ -83,6 +83,7 @@ import { sendPushNotification } from "../service/pushNotificationService.js";
 import { v4 as uuidv4, validate as isValidUUID } from "uuid";
 import orderEmailController from "./orderEmailController.js";
 import registerModel from "../model/registerModel.js";
+import businessregisterModel from "../model/BusinessModel.js";
 
 
 export const getOrderDetails = async (req, res) => {
@@ -667,7 +668,7 @@ export const cancelOrderBySeller = async (req, res) => {
             
       
               await sendPushNotification(notificationPayload);
-              
+
         return handleSuccessV1(res, 200, "Order cancelled successfully", {
             orderId: order._id,
             status: order.order_status,
@@ -856,4 +857,157 @@ export const deleteOrder = async (req, res) => {
         return handleError(res, 500, `Error deleting order: ${error.message}`);
     }
 };
+
+export const shippedOrderBySeller = async (req, res) => {
+    try {
+        const { orderId,seller_id } = req.body;
+
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        if (order.seller_id.toString() !== seller_id) {
+            return handleError(res, 403, "Unauthorized: You are not the seller of this order");
+        }
+
+        const product = await Product.findById(order.product_id);
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
+
+        
+        if (order.order_status === "Shipped") {
+            return handleError(res, 400, "Order is already marked as Shipped");
+        }
+
+        
+        order.order_status = "Shipped";
+        order.seller_review_status = "Shipped";
+        order.buyer_approval_status = "Accepted";
+        order.is_Shipped="true";
+        order.tracking_info.push({
+            status: "Order Shipped By Seller",
+            timestamp: new Date(),
+        });
+
+        await order.save();
+
+        const user = await registerModel.findById(order.user_id);
+        if (!user) {
+            return handleError(res, 404, "User not found");
+        }
+ 
+        const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
+        if (validPlayerIds.length === 0) {
+            console.warn("Warning: No valid player IDs for push notifications.");
+        } else {
+            console.log("Valid Player IDs:", validPlayerIds);
+
+            const notificationPayload = {
+                playerIds: validPlayerIds,
+                title: "Order Shipped",
+                message: `The seller has shipped your order for ${product.basicInfo.productTitle.trim()}.`,
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+
+            await sendPushNotification(notificationPayload);
+        }
+
+        return handleSuccessV1(res, 200, "Order shipped successfully", {
+            orderId: order._id,
+            status: order.order_status,
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error shipping order: ${error.message}`);
+    }
+};
+
+
+export const DeliveredBySellerOrBuyer = async (req, res) => {
+    try {
+        const { orderId, seller_id, userId } = req.body;
+
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        let updatedBy = "";
+        let updatedByName = "";
+
+       
+        if (order.seller_id.toString() === seller_id) {
+            updatedBy = "Seller";
+            const seller = await businessregisterModel.findById(seller_id);
+            updatedByName = seller ? seller.Name || "Unknown Seller" : "Unknown Seller";
+        } else if (order.user_id.toString() === userId) {
+            updatedBy = "Buyer";
+            const buyer = await registerModel.findById(userId);
+            updatedByName = buyer ? buyer.full_Name || "Unknown Buyer" : "Unknown Buyer";
+        } else {
+            return handleError(res, 403, "Unauthorized: You cannot update this order");
+        }
+
+        const product = await Product.findById(order.product_id);
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
+
+        if (order.order_status === "Delivered") {
+            return handleError(res, 400, "Order is already marked as Delivered");
+        }
+
+   
+        order.order_status = "Delivered";
+        order.seller_review_status = "Delivered";
+        order.buyer_approval_status = "Accepted";
+        order.is_Delivered = true;
+
+      
+        order.tracking_info.push({
+            status: `Order Delivered by ${updatedBy} (${updatedByName})`,
+            timestamp: new Date(),
+        });
+
+        await order.save();
+
+        const user = await registerModel.findById(order.user_id);
+        if (!user) {
+            return handleError(res, 404, "User not found");
+        }
+
+       
+        const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
+        if (validPlayerIds.length > 0) {
+            const notificationPayload = {
+                playerIds: validPlayerIds,
+                title: "Order Delivered",
+                message: `Your order for ${product.basicInfo.productTitle.trim()} has been marked as Delivered by ${updatedByName}.`,
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+            await sendPushNotification(notificationPayload);
+        }
+
+        return handleSuccessV1(res, 200, "Order delivered successfully", {
+            orderId: order._id,
+            status: order.order_status,
+            updatedBy,
+            updatedByName,
+        });
+
+    } catch (error) {
+        return handleError(res, 500, `Error updating order status: ${error.message}`);
+    }
+};
+
+
 
