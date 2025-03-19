@@ -81,6 +81,8 @@ import { handleSuccess, handleSuccessV1, handleError , generateTrackingNumber } 
 import { sendPushNotification } from "../service/pushNotificationService.js";
 
 import { v4 as uuidv4, validate as isValidUUID } from "uuid";
+import orderEmailController from "./orderEmailController.js";
+import registerModel from "../model/registerModel.js";
 
 
 export const getOrderDetails = async (req, res) => {
@@ -157,6 +159,11 @@ export const cancelOrderByUser = async (req, res) => {
             return handleError(res, 404, "Order not found");
         }
 
+        const product = await Product.findById(order.product_id);
+        console.log(product,"product")
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
         if (order.order_status !== "Pending") {
             return handleError(res, 400, `Sorry, the order cannot be canceled as its status has changed to ${order.order_status}.`);
         }
@@ -171,7 +178,30 @@ export const cancelOrderByUser = async (req, res) => {
         order.tracking_info.push({ status: "Cancelled", timestamp: moment().tz("Asia/Kolkata").toDate() });
 
         await order.save();
-
+        const business = await BusinessModel.findById(product.createdBy);
+        console.log(business,"business")
+                const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+              
+                      // Move this check **after** validPlayerIds is initialized
+                      if (validPlayerIds.length === 0) {
+                          return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+                      }
+              
+                      console.log(validPlayerIds);
+              
+                      const notificationPayload = { 
+                        playerIds: validPlayerIds, 
+                        title: "Order Cancelled ✅", 
+                        message: `The order for ${product.basicInfo.productTitle.trim()} has been cancelled by the buyer. Please check for further details.`, 
+                        productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+                    };
+                    
+              
+                       sendPushNotification(notificationPayload);
+                      const email = business.businessEmail;
+                      const productTitle = product.basicInfo.productTitle;
+                      orderEmailController.cancelOrderByuserEmail(email, productTitle, orderId, cancelReason);
+        
         return handleSuccessV1(res, 200, "Order canceled successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error canceling order: ${error.message}`);
@@ -192,7 +222,11 @@ export const confirmOrderByUser = async (req, res) => {
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
-
+        const product = await Product.findById(order.product_id);
+        console.log(product,"product")
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
         // if (order.order_status !== "Pending") {
         //     return handleError(res, 400, `Order status has already changed to ${order.order_status}. Confirmation is not allowed.`);
         // }
@@ -203,7 +237,28 @@ export const confirmOrderByUser = async (req, res) => {
         order.tracking_info.push({ status: "The creator has confirmed this product for the order", timestamp: moment().tz("Asia/Kolkata").toDate() });
 
         await order.save();
-
+        const business = await BusinessModel.findById(product.createdBy);
+        console.log(business,"business")
+                const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+              
+                      // Move this check **after** validPlayerIds is initialized
+                      if (validPlayerIds.length === 0) {
+                          return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+                      }
+              
+                      console.log(validPlayerIds);
+              
+                      const notificationPayload = { 
+                        playerIds: validPlayerIds, 
+                        title: "Order Confirmed ✅", 
+                        message: `The order for ${product.basicInfo.productTitle.trim()} has been confirmed by the customer. Get ready to process it!`, 
+                        productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+                    };
+                    
+              
+                      await sendPushNotification(notificationPayload);
+              
+        
         return handleSuccessV1(res, 200, "Order confirmed successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error confirming order: ${error.message}`);
@@ -224,7 +279,11 @@ export const rejectOrderByUser = async (req, res) => {
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
-
+        const product = await Product.findById(order.product_id);
+        console.log(product,"product")
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
         // if (order.order_status !== "Pending") {
         //     return handleError(res, 400, `Order status has already changed to ${order.order_status}. Rejection is not allowed.`);
         // }
@@ -236,7 +295,31 @@ export const rejectOrderByUser = async (req, res) => {
         order.tracking_info.push({ status: "Rejected by order creator", timestamp: moment().tz("Asia/Kolkata").toDate(), reason: rejectReason });
 
         await order.save();
-
+        const business = await BusinessModel.findById(product.createdBy);
+        console.log(business,"business")
+                const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+              
+                      // Move this check **after** validPlayerIds is initialized
+                      if (validPlayerIds.length === 0) {
+                          return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+                      }
+              
+                      console.log(validPlayerIds);
+              
+                      const notificationPayload = { 
+                        playerIds: validPlayerIds, 
+                        title: "Order Rejected", 
+                        message: `Your order for ${product.basicInfo.productTitle.trim()} has been rejected by the buyer. Please check your dashboard for details.`, 
+                        productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+                    };
+                    
+              
+                      await sendPushNotification(notificationPayload);
+                      const email = business.businessEmail;
+                      const productTitle = product.basicInfo.productTitle;
+                      orderEmailController.cancelOrderByuserEmail(email, productTitle, orderId, rejectReason);
+        
+        
         return handleSuccessV1(res, 200, "Order rejected successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error rejecting order: ${error.message}`);
@@ -455,6 +538,7 @@ export const confirmOrderBySeller = async (req, res) => {
         }
 
         const order = await Order.findById(orderId);
+        console.log(order,"order");
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
@@ -464,6 +548,8 @@ export const confirmOrderBySeller = async (req, res) => {
             return handleError(res, 404, "Product not found");
         }
 
+        const user= await registerModel.findById(order.user_id);
+        console.log(user,"user");
         let totalAmount = parseFloat(order.total_price) + parseFloat(deliveryCharge);
         totalAmount = totalAmount.toFixed(2);
 
@@ -497,7 +583,24 @@ export const confirmOrderBySeller = async (req, res) => {
 
         await order.save();
 
-
+        const validPlayerIds = (user?.subscriptionIDs || []).filter(id => isValidUUID(id));
+      
+              // Move this check **after** validPlayerIds is initialized
+              if (validPlayerIds.length === 0) {
+                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+              }
+      
+              console.log(validPlayerIds);
+      
+              const notificationPayload = { 
+                playerIds: validPlayerIds, 
+                title: "Order Confirmed ✅", 
+                message: `Your order for ${product.basicInfo.productTitle.trim()} has been confirmed! Processing will begin shortly.`, 
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+            
+      
+              await sendPushNotification(notificationPayload);
 
         return handleSuccessV1(res, 200, "Order Accepted successfully", {
             orderId: order._id,
@@ -526,7 +629,11 @@ export const cancelOrderBySeller = async (req, res) => {
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
-
+        const product = await Product.findById(order.product_id);
+        console.log(product,"product")
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
         if (order.order_status === "Cancelled") {
             return handleError(res, 400, "Order is already cancelled");
         }
@@ -540,7 +647,27 @@ export const cancelOrderBySeller = async (req, res) => {
         order.tracking_info.push({ status: "Order Cancelled By Seller", reason: cancelReason, timestamp: new Date() });
 
         await order.save();
-
+        const user= await registerModel.findById(order.user_id);
+        console.log(user,"user");
+        
+        const validPlayerIds = (user?.subscriptionIDs || []).filter(id => isValidUUID(id));
+      
+              if (validPlayerIds.length === 0) {
+                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+              }
+      
+              console.log(validPlayerIds);
+      
+              const notificationPayload = { 
+                playerIds: validPlayerIds, 
+                title: "Order Canceled ", 
+                message: `The seller has canceled your order for ${product.basicInfo.productTitle.trim()}.`, 
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            };
+            
+      
+              await sendPushNotification(notificationPayload);
+              
         return handleSuccessV1(res, 200, "Order cancelled successfully", {
             orderId: order._id,
             status: order.order_status,
