@@ -2,6 +2,7 @@ import express from "express";
 import {
     getOrderDetails,
     createOrder,
+    getConfirmedOrders,
     getPendingOrders,
     getPendingApprovedOrderList,
     cancelOrderByUser,
@@ -21,6 +22,7 @@ import {
 const router = express.Router();
 
 router.post("/", createOrder); 
+router.get("/getConfirmedOrders", getConfirmedOrders);
 router.get("/getOrderDetails", getOrderDetails); 
 router.get("/getPendingOrders", getPendingOrders); 
 router.get("/getPendingApprovedOrderList", getPendingApprovedOrderList); 
