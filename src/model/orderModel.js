@@ -74,6 +74,7 @@ const orderSchema = new mongoose.Schema(
     is_fragile: { type: Boolean, default: false }, // If the product is fragile
     is_Shipped: { type: Boolean, default: false }, 
     is_Delivered: { type: Boolean, default: false }, 
+    is_Payment: { type: Boolean, default: false }, 
     // Order Tracking
     order_status: {
       type: String,
