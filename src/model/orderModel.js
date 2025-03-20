@@ -83,11 +83,12 @@ const orderSchema = new mongoose.Schema(
         "Accepted",
         "Processing",
         "Shipped",
+        "Payed Off",
         "Out for Delivery",
         "Delivered",
         "Cancelled",
         "Rejected",
-        "Confirmed", // Added Confirmed status
+        "Confirmed", 
       ],
       default: "Pending",
     },

@@ -15,7 +15,7 @@ import {
     updateOrderStatus,
     deleteOrder,
     shippedOrderBySeller,
-    DeliveredBySellerOrBuyer,
+    DeliveredBySeller,
     changePaymentBySeller
 } from "../controller/orderController.js";
 
@@ -37,7 +37,7 @@ router.put("/:orderId", updateOrderStatus);
 router.delete("/:orderId", deleteOrder); 
 
 router.post("/shippedOrderBySeller", shippedOrderBySeller); 
-router.post("/DeliveredBySellerOrBuyer", DeliveredBySellerOrBuyer); 
+router.post("/DeliveredBySeller", DeliveredBySeller); 
 router.post("/changePaymentBySeller", changePaymentBySeller);
 
 export default router;
