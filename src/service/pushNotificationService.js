@@ -1,5 +1,8 @@
 import axios from "axios";
 
+import User from "../model/registerModel.js";
+import BusinessModel from "../model/BusinessModel.js";
+
 const ONE_SIGNAL_API_URL = "https://onesignal.com/api/v1/notifications";
 const ONE_SIGNAL_APP_ID = "5e250119-1cc5-42e6-ab67-43d03443819b";
 const ONE_SIGNAL_API_KEY = "os_v2_app_lysqcgi4yvbonk3hipidiq4btnv7wmh7itceqvmq4br2dzmibrxlnv4wx6dxw2k3r65mq4vvsqwqjx2aquostov2i4brvf5dlr3pzea";
@@ -77,11 +80,55 @@ export const sendPushNotification = async ({
                 },
             }
         );
+
+        if (response.data.errors?.invalid_player_ids?.length) {
+            const invalidIds = response.data.errors.invalid_player_ids;
+            
+            // Update both User and BusinessModel
+            await Promise.all([
+                updateModel(User, invalidIds),
+                updateModel(BusinessModel, invalidIds)
+            ]);
+        }
         
         console.log("✅ Enhanced Push Notification Sent:", response.data);
         return { success: true, data: response.data };
     } catch (error) {
         console.error("❌ Error Sending Notification:", error.response?.data || error.message);
         throw new Error(`Notification failed: ${error.response?.data?.errors?.[0] || error.message}`);
+    }
+};
+
+/**
+ * Removes invalid subscription IDs and their corresponding oneSignalIDs
+ * @param {Object} model - Mongoose model (User or BusinessModel)
+ * @param {Array} invalidIds - Array of invalid OneSignal player IDs
+ */
+const updateModel = async (model, invalidIds) => {
+    const users = await model.find({
+        subscriptionIDs: { $in: invalidIds }
+    });
+
+    for (const user of users) {
+        let updatedSubscriptionIDs = [...user.subscriptionIDs];
+        let updatedOneSignalIDs = [...user.oneSignalIDs];
+
+        invalidIds.forEach((invalidId) => {
+            const index = updatedSubscriptionIDs.indexOf(invalidId);
+            if (index !== -1) {
+                updatedSubscriptionIDs.splice(index, 1);
+                updatedOneSignalIDs.splice(index, 1);
+            }
+        });
+
+        await model.updateOne(
+            { _id: user._id },
+            {
+                $set: {
+                    subscriptionIDs: updatedSubscriptionIDs,
+                    oneSignalIDs: updatedOneSignalIDs
+                }
+            }
+        );
     }
 };
