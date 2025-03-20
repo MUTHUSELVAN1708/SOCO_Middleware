@@ -10,7 +10,7 @@ const orderSchema = new mongoose.Schema(
     },
     seller_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "sellers",
+      ref: "businessRegister",
       required: true,
     },
     product_id: {
