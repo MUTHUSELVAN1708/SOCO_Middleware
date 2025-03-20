@@ -52,7 +52,7 @@ export const getDashboardFeed = async (req, res) => {
         const followingIds = following.map(f => f.following_id);
 
         let posts = [];
-        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId ";
+        const baseSelect = "creatorName creatorProfileImageUrl completeAddress tags isVideo mediaFile thumbnailFile aspectRatio description caption timestamp creator_id likesCount viewsCount state pinCode language commentsCount user_id _id isProductPost isUserPost isBusinessPost productId productPrice";
 
         if (followingIds.length) {
             const followingPosts = await createPostModel.find({

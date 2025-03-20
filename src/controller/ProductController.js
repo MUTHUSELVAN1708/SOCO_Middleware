@@ -232,8 +232,9 @@ const formatResponse = (success, message, data = null, errors = null) => {
           sharesCount: 0,
           isBusinessPost: false,
           isUserPost: false,
+          isProductPost:true,
           productId: product._id,
-          isProductPost: true,
+          productPrice: calculateFinalPrice(productData?.pricing),
           imageUrl: productData?.images?.[0] ?? '',
           caption: productData?.basicInfo?.productTitle ?? '',
           isScheduled: false,
@@ -265,6 +266,34 @@ const formatResponse = (success, message, data = null, errors = null) => {
       return res.status(500).json(formatResponse(false, 'Server error', null, [{ message: error.message }]));
     }
   };
+  
+
+  function calculateFinalPrice(pricing) {
+    if (!pricing) return 0.0;
+  
+    let basePrice = parseFloat(pricing.salePrice || pricing.regularPrice || '0');
+    if (isNaN(basePrice) || basePrice <= 0) return 0.0;
+  
+    let finalPrice = basePrice;
+  
+    // Apply GST if included
+    if (pricing.gstDetails?.gstIncluded) {
+      finalPrice += (basePrice * (pricing.gstDetails.gstPercentage || 0)) / 100;
+    }
+  
+    // Apply additional taxes
+    if (pricing.additionalTaxes && Array.isArray(pricing.additionalTaxes)) {
+      pricing.additionalTaxes.forEach(tax => {
+        if (tax.percentage) {
+          finalPrice += (basePrice * tax.percentage) / 100;
+        }
+      });
+    }
+  
+    console.log(finalPrice);
+  
+    return Math.round(finalPrice * 100) / 100; // Ensure two decimal places as a number
+  }
   
   
   

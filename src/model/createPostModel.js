@@ -23,6 +23,7 @@ const createPostSchema = new mongoose.Schema({
     isUserPost: { type: Boolean, default: false }, 
     isProductPost: { type: Boolean, default: false },
     productId: { type: String, },
+    productPrice: {  type: Number, default: 0  },
     imageUrl: { type: String, },
     caption: { type: String,  },
     isScheduled: { type: Boolean, default: false },
