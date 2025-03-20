@@ -904,9 +904,9 @@ export const shippedOrderBySeller = async (req, res) => {
 
         await Promise.all([order.save(), product.save()]);
 
-        const user = await registerModel.findById(order.user_id);
+        let user = await registerModel.findById(order.user_id);
         if (!user) {
-            return handleError(res, 404, "User not found");
+          user = await BusinessModel.findById(order.user_id);
         }
 
         const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
@@ -928,6 +928,64 @@ export const shippedOrderBySeller = async (req, res) => {
     }
 };
 
+export const changePaymentBySeller = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+
+        if (!orderId) {
+            return handleError(res, 400, "Missing required field: orderId");
+        }
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return handleError(res, 404, "Order not found");
+        }
+
+        if (!order.seller_id) {
+            return handleError(res, 400, "Seller ID is missing in order data");
+        }
+
+        const product = await Product.findById(order.product_id);
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
+
+        // Update order payment status
+        order.payment_status = "Completed";
+        order.order_status = "Payed Off";
+        order.is_Payment = true;
+        order.tracking_info.push({
+            status: "Payment Completed",
+            timestamp: new Date(),
+        });
+
+        await order.save();
+
+        // Fetch user details
+        let user = await registerModel.findById(order.user_id);
+        if (!user) {
+            user = await BusinessModel.findById(order.user_id);
+        }
+
+        // Send push notification if valid player IDs exist
+        const validPlayerIds = (user?.subscriptionIDs || []).filter(id => isValidUUID(id));
+        if (validPlayerIds.length > 0) {
+            sendPushNotification({
+                playerIds: validPlayerIds,
+                title: "Payment Completed",
+                message: `The payment for your order (${product.basicInfo.productTitle.trim()}) has been successfully processed.`,
+                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+            });
+        }
+
+        return handleSuccessV1(res, 200, "Payment status updated successfully", {
+            orderId: order._id,
+            is_Payment: order.is_Payment,
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error updating payment status: ${error.message}`);
+    }
+};
 
 
 
@@ -982,6 +1040,9 @@ export const getConfirmedOrders = async (req, res) => {
                     delivery_charge: order.delivery_charge,
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `${product?._id}`,
+                    is_Shipped: order.is_Shipped, 
+                    is_Delivered: order.is_Delivered, 
+                    is_Payment: order.is_Payment,  
                     estimated_delivery_date: order.estimated_delivery_date,
                     price: `${product?.pricing?.currency === "INR" ? "₹" : product?.pricing?.currency || ""} ${order.total_price}`,
                     productImage: product?.images?.length > 0 ? product.images[0] : "",
@@ -1015,9 +1076,9 @@ export const getConfirmedOrders = async (req, res) => {
 };
 
 
-export const DeliveredBySellerOrBuyer = async (req, res) => {
+export const DeliveredBySeller = async (req, res) => {
     try {
-        const { orderId, seller_id, userId } = req.body;
+        const { orderId } = req.body;
 
         if (!orderId) {
             return handleError(res, 400, "Missing required field: orderId");
@@ -1028,20 +1089,17 @@ export const DeliveredBySellerOrBuyer = async (req, res) => {
             return handleError(res, 404, "Order not found");
         }
 
-        let updatedBy = "";
-        let updatedByName = "";
+        if (!order.seller_id) {
+            return handleError(res, 400, "Seller ID is missing in order data");
+        }
 
-       
-        if (order.seller_id.toString() === seller_id) {
-            updatedBy = "Seller";
-            const seller = await businessregisterModel.findById(seller_id);
-            updatedByName = seller ? seller.Name || "Unknown Seller" : "Unknown Seller";
-        } else if (order.user_id.toString() === userId) {
-            updatedBy = "Buyer";
-            const buyer = await registerModel.findById(userId);
-            updatedByName = buyer ? buyer.full_Name || "Unknown Buyer" : "Unknown Buyer";
-        } else {
-            return handleError(res, 403, "Unauthorized: You cannot update this order");
+        const seller = await businessregisterModel.findById(order.seller_id);
+        if (!seller) {
+            return handleError(res, 404, "Seller not found");
+        }
+
+        if (order.order_status === "Delivered") {
+            return handleError(res, 400, "Order is already marked as Delivered");
         }
 
         const product = await Product.findById(order.product_id);
@@ -1049,46 +1107,37 @@ export const DeliveredBySellerOrBuyer = async (req, res) => {
             return handleError(res, 404, "Product not found");
         }
 
-        if (order.order_status === "Delivered") {
-            return handleError(res, 400, "Order is already marked as Delivered");
-        }
-
-   
+        // Update order status
         order.order_status = "Delivered";
         order.seller_review_status = "Delivered";
-        order.buyer_approval_status = "Accepted";
         order.is_Delivered = true;
 
-      
         order.tracking_info.push({
-            status: `Order Delivered by ${updatedBy} (${updatedByName})`,
+            status: `Order Delivered by Seller (${seller.businessName || "Unknown Seller"})`,
             timestamp: new Date(),
         });
 
         await order.save();
 
+        // Send push notification to user
         const user = await registerModel.findById(order.user_id);
-        if (!user) {
-            return handleError(res, 404, "User not found");
-        }
-
-       
-        const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
-        if (validPlayerIds.length > 0) {
-            const notificationPayload = {
-                playerIds: validPlayerIds,
-                title: "Order Delivered",
-                message: `Your order for ${product.basicInfo.productTitle.trim()} has been marked as Delivered by ${updatedByName}.`,
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            };
-             sendPushNotification(notificationPayload);
+        if (user) {
+            const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
+            if (validPlayerIds.length > 0) {
+                sendPushNotification({
+                    playerIds: validPlayerIds,
+                    title: "Order Delivered",
+                    message: `Your order for ${product.basicInfo.productTitle.trim()} has been marked as Delivered by ${seller.businessName || "Unknown Seller"}.`,
+                    productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+                });
+            }
         }
 
         return handleSuccessV1(res, 200, "Order delivered successfully", {
             orderId: order._id,
             status: order.order_status,
-            updatedBy,
-            updatedByName,
+            updatedBy: "Seller",
+            updatedByName: seller.Name || "Unknown Seller",
         });
 
     } catch (error) {
@@ -1097,66 +1146,4 @@ export const DeliveredBySellerOrBuyer = async (req, res) => {
 };
 
 
-export const changePaymentBySeller = async (req, res) => {
-    try {
-        const { orderId, seller_id } = req.body;
 
-        if (!orderId || !seller_id) {
-            return handleError(res, 400, "Missing required fields: orderId, seller_id");
-        }
-
-        const order = await Order.findById(orderId);
-        if (!order) {
-            return handleError(res, 404, "Order not found");
-        }
-
-        if (order.seller_id.toString() !== seller_id) {
-            return handleError(res, 403, "Unauthorized: You are not the seller of this order");
-        }
-
-        const product = await Product.findById(order.product_id);
-        if (!product) {
-            return handleError(res, 404, "Product not found");
-        }
-        
-        order.payment_status="Completed";
-        order.is_Payment = true;  
-        order.tracking_info.push({
-            status: "Payment Completed",
-            timestamp: new Date(),
-        });
-
-        await order.save();
-
-        
-        const user = await registerModel.findById(order.user_id);
-        if (!user) {
-            return handleError(res, 404, "User not found");
-        }
-
-        
-        const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
-        if (validPlayerIds.length > 0) {
-            console.log("Valid Player IDs:", validPlayerIds);
-
-            
-            const notificationPayload = {
-                playerIds: validPlayerIds,
-                title: "Payment Completed",
-                message: `The payment for your order (${product.basicInfo.productTitle.trim()}) has been successfully processed.`,
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            };
-
-             sendPushNotification(notificationPayload);
-        } else {
-            console.warn("Warning: No valid player IDs for push notifications.");
-        }
-
-        return handleSuccessV1(res, 200, "Payment status updated successfully", {
-            orderId: order._id,
-            is_Payment: order.is_Payment,
-        });
-    } catch (error) {
-        return handleError(res, 500, `Error updating payment status: ${error.message}`);
-    }
-};
