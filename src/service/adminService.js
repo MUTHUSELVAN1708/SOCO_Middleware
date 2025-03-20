@@ -1911,6 +1911,7 @@ const adminService = {
             isUserPost,
             isProductPost,
             productId,
+            productPrice,
             imageUrl,
             caption,
             isScheduled,
@@ -1973,6 +1974,7 @@ const adminService = {
                 postLanguage: postLanguage ?? [],
                 postCategories: postCategories ?? [],
                 interestPeoples: interestPeoples ?? [],
+                productPrice:productPrice,
                 likesCount,
                 commentsCount,
                 viewsCount,
@@ -3244,10 +3246,6 @@ const adminService = {
             console.log("Fetching cart for user:", user_id);
 
             const getCart = await cartModel.find({ user_id });
-
-            if (!getCart.length) {
-                throw new Error("Cart is empty");
-            }
 
             return getCart;
         } catch (error) {
