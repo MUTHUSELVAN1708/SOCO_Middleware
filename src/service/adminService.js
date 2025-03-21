@@ -3591,25 +3591,30 @@ const adminService = {
     },
     // =================
 
-    getUserProfile: async (id, isBusinessAccount, userId, accountBusinessType) => {
+    getUserProfile: async (id, userId, accountBusinessType) => {
         try {
-            console.log(`Fetching user profile for ID: ${id}, isBusinessAccount: ${isBusinessAccount}`);
-
-            const user = isBusinessAccount
-                ? await businessregisterModel.findById(id)
-                : await registerModel.findById(id);
-
+            console.log(`Fetching user profile for ID: ${id}`);
+    
+            // First, try to find the user in registerModel
+            let user = await registerModel.findById(id);
+    
+            // If not found, try businessregisterModel
+            const isBusinessAccount = !user;
+            if (!user) {
+                user = await businessregisterModel.findById(id);
+            }
+    
             if (!user) {
                 console.log(`User not found for ID: ${id}`);
                 return null;
             }
-
+    
             console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.ownerName : user.full_Name}`);
-
+    
             const fullName = isBusinessAccount ? user.businessName || "Business Owner" : user.full_Name || "";
-
+    
             console.log(`Checking friendship status for userId: ${userId} and profileId: ${id}`);
-
+    
             // Fetch friendship details
             const friendRecord = await Friend.findOne({
                 userId,
@@ -3617,7 +3622,7 @@ const adminService = {
                 "friends.friendId": id,
                 "friends.friendReference": isBusinessAccount ? "businessRegister" : "User",
             });
-
+    
             let friendStatus = "Not Friends";
             if (friendRecord) {
                 const friendEntry = friendRecord.friends.find(f => f.friendId === id);
@@ -3625,11 +3630,11 @@ const adminService = {
                     friendStatus = friendEntry.status;
                 }
             }
-
+    
             console.log(`Friendship status: ${friendStatus}`);
-
+    
             console.log(`Checking follow status for userId: ${userId} and profileId: ${id}`);
-
+    
             // Check if userId is already following
             const isAlreadyFollow = await Follow.exists({
                 userId,
@@ -3637,9 +3642,9 @@ const adminService = {
                 followingId: id,
                 followingReference: isBusinessAccount ? "businessRegister" : "User",
             });
-
+    
             console.log(`Follow status: ${isAlreadyFollow ? "Already following" : "Not following"}`);
-
+    
             const profileData = {
                 id: user._id.toString(),
                 username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
@@ -3658,15 +3663,16 @@ const adminService = {
                 isBusinessAccount,
                 friendStatus, // ✅ Added friend status
             };
-
+    
             console.log(`Returning profile data:`, profileData);
-
+    
             return profileData;
         } catch (error) {
             console.error("Error fetching user profile:", error);
             return null;
         }
     },
+    
 
 
 
