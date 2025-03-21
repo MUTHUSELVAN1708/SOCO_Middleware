@@ -2174,7 +2174,7 @@ const adminService = {
                 .sort({ likesCount: -1 }) // Sort by likesCount (highest first)
                 .skip(skip)
                 .limit(10)
-                .select('imageUrl likesCount caption likes tags timestamp isVideo thumbnailFile aspectRatio viewsCount');
+                .select('imageUrl likesCount caption likes tags timestamp isVideo thumbnailFile aspectRatio viewsCount isProductPost productId productPrice');
 
             // Count total results for pagination
             const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
@@ -2208,11 +2208,11 @@ const adminService = {
             if (!post) throw new Error("Post not found");
 
             // // Fetch user details
-            const user = post.isBusinessPost
-                ? await businessregisterModel.findById(post.user_id)
-                : await registerModel.findById(post.user_id);
+            // const user = post.isBusinessPost
+            //     ? await businessregisterModel.findById(post.user_id)
+            //     : await registerModel.findById(post.user_id);
 
-            if (!user) throw new Error("User not found");
+            // if (!user) throw new Error("User not found");
 
             // Fetch total comments count
             const totalComments = await Comment.countDocuments({ postId });
