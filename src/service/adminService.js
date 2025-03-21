@@ -2203,7 +2203,7 @@ const adminService = {
 
             // Fetch post details
             const post = await createPostModel.findById(postId).select(
-                "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp isBusinessPost"
+                "user_id creatorName creatorProfileImageUrl mediaFile thumbnailFile videoDuration aspectRatio isVideo likesCount commentsCount viewsCount sharesCount isBusinessPost caption timestamp isBusinessPost description"
             );
             if (!post) throw new Error("Post not found");
 
@@ -2248,6 +2248,7 @@ const adminService = {
                 mediaFile: post.mediaFile,
                 thumbnailFile: post.thumbnailFile,
                 videoDuration: post.videoDuration,
+                description:post.description,
                 aspectRatio: post.aspectRatio,
                 isVideo: post.isVideo,
                 likesCount: post.likesCount,
