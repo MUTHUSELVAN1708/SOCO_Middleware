@@ -558,7 +558,7 @@ const adminController = {
 
 
         try {
-            const getUserDetails = await adminService.getUserProfile(id, isBusinessAccount, userId ,accountBusinessType );
+            const getUserDetails = await adminService.getUserProfile(id, userId ,accountBusinessType );
 
             res.status(200).json({
                 status: 200,
