@@ -3610,7 +3610,7 @@ const adminService = {
                 return null;
             }
     
-            console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.ownerName : user.full_Name}`);
+            console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.businessName : user.full_Name}`);
     
             const fullName = isBusinessAccount ? user.businessName || "Business Owner" : user.full_Name || "";
     
