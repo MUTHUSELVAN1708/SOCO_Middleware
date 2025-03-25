@@ -3619,16 +3619,42 @@ const adminService = {
             // Fetch friendship details
             const friendRecord = await Friend.findOne({
                 userId,
-                userReference: accountBusinessType,
                 "friends.friendId": id,
                 "friends.friendReference": isBusinessAccount ? "businessRegister" : "User",
             });
+            const friendRecordV1 = await Friend.aggregate([
+                { $match: { "friends.friendId": userId } },
+                { $unwind: "$friends" },
+                { $match: { "friends.friendId": userId, "friends.status": "Accepted" } },
+                {
+                    $project: {
+                        _id: "$friends._id",
+                        requesterId: "$userId",
+                        status: "$friends.status",
+                        friendId: "$friends.friendId",
+                        friendReference: "$userReference",
+                        requestedAt: "$friends.requestedAt",
+                        acceptedAt: "$friends.acceptedAt"
+                    }
+                }
+            ]);
+            
+            console.log('------ friendRecordV1 ------');
+            console.log(friendRecordV1);
+            
     
             let friendStatus = "Not Friends";
             if (friendRecord) {
                 const friendEntry = friendRecord.friends.find(f => f.friendId === id);
                 if (friendEntry) {
                     friendStatus = friendEntry.status;
+                }
+            }
+
+            if (friendRecordV1.length > 0) {
+                const acceptedFriend = friendRecordV1.find(f => f.requesterId === id && f.status === "Accepted");
+                if (acceptedFriend) {
+                    friendStatus = "Accepted";
                 }
             }
     
