@@ -74,6 +74,7 @@ const registerSchema = new mongoose.Schema(
       type: Number,
       required: false
     },
+    lastSeen: { type: Date, default: null },
     onlineStatus: { 
       type: Boolean, 
       default: false,  // Default to false, indicating the user is offline

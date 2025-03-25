@@ -51,7 +51,7 @@ const PORT = process.env.port || 3000;
 const server = http.createServer(app);
 
 
-const io = initializeSocket(server);
+initializeSocket(server);
 // redisService.connect();
 
 // redisService.subscribeToNotifications(io);

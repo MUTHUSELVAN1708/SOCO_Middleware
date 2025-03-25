@@ -222,7 +222,7 @@ const adminService = {
                     </div>
                 `
             };
-
+            console.log(otp, "otp")
             const info = await transporter.sendMail(mailOptions);
             return info.response;
         } catch (error) {
@@ -271,43 +271,43 @@ const adminService = {
     updateNotificationDetails: async (data) => {
         try {
             const { userId, oneSignalID, subscriptionID } = data;
-    
+
             if (!userId || !oneSignalID || !subscriptionID) {
                 throw { status: 400, message: "User ID, OneSignal ID, and Subscription ID are required." };
             }
-    
+
             let userToUpdate = await registerModel.findById(userId);
             let businessToUpdate = await businessregisterModel.findOne({ user_id: userId });
             let linkedUserId = null;
             let relatedBusinesses = []; // Declare it outside to avoid "not defined" error
-    
+
             if (!userToUpdate && !businessToUpdate) {
                 throw { status: 404, message: "User or Business account not found." };
             }
-    
+
             if (businessToUpdate) {
                 linkedUserId = businessToUpdate.user_id;
-    
+
                 const businessUpdateFields = {
                     oneSignalIDs: businessToUpdate.oneSignalIDs || [],
                     subscriptionIDs: businessToUpdate.subscriptionIDs || []
                 };
-    
+
                 if (!businessUpdateFields.oneSignalIDs.includes(oneSignalID)) {
                     businessUpdateFields.oneSignalIDs.push(oneSignalID);
                 }
                 if (!businessUpdateFields.subscriptionIDs.includes(subscriptionID)) {
                     businessUpdateFields.subscriptionIDs.push(subscriptionID);
                 }
-    
+
                 await businessregisterModel.findByIdAndUpdate(
                     businessToUpdate._id,
                     { $set: businessUpdateFields },
                     { new: true }
                 );
-    
+
                 relatedBusinesses = await businessregisterModel.find({ user_id: linkedUserId });
-    
+
                 for (let business of relatedBusinesses) {
                     const updateFields = {
                         oneSignalIDs: business.oneSignalIDs || [],
@@ -325,10 +325,10 @@ const adminService = {
                         { new: true }
                     );
                 }
-    
+
                 userToUpdate = await registerModel.findById(linkedUserId);
             }
-    
+
             if (userToUpdate) {
                 const userUpdateFields = {
                     oneSignalIDs: userToUpdate.oneSignalIDs || [],
@@ -346,7 +346,7 @@ const adminService = {
                     { new: true }
                 );
             }
-    
+
             return {
                 success: true,
                 updatedUser: userToUpdate,
@@ -358,9 +358,9 @@ const adminService = {
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
-    
-    
+
+
+
 
 
 
@@ -1974,7 +1974,7 @@ const adminService = {
                 postLanguage: postLanguage ?? [],
                 postCategories: postCategories ?? [],
                 interestPeoples: interestPeoples ?? [],
-                productPrice:productPrice,
+                productPrice: productPrice,
                 likesCount,
                 commentsCount,
                 viewsCount,
@@ -3273,7 +3273,7 @@ const adminService = {
 
         try {
             const newMessage = await MessageModel.create({ from, to, message, timestamp });
-            console.log("✅ New message created:", newMessage);
+            console.log(" New message created:", newMessage);
 
             const messageWithObjectId = {
                 _id: newMessage._id.toString(),
@@ -3283,25 +3283,25 @@ const adminService = {
                 timestamp,
             };
 
-            // Store message in Redis
+            
             await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
 
-            console.log("🟢 Checking connected users:", JSON.stringify(connectedUsers, null, 2));
+            console.log("Checking connected users:", JSON.stringify(connectedUsers, null, 2));
             const receiverSocketId = connectedUsers[to];
 
             if (receiverSocketId) {
-                console.log(`✅ Receiver (${to}) is online. Sending message...`);
+                console.log(` Receiver (${to}) is online. Sending message...`);
                 io.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
             } else {
-                console.log(`❌ Receiver (${to}) is offline.`);
+                console.log(` Receiver (${to}) is offline.`);
                 await redisService.getRedisClient().lPush(`offlineMessages:${to}`, JSON.stringify(messageWithObjectId));
             }
-
+console.log("ooooooooooo")
             socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
-
+console.log("first")
             return { success: true, message: "Message sent" };
         } catch (err) {
-            console.error("❌ Error in sendMessage:", err);
+            console.error(" Error in sendMessage:", err);
             socket.emit("sendedMsg", { success: false, message: "Error sending message" });
             throw new Error("Error sending message");
         }
@@ -4322,7 +4322,37 @@ const adminService = {
         } catch (error) {
             throw new Error("Error updating order status");
         }
+    },
+    // =========================
+    getAllUser: async (user_id) => {
+        console.log("Received user ID:", user_id);
+    
+        try {
+            const followers = await Follow.find({ userId: user_id });
+            console.log("Followers Data:", followers);
+    
+            const followingIds = followers.map(f => f.followingId);
+            console.log("Extracted Following IDs:", followingIds);
+    
+            const getuserdetails = await registerModel.find({ _id: { $in: followingIds } });
+            console.log("User Details:", getuserdetails);
+    
+            const getuser = await Friend.find({ userId: user_id });
+            console.log("Friends Data:", getuser);
+    
+            const friendId = getuser.flatMap(friend => friend.friends.map(f => f.friendId));
+            console.log("Extracted Friend IDs:", friendId);
+    
+            const getfrienddetails = await registerModel.find({ _id: { $in: friendId } });
+            console.log("Friend Details:", getfrienddetails);
+    
+            return { getuser, getuserdetails, getfrienddetails };
+        } catch (error) {
+            console.error("Error getting user:", error);
+            throw new Error("Error getting user");
+        }
     }
+    
 
 
 }

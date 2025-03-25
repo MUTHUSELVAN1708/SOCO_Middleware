@@ -42,45 +42,45 @@ const adminController = {
     verifyNameUnique: async (req, res, next) => {
         try {
             let { full_Name } = req.query; // Use req.query instead of req.params
-    
+
             if (!full_Name || typeof full_Name !== 'string' || !full_Name.trim()) {
                 throw new Error('Invalid name format. Must be a non-empty string.');
             }
-    
+
             full_Name = full_Name.trim(); // Trim spaces
-    
+
             const existingUser = await registerModel.findOne({ full_Name });
-    
+
             res.status(200).json({ isUnique: !existingUser }); // Returns true if unique, false otherwise
         } catch (error) {
             console.error('Error in verifyNameUnique:', error);
             next({ statuscode: 400, error: error.message });
         }
-    } ,
+    },
 
     // ==========
     verifyOtp: async (req, res, next) => {
         try {
             const { email, enteredOtp } = req.body;
-    
+
             if (!email || !enteredOtp) {
                 const error = new Error("Email and OTP are required");
                 error.statusCode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-    
+
             if (!/^\d+$/.test(enteredOtp)) {
                 const error = new Error("OTP must contain only numeric values");
                 error.statusCode = 400;
                 error.errorType = "ValidationError";
                 throw error;
             }
-    
+
             console.log(req.body);
-    
+
             const verifyOtp = await adminService.verifingOtp(req.body);
-    
+
             if (!verifyOtp.success) {
                 return res.status(400).json({
                     status: 400,
@@ -88,7 +88,7 @@ const adminController = {
                     errorType: "OtpVerificationError",
                 });
             }
-    
+
             res.status(200).json({
                 status: 200,
                 verifyOtp,
@@ -97,7 +97,7 @@ const adminController = {
             error.error = error.message;
             console.error(error);
             const statusCode = error.statusCode || 500;
-    
+
             res.status(statusCode).json({
                 status: statusCode,
                 msg: error.message || "An unexpected error occurred",
@@ -558,7 +558,7 @@ const adminController = {
 
 
         try {
-            const getUserDetails = await adminService.getUserProfile(id, isBusinessAccount, userId ,accountBusinessType );
+            const getUserDetails = await adminService.getUserProfile(id, isBusinessAccount, userId, accountBusinessType);
 
             res.status(200).json({
                 status: 200,
@@ -868,17 +868,17 @@ const adminController = {
     },
 
     // =================
-    updateCart:async (req, res, next) => {
+    updateCart: async (req, res, next) => {
         try {
-          const updateCart = await adminService.updateCart(req.body);
-          res.json(updateCart);
+            const updateCart = await adminService.updateCart(req.body);
+            res.json(updateCart);
         } catch (error) {
-          error.message = error.error;
-          // console.log(error);
-          error.statuscode = 500;
-          next(error);
+            error.message = error.error;
+            // console.log(error);
+            error.statuscode = 500;
+            next(error);
         }
-      },
+    },
     // =======================
     removeFromCart: async (req, res, next) => {
         try {
@@ -1072,7 +1072,7 @@ const adminController = {
         try {
             const wishlist = await adminService.wishlist(req.body);
             console.log(wishlist, "wishlist");
-    
+
             res.status(200).json(wishlist);
         } catch (error) {
             error.message = error.error;
@@ -1081,18 +1081,18 @@ const adminController = {
             next(error);
         }
     },
-    
+
 
     toggleBookmark: async (req, res, next) => {
         try {
             const response = await adminService.toggleBookmark(req.body);
-    
+
             res.status(200).json({
                 success: true,
                 message: response.message,
                 bookmarked: response.bookmarked,
             });
-    
+
         } catch (error) {
             console.error("Error in toggleBookmark:", error);
             next({
@@ -1106,14 +1106,14 @@ const adminController = {
         try {
             const response = await adminService.toggleFav(req.body);
             console.log(response, "toggleFavorite");
-    
+
             res.status(200).json({
                 success: true,
                 message: response.message,
                 liked: response.liked,
                 data: response.data || null,
             });
-    
+
         } catch (error) {
             console.error("Error in toggleLike:", error);
             next({
@@ -1127,11 +1127,11 @@ const adminController = {
         try {
             const { user_id, page, limit } = req.query; // Use req.query for query parameters
             console.log(req.query);
-    
+
             if (!user_id || !page) {
                 return res.status(400).json({ message: "Missing required parameters" });
             }
-    
+
             const response = await adminService.getUserFavorites(user_id, page, limit);
             res.status(200).json(response);
         } catch (error) {
@@ -1139,23 +1139,23 @@ const adminController = {
         }
     },
 
-    getUserBookmarks : async (req, res, next) => {
+    getUserBookmarks: async (req, res, next) => {
         try {
-            const { user_id,page, limit } = req.query; 
-            const response = await adminService.getUserBookmarks(user_id,page,limit);
-            
+            const { user_id, page, limit } = req.query;
+            const response = await adminService.getUserBookmarks(user_id, page, limit);
+
             res.status(200).json(response);
         } catch (error) {
             next({ statusCode: 500, message: error.message });
         }
     },
-    
+
     // ====================
     deleteWishlist: async (req, res, next) => {
         try {
             const deleteWishlist = await adminService.deleteWishlist(req.body);
             console.log(deleteWishlist, "deleteWishlist");
-    
+
             res.status(200).json({ message: "Product removed from favorites" });
         } catch (error) {
             error.message = error.error;
@@ -1164,14 +1164,14 @@ const adminController = {
             next(error);
         }
     },
-    
+
     // =:=========================
     getWishlist: async (req, res, next) => {
         const { id } = req.params;
         try {
             const wishlist = await adminService.getWishlist(req.params);
             console.log(wishlist, "wishlist");
-    
+
             res.status(200).json({ message: "Product fetched from favorites", wishlist });
         } catch (error) {
             console.log(error);
@@ -1179,14 +1179,14 @@ const adminController = {
             next(error);
         }
     },
-    
+
     // =====================
     getOrderHistory: async (req, res, next) => {
         try {
-            const { user_id} = req.params;  
-    
+            const { user_id } = req.params;
+
             const orderHistory = await adminService.getOrderHistory(user_id);
-    
+
             res.status(200).json({
                 status: 200,
                 orderHistory
@@ -1200,22 +1200,37 @@ const adminController = {
         }
     },
     // ======================
-    updateOrderStatus: async (req,res) => {
+    updateOrderStatus: async (req, res) => {
         try {
             const { checkout_id } = req.params;
             const { newStatus } = req.body;
-    
+
             const updatedOrder = await adminService.updateOrderStatus(checkout_id, newStatus);
-    
+
             res.status(200).json({
                 status: 200,
                 message: "Order status updated successfully",
                 updatedOrder
             });
-        }  catch (error) {
+        } catch (error) {
             throw new Error("Error updating order status");
         }
-    }
+    },
+    // =============================
+    getAllUser: async (req, res) => {
+        const { user_id } = req.body
+        console.log(user_id,"ppp")
+        try {
+            const getuser = await adminService.getAllUser(user_id);
+            res.status(200).json({
+                status: 200,
+                message: "get user successfully",
+                getuser
+            });
+        } catch (error) {
+
+        }
+    },
 
 }
 

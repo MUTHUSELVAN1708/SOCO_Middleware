@@ -4,7 +4,7 @@ import Friend from "../model/FriendModel.js";
 import User from "../model/registerModel.js";
 import BusinessModel from "../model/BusinessModel.js";
 import { handleSuccessV1, handleError } from "../utils/responseHandler.js";
-
+import {getIO} from "../../socket.js"
 const toggleFriend = async (req, res) => {
     const { userId, friends, isBusinessAccount } = req.body;
 
@@ -242,9 +242,66 @@ const calculateMutualFriends = async (userId, friendId) => {
 };
 
 
+// const manageFriendStatus = async (req, res) => {
+//     const { userId, id, status } = req.body;
+
+//     if (!userId || !id || !status) {
+//         return handleError(res, 400, "Missing userId, friendId, or status.");
+//     }
+
+//     try {
+//         const friendData = await Friend.findOne({ userId });
+//         if (!friendData) return handleError(res, 404, "Friend data not found.");
+
+//         const friend = friendData.friends.find(f => f._id.toString() === id);
+//         if (!friend) return handleError(res, 400, "Friend not found.");
+
+//         if (status === "Accepted") {
+//             if (friend.status !== "Pending") return handleError(res, 400, "No pending friend request found.");
+
+//             friend.status = "Accepted";
+//             friend.acceptedAt = new Date();
+//             await friendData.save();
+
+//             const updateModel = friend.friendReference === "businessRegister" ? BusinessModel : User;
+//             await updateModel.findByIdAndUpdate(friend.friendId, { $inc: { friendCount: 1 } });
+
+//             return handleSuccessV1(res, 200, "Friend request accepted.");
+//         }
+
+//         if (status === "Rejected") {
+//             if (friend.status !== "Pending") return handleError(res, 400, "No pending friend request found.");
+
+//             friend.status = "Rejected";
+//             friend.rejectedAt = new Date();
+//             await friendData.save();
+
+//             return handleSuccessV1(res, 200, "Friend request rejected.");
+//         }
+
+//         if (status === "Removed") {
+//             if (friend.status !== "Accepted") return handleError(res, 400, "Friend not found or not accepted.");
+
+//             const friendIndex = friendData.friends.findIndex(f => f._id.toString() === id);
+//             friendData.friends.splice(friendIndex, 1);
+//             await friendData.save();
+
+//             const updateModel = friend.friendReference === "businessRegister" ? BusinessModel : User;
+//             await updateModel.findByIdAndUpdate(friend.friendId, { $inc: { friendCount: -1 } });
+
+//             return handleSuccessV1(res, 200, "Friend removed successfully.");
+//         }
+
+//         return handleError(res, 400, "Invalid status provided.");
+//     } catch (error) {
+//         return handleError(res, 500, `Error managing friend status: ${error.message}`);
+//     }
+// };
+
+
 const manageFriendStatus = async (req, res) => {
     const { userId, id, status } = req.body;
-
+    const io = getIO();
     if (!userId || !id || !status) {
         return handleError(res, 400, "Missing userId, friendId, or status.");
     }
@@ -265,6 +322,12 @@ const manageFriendStatus = async (req, res) => {
 
             const updateModel = friend.friendReference === "businessRegister" ? BusinessModel : User;
             await updateModel.findByIdAndUpdate(friend.friendId, { $inc: { friendCount: 1 } });
+
+            io.emit("friendRequestAccepted", {
+                userId: userId.toString(),
+                friendId: id,
+                message: "Friend request accepted",
+            });
 
             return handleSuccessV1(res, 200, "Friend request accepted.");
         }

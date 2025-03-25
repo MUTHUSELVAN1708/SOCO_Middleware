@@ -23,5 +23,5 @@ router.post("/wishlist",adminController.wishlist);
 router.get("/getWishlist/:id",adminController.getWishlist)
 router.delete("/deleteWishlist",adminController.deleteWishlist);
 
-
+router.get("/getAllUser",adminController.getAllUser);
 export default router
