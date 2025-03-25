@@ -5,6 +5,7 @@ import os from "os";
 import "dotenv/config";
 import { fileURLToPath } from "url";
 import path from "path";
+import { Server } from "socket.io";
 
 import "./src/db/db.js"; 
 import adminRouter from "./src/router/adminRouter.js";
@@ -16,7 +17,8 @@ import playlistsRoutes from "./src/router/playlistRoutes.js";
 import orderRoutes from "./src/router/orderRoutes.js";
 import PreferenceRouter from "./src/router/PreferenceRouter.js";
 import errorHandling from "./errorHandling.js";
-import  {initializeSocket} from "./socket.js";
+// import  {initializeSocket} from "./socket.js";
+import chatSocket from "./src/service/chatSocket.js";
 // import redisService from "./src/service/redisService.js";
 
 const app = express();
@@ -51,7 +53,14 @@ const PORT = process.env.port || 3000;
 const server = http.createServer(app);
 
 
-const io = initializeSocket(server);
+// const io = initializeSocket(server);
+const chatIo = new Server(server, {
+  cors: {
+      origin: "*", // Adjust based on your frontend URL
+      methods: ["GET", "POST"],
+  }
+});
+chatSocket(chatIo);
 // redisService.connect();
 
 // redisService.subscribeToNotifications(io);

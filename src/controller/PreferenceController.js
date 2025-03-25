@@ -117,81 +117,90 @@ const getFriendRequests = async (req, res) => {
         const { userId, page = 1, limit = 10 } = req.query;
 
         if (!userId) {
-            console.log("Missing userId in request.");
+            console.log("[Error] Missing userId in request.");
             return handleError(res, 400, "Missing userId.");
         }
 
-        const currentPage = Math.max(1, parseInt(page, 10)); 
-        const perPage = Math.max(1, parseInt(limit, 10)); 
+        const currentPage = Math.max(1, parseInt(page, 10));
+        const perPage = Math.max(1, parseInt(limit, 10));
 
-        console.log(`Fetching pending friend requests for userId: ${userId}`);
+        console.log(`[Info] Fetching pending friend requests for userId: ${userId}, Page: ${currentPage}, Limit: ${perPage}`);
 
-        const userFriendDoc = await Friend.findOne({ userId }).lean();
+        // Find users where `userId` exists inside their `friends` array with status "Pending"
+        console.log(`[DB Query] Searching for pending requests where userId exists in friends list.`);
+        const pendingRequests = await Friend.aggregate([
+            { $match: { "friends.friendId": userId, "friends.status": "Pending" } },
+            { $unwind: "$friends" },
+            { $match: { "friends.friendId": userId, "friends.status": "Pending" } },
+            {
+                $project: {
+                    _id: "$friends._id",
+                    requesterId: "$userId",
+                    friendId: "$friends.friendId",
+                    friendReference: "$userReference",
+                    requestedAt: "$friends.requestedAt"
+                }
+            },
+            { $sort: { requestedAt: -1 } },
+            { $skip: (currentPage - 1) * perPage },
+            { $limit: perPage }
+        ]);
 
-        if (!userFriendDoc || !userFriendDoc.friends.length) {
-            return handleSuccessV1(res, 200, "No pending friend requests found.", { requests: [], pagination: null });
-        }
-
-        const pendingRequests = userFriendDoc.friends.filter(friend => friend.status === "Pending");
+        console.log(`[DB Result] Found ${pendingRequests.length} pending requests for userId: ${userId}`);
 
         if (!pendingRequests.length) {
+            console.log("[Info] No pending friend requests found.");
             return handleSuccessV1(res, 200, "No pending friend requests found.", { requests: [], pagination: null });
         }
-
-        const totalResults = pendingRequests.length;
-        const totalPages = Math.ceil(totalResults / perPage);
-        
-        // Ensure currentPage does not exceed totalPages
-        if (currentPage > totalPages) {
-            return handleSuccessV1(res, 200, "No more pending friend requests.", { requests: [], pagination: {
-                totalResults,
-                totalPages,
-                currentPage,
-                limit: perPage,
-                hasNextPage: false,
-                hasPreviousPage: currentPage > 1
-            }});
-        }
-
-        const startIndex = (currentPage - 1) * perPage;
-        const endIndex = Math.min(startIndex + perPage, totalResults); 
-
-        const paginatedRequests = pendingRequests.slice(startIndex, endIndex);
 
         const userIds = [];
         const businessIds = [];
         const requestMap = new Map();
 
-        paginatedRequests.forEach(friend => {
-            requestMap.set(friend.friendId, friend.requestedAt);
-            if (friend.friendReference === "User") {
-                userIds.push(friend.friendId);
-            } else if (friend.friendReference === "businessRegister") {
-                businessIds.push(friend.friendId);
+        pendingRequests.forEach(request => {
+            requestMap.set(request.requesterId, request.requestedAt);
+            if (request.friendReference === "User") {
+                userIds.push(request.requesterId);
+            } else if (request.friendReference === "businessRegister") {
+                businessIds.push(request.requesterId);
             }
         });
 
+        console.log(`[Info] Categorizing requests: ${userIds.length} User requests, ${businessIds.length} Business requests`);
+
+        console.log(`[DB Query] Fetching User details...`);
         const users = await User.find({ _id: { $in: userIds } }, "full_Name profile_url").lean();
+        console.log(`[DB Result] Found ${users.length} Users.`);
+
+        console.log(`[DB Query] Fetching Business details...`);
         const businesses = await BusinessModel.find({ _id: { $in: businessIds } }, "businessName brand_logo").lean();
+        console.log(`[DB Result] Found ${businesses.length} Businesses.`);
 
         const userMap = new Map(users.map(user => [user._id.toString(), { name: user.full_Name, imageUrl: user.profile_url }]));
         const businessMap = new Map(businesses.map(business => [business._id.toString(), { name: business.businessName, imageUrl: business.brand_logo }]));
 
+        console.log("[Processing] Formatting friend requests...");
         const formattedRequests = await Promise.all(
-            paginatedRequests.map(async friend => {
-                const details = userMap.get(friend.friendId) || businessMap.get(friend.friendId) || {};
-                const mutualFriendsCount = await calculateMutualFriends(userId, friend.friendId);
+            pendingRequests.map(async request => {
+                const details = userMap.get(request.requesterId) || businessMap.get(request.requesterId) || {};
+                const mutualFriendsCount = await calculateMutualFriends(userId, request.requesterId);
 
                 return {
-                    _id:friend._id,
-                    friendId: friend.friendId,
+                    _id: request._id,
+                    friendId: request.requesterId,
                     name: details.name || "Unknown",
                     imageUrl: details.imageUrl || "",
-                    requestDate: new Date(requestMap.get(friend.friendId)).toISOString(),
+                    requestDate: new Date(requestMap.get(request.requesterId)).toISOString(),
                     mutualFriendsCount: `${mutualFriendsCount} mutual friends`
                 };
             })
         );
+
+        console.log("[DB Query] Counting total pending requests...");
+        const totalResults = await Friend.countDocuments({ "friends.friendId": userId, "friends.status": "Pending" });
+        const totalPages = Math.ceil(totalResults / perPage);
+        
+        console.log(`[Info] Pagination - Total Results: ${totalResults}, Total Pages: ${totalPages}, Current Page: ${currentPage}`);
 
         const pagination = {
             totalResults,
@@ -202,17 +211,17 @@ const getFriendRequests = async (req, res) => {
             hasPreviousPage: currentPage > 1
         };
 
+        console.log("[Success] Sending formatted friend requests.");
         return handleSuccessV1(res, 200, "Pending friend requests retrieved successfully.", {
             requests: formattedRequests,
             pagination
         });
+
     } catch (error) {
-        console.error("Error fetching friend requests:", error);
+        console.error("[Error] Fetching friend requests failed:", error);
         return handleError(res, 500, `Error fetching friend requests: ${error.message}`);
     }
 };
-
-
 
 
 // Function to calculate mutual friends
@@ -243,14 +252,14 @@ const calculateMutualFriends = async (userId, friendId) => {
 
 
 const manageFriendStatus = async (req, res) => {
-    const { userId, id, status } = req.body;
+    const { id, status } = req.body;
 
-    if (!userId || !id || !status) {
-        return handleError(res, 400, "Missing userId, friendId, or status.");
+    if (!id || !status) {
+        return handleError(res, 400, "Missing friendId or status.");
     }
 
     try {
-        const friendData = await Friend.findOne({ userId });
+        const friendData = await Friend.findOne({ "friends._id": id });
         if (!friendData) return handleError(res, 404, "Friend data not found.");
 
         const friend = friendData.friends.find(f => f._id.toString() === id);
@@ -282,8 +291,7 @@ const manageFriendStatus = async (req, res) => {
         if (status === "Removed") {
             if (friend.status !== "Accepted") return handleError(res, 400, "Friend not found or not accepted.");
 
-            const friendIndex = friendData.friends.findIndex(f => f._id.toString() === id);
-            friendData.friends.splice(friendIndex, 1);
+            friendData.friends = friendData.friends.filter(f => f._id.toString() !== id);
             await friendData.save();
 
             const updateModel = friend.friendReference === "businessRegister" ? BusinessModel : User;
@@ -297,6 +305,7 @@ const manageFriendStatus = async (req, res) => {
         return handleError(res, 500, `Error managing friend status: ${error.message}`);
     }
 };
+
 
 
 
