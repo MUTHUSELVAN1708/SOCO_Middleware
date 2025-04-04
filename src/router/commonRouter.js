@@ -95,6 +95,7 @@ router.post("/BusinessRegister", adminController.BusinessRegister);
 router.post("/updateNotificationDetails", adminController.updateNotificationDetails);
 router.post("/registerUserWithBusiness", adminController.registerUserWithBusiness);
 router.post("/registerUserAccount", adminController.registerUserAccount);
+router.post("/addAccessIdToBusinessAccount", adminController.addAccessIdToBusinessAccount);
 router.post("/registerBusinessAccount", adminController.registerBusinessAccount);
 router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 

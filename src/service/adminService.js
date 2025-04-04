@@ -358,12 +358,6 @@ const adminService = {
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
-    
-    
-
-
-
 
     //   ==========
     registerUserWithBusiness: async (data) => {
@@ -743,6 +737,30 @@ const adminService = {
         }
     },
 
+    addAccessIdToBusinessAccount: async (data) => {
+        try {
+            const {id, includeId} = data;
+            if (!id || !includeId) {
+                throw { status: 400, message: "Business ID and Include ID are required." };
+            }
+
+            const businessAccount = await businessregisterModel.findById(id);
+            if (!businessAccount) {
+                throw { status: 404, message: "Business account not found." };
+            }
+
+            if (!businessAccount.accessAccountsIds.includes(includeId)) {
+                businessAccount.accessAccountsIds.push(includeId);
+                await businessAccount.save();
+            }
+
+            return { success: true, business: businessAccount };
+        } catch (error) {
+            console.error("Error in AddAccessIdToBusinessAccount:", error);
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
+
 
     registerBusinessAccount: async (data) => {
         try {
@@ -783,32 +801,41 @@ const adminService = {
                 lastOnline = null,
                 currentChatRoom = null,
                 unreadMessagesCount = 0,
+                accessAccountsIds = [] // New field for additional linked accounts
             } = data;
-
+    
             let errors = [];
-
+    
             if (!user_id) errors.push("User ID is required.");
             if (!businessName) errors.push("Business name is required.");
             if (!businessType) errors.push("Business type is required.");
             if (!natureOfBusiness) errors.push("Nature of business is required.");
-
+    
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-
-            const userId = user_id;
-
-            // Fetch the user document using the userId found in businessregisterModel
-            const existingUser = await registerModel.findById(userId);
+    
+            // Check if the main user exists
+            const existingUser = await registerModel.findById(user_id);
             if (!existingUser) {
                 throw { status: 404, message: "User not found for the given user ID in business profile." };
             }
-
+    
+            // Validate accessAccountsIds if provided
+            if (accessAccountsIds.length > 0) {
+                const validAccounts = await registerModel.find({ _id: { $in: accessAccountsIds } });
+                if (validAccounts.length !== accessAccountsIds.length) {
+                    throw { status: 400, message: "One or more access account IDs are invalid." };
+                }
+            }
+    
+            // Ensure business name is unique
             const existingBusiness = await businessregisterModel.findOne({ businessName });
             if (existingBusiness) {
                 throw { status: 400, message: "Business name already exists. Business name must be unique." };
             }
-
+    
+            // Create the business
             const business = await businessregisterModel.create({
                 user_id,
                 Brand_Name: Brand_Name || "",
@@ -847,15 +874,17 @@ const adminService = {
                 lastOnline,
                 currentChatRoom,
                 unreadMessagesCount,
+                accessAccountsIds // Store linked account IDs
             });
-
+    
             return { success: true, user: existingUser, business: [business] };
-
+    
         } catch (error) {
             console.error("Error in registerBusinessAccount:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
+    
 
 
     updateBusinessProfile: async (data) => {
@@ -1123,54 +1152,63 @@ const adminService = {
         const { email, phn_number, password, deviceToken } = data;
         try {
             let user;
-
+    
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-
+    
             if (!user) {
                 throw { msg: "Account not found. Please register to continue." };
             }
-
+    
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     throw { msg: "Invalid credentials. Please try again or reset your password." };
                 }
             }
-
+    
             console.log("User ID:", user._id, "Device Token:", deviceToken);
-
+    
             const updatedUser = await registerModel.findOneAndUpdate(
                 { _id: user._id },
                 { $addToSet: { deviceToken: deviceToken } },
                 { new: true }
             );
-
+    
             if (updatedUser) {
                 console.log("Device tokens updated successfully:", updatedUser.deviceToken);
             } else {
                 console.error("Failed to update device tokens.");
             }
-
-            // Fetch the list of businesses associated with the user ID
-            const businesses = await businessregisterModel.find({ user_id: user._id });
-
+    
+            // Fetch businesses where the user is the owner
+            const ownedBusinesses = await businessregisterModel.find({ user_id: user._id });
+    
+            // Fetch businesses where the user has access via accessAccountsIds
+            const accessibleBusinesses = await businessregisterModel.find({ accessAccountsIds: user._id.toString() });
+    
+            // Merge and remove duplicates
+            const allBusinesses = [...ownedBusinesses, ...accessibleBusinesses].filter(
+                (business, index, self) =>
+                    index === self.findIndex((b) => b._id.toString() === business._id.toString())
+            );
+    
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-
+    
             return {
                 status: 200,
                 msg: "Login successful",
                 login: {
                     token,
                     user: updatedUser,
-                    business: businesses.length > 0 ? businesses : [],
+                    business: allBusinesses.length > 0 ? allBusinesses : [],
                 },
             };
         } catch (error) {
@@ -1182,6 +1220,7 @@ const adminService = {
             };
         }
     },
+    
 
 
     // ===================

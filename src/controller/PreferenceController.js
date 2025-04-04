@@ -3,7 +3,207 @@ import Follow from "../model/FollowModel.js";
 import Friend from "../model/FriendModel.js";
 import User from "../model/registerModel.js";
 import BusinessModel from "../model/BusinessModel.js";
+import ChatMember from "../model/chatMembers.js";
 import { handleSuccessV1, handleError } from "../utils/responseHandler.js";
+
+
+export const addChatMember = async (req, res) => {
+    try {
+        console.log("Received request to add chat member with body:", req.body);
+
+        const { userId, userReference, playerId, playerReference } = req.body;
+
+        if (!userId || !userReference || !playerId || !playerReference) {
+            console.error("Missing required fields:", { userId, userReference, playerId, playerReference });
+            return handleError(res, 400, "Missing required fields");
+        }
+
+        const getUserDetails = async (id, reference) => {
+            console.log(`Fetching details for ID: ${id}, Reference: ${reference}`);
+            if (reference === "User") {
+                return await User.findById(id).select("full_Name profile_url lastOnline");
+            } else if (reference === "businessRegister") {
+                return await BusinessModel.findById(id).select("businessName brand_logo lastOnline");
+            }
+            return null;
+        };
+
+        const userDetails = await getUserDetails(userId, userReference);
+        const playerDetails = await getUserDetails(playerId, playerReference);
+
+        if (!userDetails || !playerDetails) {
+            console.error("User or Player not found:", { userDetails, playerDetails });
+            return handleError(res, 404, "User or Player not found");
+        }
+
+        console.log("User details fetched:", userDetails);
+        console.log("Player details fetched:", playerDetails);
+
+        const addOrUpdateChatMember = async (ownerId, ownerReference, memberId, memberReference, details,isFirst) => {
+            console.log(`Starting addOrUpdateChatMember function`);
+            console.log(`Received Params - Owner ID: ${ownerId}, Owner Reference: ${ownerReference}, Member ID: ${memberId}, Member Reference: ${memberReference}, Details: ${JSON.stringify(details)}`);
+        
+            try {
+                console.log(`Searching for chat member with Owner ID: ${ownerId}`);
+                let chatMember = await ChatMember.findOne({ userId: ownerId });
+        
+                if (!chatMember) {
+                    console.log(`Chat member not found for Owner ID: ${ownerId}. Creating new entry...`);
+                
+                    const name = isFirst 
+                        ? userDetails?.full_Name ?? userDetails?.businessName ?? "Unknown"
+                        : playerDetails?.full_Name ?? playerDetails?.businessName ?? "Unknown";
+                
+                    const avatarUrl = isFirst 
+                        ? userDetails?.profile_url ?? userDetails?.brand_logo ?? ""
+                        : playerDetails?.profile_url ?? playerDetails?.brand_logo ?? "";
+
+                    const lastSeen = isFirst 
+                        ? userDetails?.lastOnline ?? userDetails?.lastOnline ?? ""
+                        : playerDetails?.lastOnline ?? playerDetails?.lastOnline ?? "";
+
+                        
+                
+                    chatMember = new ChatMember({
+                        userId: ownerId,
+                        name,
+                        avatarUrl,
+                        lastSeen:lastSeen,
+                        userReference: ownerReference,
+                        player: [],
+                    });
+                
+                    console.log(`New chat member entry created with User ID: ${ownerId}`);
+                }
+                 else {
+                    console.log(`Existing chat member found for Owner ID: ${ownerId}`);
+                }
+        
+                console.log(`Checking if member with ID: ${memberId} already exists in chatMember.player list`);
+                const existingPlayerIndex = chatMember.player.findIndex(p => p.playerId === memberId);
+        
+                if (existingPlayerIndex !== -1) {
+                    console.log(`Member with ID: ${memberId} already exists. Updating details...`);
+                    chatMember.player[existingPlayerIndex] = {
+                        ...chatMember.player[existingPlayerIndex],
+                        playerId: memberId,
+                        name: details?.full_Name || details?.businessName || "Unknown",
+                        avatarUrl: details?.profile_url || details?.brand_logo || "",
+                        playerReference: memberReference,
+                        lastSeen: details?.lastSeen || details?.lastSeen || new Date(),
+                    };
+                    console.log(`Updated player details for Member ID: ${memberId}`);
+                } else {
+                    console.log(`Member with ID: ${memberId} does not exist. Adding new player entry...`);
+                    chatMember.player.push({
+                        playerId: memberId,
+                        name: details?.full_Name || details?.businessName || "Unknown",
+                        avatarUrl: details?.profile_url || details?.brand_logo || "",
+                        playerReference: memberReference,
+                        lastSeen: new Date(),
+                        isOnline: false,
+                        status: "Active",
+                    });
+                    console.log(`New player added with ID: ${memberId}`);
+                }
+        
+                console.log(`Saving chat member data for Owner ID: ${ownerId}`);
+                await chatMember.save();
+                console.log(`Chat member saved successfully for Owner ID: ${ownerId}`);
+            } catch (error) {
+                console.error(`Error in addOrUpdateChatMember function: ${error.message}`);
+            }
+        
+            console.log(`Completed addOrUpdateChatMember function`);
+        };
+        
+
+        // Add userId as owner, playerId as member
+        await addOrUpdateChatMember(userId, userReference, playerId, playerReference, playerDetails,true);
+        // Add playerId as owner, userId as member (Reverse relationship)
+        await addOrUpdateChatMember(playerId, playerReference, userId, userReference, userDetails,false);
+
+        console.log("Chat members updated successfully");
+        return handleSuccessV1(res, 200, "Chat members updated successfully");
+    } catch (error) {
+        console.error("Error in addChatMember:", error.message);
+        return handleError(res, 500, error.message);
+    }
+};
+
+
+
+
+
+// export const addChatMember = async (req, res) => {
+//     try {
+//         const { userId, userReference, playerId, playerReference } = req.body;
+
+//         if (!userId || !userReference || !playerId || !playerReference) {
+//             return handleError(res, "Missing required fields", 400);
+//         }
+
+//         const getUserDetails = async (id, reference) => {
+//             if (reference === "User") {
+//                 return await User.findById(id).select("name avatarUrl");
+//             } else if (reference === "businessRegister") {
+//                 return await BusinessModel.findById(id).select("name avatarUrl");
+//             }
+//             return null;
+//         };
+
+//         const userDetails = await getUserDetails(userId, userReference);
+//         const playerDetails = await getUserDetails(playerId, playerReference);
+
+//         if (!userDetails || !playerDetails) {
+//             return handleError(res, "User or Player not found", 404);
+//         }
+
+//         const addOrUpdateChatMember = async (ownerId, memberId, memberRef, details) => {
+//             let chatMember = await ChatMember.findOne({ userId: ownerId });
+//             if (!chatMember) {
+//                 chatMember = new ChatMember({
+//                     userId: ownerId,
+//                     name: userDetails.name,
+//                     avatarUrl: userDetails.avatarUrl,
+//                     userReference,
+//                     player: [],
+//                 });
+//             }
+
+//             const existingPlayerIndex = chatMember.player.findIndex(p => p.playerId === memberId);
+//             if (existingPlayerIndex !== -1) {
+//                 chatMember.player[existingPlayerIndex] = {
+//                     ...chatMember.player[existingPlayerIndex],
+//                     name: details.name,
+//                     avatarUrl: details.avatarUrl,
+//                     playerReference: memberRef,
+//                     lastSeen: new Date(),
+//                 };
+//             } else {
+//                 chatMember.player.push({
+//                     playerId: memberId,
+//                     name: details.name,
+//                     avatarUrl: details.avatarUrl,
+//                     playerReference: memberRef,
+//                     lastSeen: new Date(),
+//                     isOnline: false,
+//                     status: "Active",
+//                 });
+//             }
+
+//             await chatMember.save();
+//         };
+
+//         await addOrUpdateChatMember(userId, playerId, playerReference, playerDetails);
+//         await addOrUpdateChatMember(playerId, userId, userReference, userDetails);
+
+//         return handleSuccessV1(res, "Chat members updated successfully");
+//     } catch (error) {
+//         return handleError(res, error.message, 500);
+//     }
+// };
+
 
 const toggleFriend = async (req, res) => {
     const { userId, friends, isBusinessAccount } = req.body;
@@ -54,8 +254,6 @@ const toggleFriend = async (req, res) => {
         return handleError(res, 500, `Error toggling friend request: ${error.message}`);
     }
 };
-
-
 
 
 const toggleFollow = async (req, res) => {
@@ -309,4 +507,4 @@ const manageFriendStatus = async (req, res) => {
 
 
 
-export { toggleFriend, toggleFollow , getFriendRequests , manageFriendStatus};
+export { toggleFriend, toggleFollow , getFriendRequests , manageFriendStatus };

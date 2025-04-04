@@ -16,6 +16,8 @@ import feedRoutes from "./src/router/feedRouter.js";
 import playlistsRoutes from "./src/router/playlistRoutes.js";
 import orderRoutes from "./src/router/orderRoutes.js";
 import PreferenceRouter from "./src/router/PreferenceRouter.js";
+import chatMessageRoutes from "./src/router/chatMessageRoutes.js";
+import linkAccountRoutes from "./src/router/linkAccountRouters.js";
 import errorHandling from "./errorHandling.js";
 // import  {initializeSocket} from "./socket.js";
 import chatSocket from "./src/service/chatSocket.js";
@@ -43,6 +45,8 @@ app.use('/feed', feedRoutes);
 app.use('/playlists', playlistsRoutes);
 app.use('/order', orderRoutes);
 app.use('/preferenceRouter', PreferenceRouter);
+app.use("/messages", chatMessageRoutes);
+app.use("/link", linkAccountRoutes);
 
 // Error Handling
 app.use(errorHandling);
