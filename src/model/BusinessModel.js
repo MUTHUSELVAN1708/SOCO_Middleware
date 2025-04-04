@@ -24,6 +24,7 @@ const BusinessregisterSchema = new mongoose.Schema(
     friendCount: { type: Number, default: 0 },
     needPermissionForFollowing: { type: Boolean, default: false },
     friendPermission: { type: Boolean, default: false },
+    isThereAnyNotification: { type: Boolean, default: false },
     ownerName: { type: String, required: false },
     businessAddress: { type: String, required: false },
     businessCity: { type: String, required: false },
@@ -37,6 +38,7 @@ const BusinessregisterSchema = new mongoose.Schema(
     businessName: { type: String, required: false },
     oneSignalIDs: { type: [String], default: [] },
     subscriptionIDs: { type: [String], default: [] },
+    accessAccountsIds: { type: [String], default: [] },
     
     // Chat-related fields
     onlineStatus: { 

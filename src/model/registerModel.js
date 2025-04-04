@@ -49,6 +49,7 @@ const registerSchema = new mongoose.Schema(
     friendCount: { type: Number, default: 0 },
     needPermissionForFollowing: { type: Boolean, default: false },
     friendPermission: { type: Boolean, default: false },
+    isThereAnyNotification: { type: Boolean, default: false },
     accountIsPublic: { type: Boolean, default: false },
     schoolDetails: {
       name: { type: String, required: false },

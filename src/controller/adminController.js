@@ -163,6 +163,25 @@ const adminController = {
         }
     },
 
+    addAccessIdToBusinessAccount: async (req, res, next) => {
+        try {
+            const register = await adminService.addAccessIdToBusinessAccount(req.body);
+            res.status(200).json({
+                status: 200,
+                msg: "Account linked successfully.",
+                data: register,
+            });
+        } catch (error) {
+            console.error(error);
+            // Ensure error structure is consistent
+            error.status = error.status || 400; // Default to 400 if no status set
+            error.message = error.message || 'Failed to link account';
+
+            // Pass the error to the next middleware
+            next(error);
+        }
+    },
+
     registerBusinessAccount: async (req, res, next) => {
         try {
             const register = await adminService.registerBusinessAccount(req.body);
