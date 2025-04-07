@@ -18,6 +18,7 @@ import orderRoutes from "./src/router/orderRoutes.js";
 import PreferenceRouter from "./src/router/PreferenceRouter.js";
 import chatMessageRoutes from "./src/router/chatMessageRoutes.js";
 import linkAccountRoutes from "./src/router/linkAccountRouters.js";
+import notificationRoutes from "./src/router/notificationRoutes.js";
 import errorHandling from "./errorHandling.js";
 // import  {initializeSocket} from "./socket.js";
 import chatSocket from "./src/service/chatSocket.js";
@@ -47,6 +48,7 @@ app.use('/order', orderRoutes);
 app.use('/preferenceRouter', PreferenceRouter);
 app.use("/messages", chatMessageRoutes);
 app.use("/link", linkAccountRoutes);
+app.use("/notification", notificationRoutes);
 
 // Error Handling
 app.use(errorHandling);

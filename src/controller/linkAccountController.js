@@ -4,45 +4,107 @@ import LinkAccountModel from "../model/LinkAccountModel.js";
 import { handleSuccessV1, handleError } from "../utils/responseHandler.js";
 import { sendPushNotification } from "../service/pushNotificationService.js";
 import Notification from "../model/NotificationModel.js";
-
+import adminService from "../service/adminService.js";
 
 
 export const getLinkedAccounts = async (req, res) => {
     try {
+        console.log("⏱️ getLinkedAccounts started at:", new Date().toISOString());
+        const start = Date.now();
+        console.time("⏱️ getLinkedAccounts duration");
+
         const { businessId } = req.query;
 
         if (!businessId) {
             return handleError(res, 400, "Business ID is required.");
         }
 
-        // Find all users linked to this business and populate user details
         const linkedAccounts = await LinkAccountModel.find({ linkingBusinessAccountId: businessId })
             .populate({
                 path: "userId",
-                select: "full_Name profile_url email" // Fetch only these fields from User model
+                select: "full_Name profile_url email"
             })
-            .select("userId linkStatus"); // Only return necessary fields
+            .select("userId linkStatus");
 
-        if (!linkedAccounts.length) {
-            return handleError(res, 404, "No linked accounts found for this business.");
-        }
-
-        // Format response
-        const response = linkedAccounts
-            .filter(link => link.userId) // Ensure userId exists after population
+        const linkedAccountUsers = linkedAccounts
+            .filter(link => link.userId)
             .map(link => ({
-                id: link.userId._id,
+                id: link.userId._id.toString(),
                 name: link.userId.full_Name,
                 imageUrl: link.userId.profile_url || null,
                 email: link.userId.email || null,
                 status: link.linkStatus
             }));
 
-        return handleSuccessV1(res, 200, "Linked accounts retrieved successfully.", response);
+        const linkedUserIds = linkedAccountUsers.map(user => user.id);
+
+        const business = await BusinessModel.findById(businessId).lean();
+        if (!business) {
+            return handleError(res, 404, "Business not found.");
+        }
+
+        const accessUserIds = (business.accessAccountsIds || []).filter(
+            id => !linkedUserIds.includes(id.toString())
+        );
+
+        const accessUsers = await User.find({ _id: { $in: accessUserIds } })
+            .select("full_Name profile_url email");
+
+        const accessAccountUsers = accessUsers.map(user => ({
+            id: user._id.toString(),
+            name: user.full_Name,
+            imageUrl: user.profile_url || null,
+            email: user.email || null,
+            status: "confirmed"
+        }));
+
+        const allUserIds = [
+            ...linkedUserIds,
+            ...accessAccountUsers.map(user => user.id)
+        ];
+
+        let businessOwner = null;
+        const businessOwnerId = business.userId?.toString();
+
+        if (businessOwnerId && !allUserIds.includes(businessOwnerId)) {
+            const ownerUser = await User.findById(businessOwnerId).select("full_Name profile_url email");
+            if (ownerUser) {
+                businessOwner = {
+                    id: ownerUser._id.toString(),
+                    name: ownerUser.full_Name,
+                    imageUrl: ownerUser.profile_url || null,
+                    email: ownerUser.email || null,
+                    status: "owner"
+                };
+            }
+        }
+
+        const combined = [
+            ...linkedAccountUsers,
+            ...accessAccountUsers,
+            ...(businessOwner ? [businessOwner] : [])
+        ];
+
+        const response = combined.sort((a, b) => {
+            const order = { owner: -1, confirmed: 0, pending: 1, rejected: 2 };
+            return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+        });
+
+        console.timeEnd("⏱️ getLinkedAccounts duration");
+        console.log("✅ getLinkedAccounts completed in", Date.now() - start, "ms");
+
+        return handleSuccessV1(
+            res,
+            200,
+            response.length ? "Linked accounts retrieved successfully." : "No linked accounts found.",
+            response
+        );
     } catch (error) {
+        console.error("❌ getLinkedAccounts failed:", error.message);
         return handleError(res, 500, error.message);
     }
 };
+
 
 
 export const linkAccount = async (req, res) => {
@@ -84,9 +146,12 @@ export const linkAccount = async (req, res) => {
 
         const notification = new Notification({
             userId,
+            operationId: linkingBusinessAccountId,
             imageUrl: business?.brand_logo || null,
             isPerformAction:true,
             isPerformed:false,
+            isBusinessTypeAccount:true,
+            isRead:false,
             actions:["Accept","Reject"],
             title: "Business Account Link Request",
             message: `${business?.businessName || "A business account"} has requested to be linked to your profile. Review and take action.`,
@@ -115,6 +180,75 @@ export const linkAccount = async (req, res) => {
         return handleError(res, 500, error.message);
     }
 };
+
+export const updateLinkStatus = async (req, res) => {
+    try {
+        const { userId, status, actionUserId } = req.body;
+
+        if (!userId || !status || !['confirmed', 'rejected'].includes(status)) {
+            return handleError(res, 400, "userId and valid status ('confirmed' or 'rejected') are required");
+        }
+
+        const updateData = {
+            linkStatus: status,
+            $push: {
+                trackInfo: {
+                    userId: actionUserId || userId,
+                    status,
+                    changedAt: new Date(),
+                    dateTime: new Date().toISOString()
+                }
+            }
+        };
+
+        const linkRequest = await LinkAccountModel.findOneAndUpdate(
+            { userId, linkStatus: "pending" },
+            updateData,
+            { new: true }
+        );
+
+        if (!linkRequest) {
+            return handleError(res, 404, "Pending link request not found");
+        }
+
+        // If confirmed, update business account with access
+        if (status === 'confirmed') {
+            await adminService.addAccessIdToBusinessAccount({
+                id: linkRequest.linkingBusinessAccountId,
+                includeId: linkRequest.userId
+            });
+        }
+
+        // Update notifications
+        await Notification.updateMany(
+            { userId: userId, isRead: false },
+            {
+                $set: {
+                    isRead: true,
+                    isPerformAction: true,
+                    isPerformed: true
+                }
+            }
+        );
+
+        // Check for any remaining unread notifications
+        const hasUnreadNotifications = await Notification.exists({
+            userId: userId,
+            isRead: false
+        });
+
+        await User.findByIdAndUpdate(userId, {
+            isThereAnyNotification: !!hasUnreadNotifications
+        });
+
+        return handleSuccessV1(res, 200, `Link request ${status}`, linkRequest);
+    } catch (error) {
+        return handleError(res, 500, error.message);
+    }
+};
+
+
+
 
 
 // Confirm Link - Change status to "confirmed"
