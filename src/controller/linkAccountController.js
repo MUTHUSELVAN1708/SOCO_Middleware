@@ -105,8 +105,6 @@ export const getLinkedAccounts = async (req, res) => {
     }
 };
 
-
-
 export const linkAccount = async (req, res) => {
     try {
         const { userId, linkingBusinessAccountId } = req.body;
@@ -146,6 +144,7 @@ export const linkAccount = async (req, res) => {
 
         const notification = new Notification({
             userId,
+            linkingId: newLink._id,
             operationId: linkingBusinessAccountId,
             imageUrl: business?.brand_logo || null,
             isPerformAction:true,
@@ -181,12 +180,56 @@ export const linkAccount = async (req, res) => {
     }
 };
 
+export const markNotificationAsRead = async (req, res) => {
+    try {
+        const { notificationId } = req.body;
+
+        if (!notificationId) {
+            return handleError(res, 400, "Notification ID is required");
+        }
+
+        const notification = await Notification.findByIdAndUpdate(
+            notificationId,
+            { isRead: true },
+            { new: true }
+        );
+
+        if (!notification) {
+            return handleError(res, 404, "Notification not found");
+        }
+
+        const userId = notification.userId;
+
+        const hasUnreadNotifications = await Notification.exists({
+            userId,
+            isRead: false
+        });
+
+        await User.findByIdAndUpdate(userId, {
+            isThereAnyNotification: !!hasUnreadNotifications
+        });
+
+        return handleSuccessV1(res, 200, "Notification marked as read", notification);
+    } catch (error) {
+        return handleError(res, 500, error.message);
+    }
+};
+
+
 export const updateLinkStatus = async (req, res) => {
     try {
-        const { userId, status, actionUserId } = req.body;
+        const { userId, status, actionUserId, notificationId, linkRequestId } = req.body;
+
+        console.log("🔄 [updateLinkStatus] Incoming request:", req.body);
 
         if (!userId || !status || !['confirmed', 'rejected'].includes(status)) {
+            console.warn("⚠️ [updateLinkStatus] Missing or invalid userId/status.");
             return handleError(res, 400, "userId and valid status ('confirmed' or 'rejected') are required");
+        }
+
+        if (!linkRequestId) {
+            console.warn("⚠️ [updateLinkStatus] Missing linkRequestId.");
+            return handleError(res, 400, "linkRequestId is required");
         }
 
         const updateData = {
@@ -201,27 +244,49 @@ export const updateLinkStatus = async (req, res) => {
             }
         };
 
+        console.log("📦 [updateLinkStatus] Update payload:", updateData);
+
         const linkRequest = await LinkAccountModel.findOneAndUpdate(
-            { userId, linkStatus: "pending" },
+            { _id: linkRequestId, linkStatus: "pending" },
             updateData,
             { new: true }
         );
 
         if (!linkRequest) {
+            console.warn(`❌ [updateLinkStatus] Link request not found for ID: ${linkRequestId}`);
             return handleError(res, 404, "Pending link request not found");
         }
 
-        // If confirmed, update business account with access
+        console.log("✅ [updateLinkStatus] Link request updated:", linkRequest);
+
+        let businessAccounts = [];
+
         if (status === 'confirmed') {
+            console.log("🔗 [updateLinkStatus] Confirming access for business:", linkRequest.linkingBusinessAccountId);
+
             await adminService.addAccessIdToBusinessAccount({
                 id: linkRequest.linkingBusinessAccountId,
                 includeId: linkRequest.userId
             });
+
+            const businesses = await BusinessModel.find({
+                $or: [
+                    { user_id: userId },
+                    { accessAccountsIds: userId }
+                ]
+            }).lean();
+
+            const uniqueBusinessMap = new Map();
+            businesses.forEach(biz => uniqueBusinessMap.set(biz._id.toString(), biz));
+            businessAccounts = Array.from(uniqueBusinessMap.values());
+
+            console.log("🏢 [updateLinkStatus] User's business accounts (deduplicated):", businessAccounts.length);
         }
 
-        // Update notifications
+        console.log("🔔 [updateLinkStatus] Updating unread notifications for user:", userId);
+
         await Notification.updateMany(
-            { userId: userId, isRead: false },
+            { userId, isRead: false },
             {
                 $set: {
                     isRead: true,
@@ -231,24 +296,45 @@ export const updateLinkStatus = async (req, res) => {
             }
         );
 
-        // Check for any remaining unread notifications
+        if (notificationId) {
+            console.log("📬 [updateLinkStatus] Updating specific notification ID:", notificationId);
+
+            await Notification.findByIdAndUpdate(
+                notificationId,
+                {
+                    $set: {
+                        isRead: true,
+                        isPerformAction: true,
+                        isPerformed: true
+                    }
+                }
+            );
+        }
+
         const hasUnreadNotifications = await Notification.exists({
-            userId: userId,
+            userId,
             isRead: false
         });
+
+        console.log("📊 [updateLinkStatus] User has unread notifications?", !!hasUnreadNotifications);
 
         await User.findByIdAndUpdate(userId, {
             isThereAnyNotification: !!hasUnreadNotifications
         });
 
-        return handleSuccessV1(res, 200, `Link request ${status}`, linkRequest);
+        console.log("✅ [updateLinkStatus] Completed processing. Returning success.");
+
+        return handleSuccessV1(
+            res,
+            200,
+            `Link request ${status}`,
+            status === 'confirmed' ? { linkRequest, businessAccounts } : linkRequest
+        );
     } catch (error) {
+        console.error("🔥 [updateLinkStatus] Unexpected error:", error);
         return handleError(res, 500, error.message);
     }
 };
-
-
-
 
 
 // Confirm Link - Change status to "confirmed"
