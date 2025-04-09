@@ -12,6 +12,7 @@ const notificationSchema = new mongoose.Schema({
     isRead: { type: Boolean, default: false },
     isPerformAction: { type: Boolean, default: false },
     isPerformed: { type: Boolean, default: false },
+    cancleReason:{type:String},
     actions: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now }
 });
