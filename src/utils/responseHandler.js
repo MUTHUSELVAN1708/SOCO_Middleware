@@ -25,8 +25,8 @@ export const handleSuccess = (res, { message, data, statusCode = 200 }) => {
 
   export const generateTrackingNumber = () => {
     const prefix = "TRK";
-    const datePart = new Date().toISOString().replace(/[-T:.Z]/g, "").slice(2, 12); // Extract YYYYMMDDHH format
-    const uniqueId = uuidv4().split("-")[0].toUpperCase(); // Use a portion of UUID for uniqueness
+    const datePart = new Date().toISOString().replace(/[-T:.Z]/g, "").slice(2, 12); 
+    const uniqueId = uuidv4().split("-")[0].toUpperCase(); 
 
     return `${prefix}${datePart}${uniqueId}`;
 };

@@ -50,7 +50,7 @@
 //         const sellerName = product.createdBy.Brand_Name || product.createdBy.Name || 'Seller';
 //         const notificationTitle = "New Order Received";
 //         const notificationMessage = `You have received a new order for ${product.name}`;
-        
+
 //         // Additional data to include with the notification
 //         const notificationData = {
 //             order_id: savedOrder._id.toString(),
@@ -75,16 +75,16 @@ import Order from "../model/orderModel.js";
 import Product from "../model/Product.js";
 import User from "../model/registerModel.js";
 import BusinessModel from "../model/BusinessModel.js";
-import moment from "moment-timezone"; 
+import moment from "moment-timezone";
 import DeliveryAddressModel from "../model/deliveryAddressModel.js";
-import { handleSuccess, handleSuccessV1, handleError , generateTrackingNumber } from "../utils/responseHandler.js";
+import { handleSuccess, handleSuccessV1, handleError, generateTrackingNumber } from "../utils/responseHandler.js";
 import { sendPushNotification } from "../service/pushNotificationService.js";
 
 import { v4 as uuidv4, validate as isValidUUID } from "uuid";
 import orderEmailController from "./orderEmailController.js";
 import registerModel from "../model/registerModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
-
+import {storeNotificationMessage} from "../controller/linkAccountController.js"
 
 export const getOrderDetails = async (req, res) => {
     try {
@@ -101,7 +101,7 @@ export const getOrderDetails = async (req, res) => {
         }
 
         const product = await Product.findById(order.product_id);
-        
+
         const orderDetails = {
             orderId: order._id,
             userId: order.user_id,
@@ -161,14 +161,14 @@ export const cancelOrderByUser = async (req, res) => {
         }
 
         const product = await Product.findById(order.product_id);
-        console.log(product,"product")
+        console.log(product, "product")
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
         if (order.order_status !== "Pending") {
             return handleError(res, 400, `Sorry, the order cannot be canceled as its status has changed to ${order.order_status}.`);
         }
-        
+
         order.order_status = "Cancelled";
         order.buyer_approval_status = "Rejected";
 
@@ -180,29 +180,30 @@ export const cancelOrderByUser = async (req, res) => {
 
         await order.save();
         const business = await BusinessModel.findById(product.createdBy);
-        console.log(business,"business")
-                const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
-              
-                      // Move this check **after** validPlayerIds is initialized
-                      if (validPlayerIds.length === 0) {
-                          return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-                      }
-              
-                      console.log(validPlayerIds);
-              
-                      const notificationPayload = { 
-                        playerIds: validPlayerIds, 
-                        title: "Order Cancelled ✅", 
-                        message: `The order for ${product.basicInfo.productTitle.trim()} has been cancelled by the buyer. Please check for further details.`, 
-                        productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-                    };
-                    
-              
-                       sendPushNotification(notificationPayload);
-                      const email = business.businessEmail;
-                      const productTitle = product.basicInfo.productTitle;
-                      orderEmailController.cancelOrderByuserEmail(email, productTitle, orderId, cancelReason);
-        
+        console.log(business, "business")
+        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+
+
+        if (validPlayerIds.length === 0) {
+            return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+        }
+
+        console.log(validPlayerIds);
+
+        const notificationPayload = {
+            userId:userId,
+            playerIds: validPlayerIds,
+            title: "Order Cancelled ✅",
+            message: `The order for ${product.basicInfo.productTitle.trim()} has been cancelled by the buyer. Please check for further details.`,
+            productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+        };
+
+        sendPushNotification(notificationPayload);
+        const email = business.businessEmail;
+        const productTitle = product.basicInfo.productTitle;
+        orderEmailController.cancelOrderByuserEmail(email, productTitle, orderId, cancelReason);
+
+        storeNotificationMessage(notificationPayload);
         return handleSuccessV1(res, 200, "Order canceled successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error canceling order: ${error.message}`);
@@ -224,7 +225,7 @@ export const confirmOrderByUser = async (req, res) => {
             return handleError(res, 404, "Order not found");
         }
         const product = await Product.findById(order.product_id);
-        console.log(product,"product")
+        console.log(product, "product")
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
@@ -239,27 +240,28 @@ export const confirmOrderByUser = async (req, res) => {
 
         await order.save();
         const business = await BusinessModel.findById(product.createdBy);
-        console.log(business,"business")
-                const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
-              
-                      // Move this check **after** validPlayerIds is initialized
-                      if (validPlayerIds.length === 0) {
-                          return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-                      }
-              
-                      console.log(validPlayerIds);
-              
-                      const notificationPayload = { 
-                        playerIds: validPlayerIds, 
-                        title: "Order Confirmed ✅", 
-                        message: `The order for ${product.basicInfo.productTitle.trim()} has been confirmed by the customer. Get ready to process it!`, 
-                        productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-                    };
-                    
-              
-                       sendPushNotification(notificationPayload);
-              
-        
+        console.log(business, "business")
+        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+
+        // Move this check **after** validPlayerIds is initialized
+        if (validPlayerIds.length === 0) {
+            return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+        }
+
+        console.log(validPlayerIds);
+
+        const notificationPayload = {
+            userId:userId,
+            playerIds: validPlayerIds,
+            title: "Order Confirmed ✅",
+            message: `The order for ${product.basicInfo.productTitle.trim()} has been confirmed by the customer. Get ready to process it!`,
+            productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+        };
+
+
+        sendPushNotification(notificationPayload);
+        storeNotificationMessage(notificationPayload);
+
         return handleSuccessV1(res, 200, "Order confirmed successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error confirming order: ${error.message}`);
@@ -281,7 +283,7 @@ export const rejectOrderByUser = async (req, res) => {
             return handleError(res, 404, "Order not found");
         }
         const product = await Product.findById(order.product_id);
-        console.log(product,"product")
+        console.log(product, "product")
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
@@ -297,30 +299,31 @@ export const rejectOrderByUser = async (req, res) => {
 
         await order.save();
         const business = await BusinessModel.findById(product.createdBy);
-        console.log(business,"business")
-                const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
-              
-                      // Move this check **after** validPlayerIds is initialized
-                      if (validPlayerIds.length === 0) {
-                          return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-                      }
-              
-                      console.log(validPlayerIds);
-              
-                      const notificationPayload = { 
-                        playerIds: validPlayerIds, 
-                        title: "Order Rejected", 
-                        message: `Your order for ${product.basicInfo.productTitle.trim()} has been rejected by the buyer. Please check your dashboard for details.`, 
-                        productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-                    };
-                    
-              
-                       sendPushNotification(notificationPayload);
-                      const email = business.businessEmail;
-                      const productTitle = product.basicInfo.productTitle;
-                      orderEmailController.cancelOrderByuserEmail(email, productTitle, orderId, rejectReason);
-        
-        
+        console.log(business, "business")
+        const validPlayerIds = (business?.subscriptionIDs || []).filter(id => isValidUUID(id));
+
+        // Move this check **after** validPlayerIds is initialized
+        if (validPlayerIds.length === 0) {
+            return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+        }
+
+        console.log(validPlayerIds);
+
+        const notificationPayload = {
+            userId:userId,
+            playerIds: validPlayerIds,
+            title: "Order Rejected",
+            message: `Your order for ${product.basicInfo.productTitle.trim()} has been rejected by the buyer. Please check your dashboard for details.`,
+            productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+        };
+
+
+        sendPushNotification(notificationPayload);
+        const email = business.businessEmail;
+        const productTitle = product.basicInfo.productTitle;
+        orderEmailController.cancelOrderByuserEmail(email, productTitle, orderId, rejectReason);
+        storeNotificationMessage(notificationPayload);
+
         return handleSuccessV1(res, 200, "Order rejected successfully", order);
     } catch (error) {
         return handleError(res, 500, `Error rejecting order: ${error.message}`);
@@ -399,17 +402,17 @@ export const getPendingApprovedOrderList = async (req, res) => {
                 return {
                     id: order._id,
                     trackId: order.delivery_partner?.tracking_number || "N/A",
-                    delivery_type:order.delivery_type,
-                    return_type:order.return_type,
-                    delivery_charge:order.delivery_charge,
+                    delivery_type: order.delivery_type,
+                    return_type: order.return_type,
+                    delivery_charge: order.delivery_charge,
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `${product?._id}`,
                     estimated_delivery_date: estimatedDeliveryDate,
                     price: `${order.total_price} ${product?.pricing?.currency || "INR"}`,
                     productImage: product?.images?.length > 0 ? product.images[0] : "",
                     buyerAddress: address
-                    ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}`
-                    : "Address Not Found",                
+                        ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}`
+                        : "Address Not Found",
                     requestDate: order.timestamp,
                     status: order.order_status, // Updated to return the correct buyer_approval_status
                     isIncrement,
@@ -466,7 +469,7 @@ export const getPendingOrders = async (req, res) => {
             orders.map(async (order, index) => {
                 const product = await Product.findById(order.product_id);
                 const address = await DeliveryAddressModel.findById(order.delivery_address_id);
-                
+
                 let buyer = await User.findById(order.user_id);
                 if (!buyer) {
                     buyer = await BusinessModel.findById(order.user_id);
@@ -490,9 +493,9 @@ export const getPendingOrders = async (req, res) => {
                     trackId: order.delivery_partner.tracking_number,
                     req_id: `REQ${1000 + skip + index}`,
                     buyerName: buyer?.businessName || buyer?.full_Name || "Unknown Buyer",
-                    buyerAddress: address 
-                    ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}` 
-                    : "Address Not Found",                               
+                    buyerAddress: address
+                        ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}`
+                        : "Address Not Found",
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `PROD${product?._id}`,
                     price: `${finalPrice} ${product?.pricing?.currency || "INR"}`,
@@ -539,7 +542,7 @@ export const confirmOrderBySeller = async (req, res) => {
         }
 
         const order = await Order.findById(orderId);
-        console.log(order,"order");
+        console.log(order, "order");
         if (!order) {
             return handleError(res, 404, "Order not found");
         }
@@ -551,7 +554,7 @@ export const confirmOrderBySeller = async (req, res) => {
 
         let user = await registerModel.findById(order.user_id);
         if (!user) {
-          user = await BusinessModel.findById(order.user_id);
+            user = await BusinessModel.findById(order.user_id);
         }
 
         let totalAmount = parseFloat(order.total_price) + parseFloat(deliveryCharge);
@@ -559,15 +562,15 @@ export const confirmOrderBySeller = async (req, res) => {
 
         const estimatedDeliveryDate = new Date();
         estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + parseInt(deliveryTimeInDays));
-        
+
         // Convert to Indian Standard Time (IST - UTC+5:30)
         const estimatedDeliveryDateIST = new Date(estimatedDeliveryDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-        
+
 
         order.order_status = "Accepted";
         order.seller_review_status = "Accepted";
         order.total_price = totalAmount;
-        order.deliveryTimeInDays= deliveryTimeInDays;
+        order.deliveryTimeInDays = deliveryTimeInDays;
         order.estimated_delivery_date = estimatedDeliveryDateIST;
         order.delivery_method = deliveryType;
         order.payment_mode = paymentMethod;
@@ -588,24 +591,25 @@ export const confirmOrderBySeller = async (req, res) => {
         await order.save();
 
         const validPlayerIds = (user?.subscriptionIDs || []).filter(id => isValidUUID(id));
-      
-              // Move this check **after** validPlayerIds is initialized
-              if (validPlayerIds.length === 0) {
-                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-              }
-      
-              console.log(validPlayerIds);
-      
-              const notificationPayload = { 
-                playerIds: validPlayerIds, 
-                title: "Order Accepted by Seller ✅",
-                message: `Your order for ${product.basicInfo.productTitle.trim()} has been accepted! Processing will begin soon. Stay tuned for updates.`,
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            };
-            
-      
-               sendPushNotification(notificationPayload);
 
+        // Move this check **after** validPlayerIds is initialized
+        if (validPlayerIds.length === 0) {
+            return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+        }
+
+        console.log(validPlayerIds);
+
+        const notificationPayload = {
+            userId:order.seller_id,
+            playerIds: validPlayerIds,
+            title: "Order Accepted by Seller ✅",
+            message: `Your order for ${product.basicInfo.productTitle.trim()} has been accepted! Processing will begin soon. Stay tuned for updates.`,
+            productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+        };
+
+
+        sendPushNotification(notificationPayload);
+        storeNotificationMessage(notificationPayload);
         return handleSuccessV1(res, 200, "Order Accepted successfully", {
             orderId: order._id,
             totalAmount,
@@ -620,7 +624,7 @@ export const confirmOrderBySeller = async (req, res) => {
 
 export const cancelOrderBySeller = async (req, res) => {
     try {
-        const { orderId, cancelReason ,additionalComments,category} = req.body;
+        const { orderId, cancelReason, additionalComments, category } = req.body;
 
         if (!orderId) {
             return handleError(res, 400, "Missing required field: orderId");
@@ -634,7 +638,7 @@ export const cancelOrderBySeller = async (req, res) => {
             return handleError(res, 404, "Order not found");
         }
         const product = await Product.findById(order.product_id);
-        console.log(product,"product")
+        console.log(product, "product")
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
@@ -651,27 +655,28 @@ export const cancelOrderBySeller = async (req, res) => {
         order.tracking_info.push({ status: "Order Cancelled By Seller", reason: cancelReason, timestamp: new Date() });
 
         await order.save();
-        const user= await registerModel.findById(order.user_id);
-        console.log(user,"user");
-        
-        const validPlayerIds = (user?.subscriptionIDs || []).filter(id => isValidUUID(id));
-      
-              if (validPlayerIds.length === 0) {
-                  return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
-              }
-      
-              console.log(validPlayerIds);
-      
-              const notificationPayload = { 
-                playerIds: validPlayerIds, 
-                title: "Order Canceled ", 
-                message: `The seller has canceled your order for ${product.basicInfo.productTitle.trim()}.`, 
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            };
-            
-      
-               sendPushNotification(notificationPayload);
+        const user = await registerModel.findById(order.user_id);
+        console.log(user, "user");
 
+        const validPlayerIds = (user?.subscriptionIDs || []).filter(id => isValidUUID(id));
+
+        if (validPlayerIds.length === 0) {
+            return handleError(res, 400, "Invalid or missing player_id(s) for push notifications");
+        }
+
+        console.log(validPlayerIds);
+
+        const notificationPayload = {
+            userId:order.seller_id,
+            playerIds: validPlayerIds,
+            title: "Order Canceled ",
+            message: `The seller has canceled your order for ${product.basicInfo.productTitle.trim()}.`,
+            productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+        };
+
+
+        sendPushNotification(notificationPayload);
+        storeNotificationMessage(notificationPayload);
         return handleSuccessV1(res, 200, "Order cancelled successfully", {
             orderId: order._id,
             status: order.order_status,
@@ -683,21 +688,21 @@ export const cancelOrderBySeller = async (req, res) => {
 };
 
 
-export const createOrder = async (req, res) => { 
-    try { 
+export const createOrder = async (req, res) => {
+    try {
         const { product_id, delivery_address_id, user_id, isBusinessAccount } = req.body;
- 
-        if (!product_id || !delivery_address_id || !user_id) { 
-            return handleError(res, 400, "Missing required fields"); 
-        } 
+
+        if (!product_id || !delivery_address_id || !user_id) {
+            return handleError(res, 400, "Missing required fields");
+        }
 
         const product = await Product.findById(product_id);
-        if (!product) { 
-            return handleError(res, 404, "Product not found"); 
-        } 
+        if (!product) {
+            return handleError(res, 404, "Product not found");
+        }
 
-        const user = isBusinessAccount 
-            ? await BusinessModel.findById(user_id) 
+        const user = isBusinessAccount
+            ? await BusinessModel.findById(user_id)
             : await User.findById(user_id);
 
         const business = await BusinessModel.findById(product.createdBy);
@@ -706,8 +711,8 @@ export const createOrder = async (req, res) => {
             return handleError(res, 404, isBusinessAccount ? "Business account not found" : "User not found");
         }
 
-        const seller_id = product.createdBy; 
-        const trackingNumber = generateTrackingNumber(); 
+        const seller_id = product.createdBy;
+        const trackingNumber = generateTrackingNumber();
 
         let totalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
 
@@ -723,11 +728,11 @@ export const createOrder = async (req, res) => {
 
         totalPrice = totalPrice.toFixed(2);
 
-        const newOrder = new Order({ 
-            user_id, 
-            seller_id, 
-            product_id, 
-            delivery_address_id, 
+        const newOrder = new Order({
+            user_id,
+            seller_id,
+            product_id,
+            delivery_address_id,
             delivery_partner: { tracking_number: trackingNumber },
             order_date: new Date(),
             order_status: "Pending",
@@ -738,10 +743,10 @@ export const createOrder = async (req, res) => {
                     timestamp: moment().tz("Asia/Kolkata").toDate(),
                 }
             ]
-        }); 
- 
+        });
+
         const savedOrder = await newOrder.save();
-        
+
         const estimatedDelivery = new Date();
         estimatedDelivery.setDate(estimatedDelivery.getDate() + 5);
 
@@ -753,35 +758,35 @@ export const createOrder = async (req, res) => {
 
         console.log(validPlayerIds);
 
-        const notificationPayload = { 
-            playerIds: validPlayerIds, 
-            title: "New Order Received! 🎉", 
-            message: `${product.basicInfo.productTitle.trim()} just ordered! Please confirm to start processing.`, 
+        const notificationPayload = {
+            playerIds: validPlayerIds,
+            title: "New Order Received! 🎉",
+            message: `${product.basicInfo.productTitle.trim()} just ordered! Please confirm to start processing.`,
             productImageUrl: product.images?.length > 0 ? product.images[0] : null,
             appLogoUrl: isBusinessAccount ? user.brand_logo : user.profile_url,
-            additionalData: { 
-                order_id: savedOrder._id.toString(), 
-                tracking_number: trackingNumber, 
+            additionalData: {
+                order_id: savedOrder._id.toString(),
+                tracking_number: trackingNumber,
                 product_name: product.caption,
                 customer_name: isBusinessAccount ? user.businessName : user.full_Name || "Customer",
                 order_value: `${totalPrice} ${product.currency || "INR"}`,
                 order_date: new Date().toISOString(),
                 needs_confirmation: true
-            } 
+            }
         };
 
         sendPushNotification(notificationPayload);
-
+        
         return handleSuccessV1(res, 201, "Order placed successfully", {
             order: savedOrder,
             tracking: {
                 number: trackingNumber,
                 estimated_delivery: estimatedDelivery
             }
-        }); 
-    } catch (error) { 
-        return handleError(res, 500, `Error creating order: ${error.message}`); 
-    } 
+        });
+    } catch (error) {
+        return handleError(res, 500, `Error creating order: ${error.message}`);
+    }
 };
 
 
@@ -906,7 +911,7 @@ export const shippedOrderBySeller = async (req, res) => {
 
         let user = await registerModel.findById(order.user_id);
         if (!user) {
-          user = await BusinessModel.findById(order.user_id);
+            user = await BusinessModel.findById(order.user_id);
         }
 
         const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
@@ -1007,7 +1012,7 @@ export const getConfirmedOrders = async (req, res) => {
         console.log(`Fetching confirmed orders for ID: ${id}, Page: ${pageNumber}, Limit: ${pageSize}, Skip: ${skip}`);
 
         const queryFilter = {
-            order_status: isBusiness === "true" ? { $nin: ["Pending" , "Cancelled" , "Rejected" ] } : "Confirmed",
+            order_status: isBusiness === "true" ? { $nin: ["Pending", "Cancelled", "Rejected"] } : "Confirmed",
             [isBusiness === "true" ? "seller_id" : "user_id"]: id,
         };
 
@@ -1040,9 +1045,9 @@ export const getConfirmedOrders = async (req, res) => {
                     delivery_charge: order.delivery_charge,
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `${product?._id}`,
-                    is_Shipped: order.is_Shipped, 
-                    is_Delivered: order.is_Delivered, 
-                    is_Payment: order.is_Payment,  
+                    is_Shipped: order.is_Shipped,
+                    is_Delivered: order.is_Delivered,
+                    is_Payment: order.is_Payment,
                     estimated_delivery_date: order.estimated_delivery_date,
                     price: `${product?.pricing?.currency === "INR" ? "₹" : product?.pricing?.currency || ""} ${order.total_price}`,
                     productImage: product?.images?.length > 0 ? product.images[0] : "",
