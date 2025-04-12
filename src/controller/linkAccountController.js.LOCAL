@@ -4,12 +4,7 @@ import LinkAccountModel from "../model/LinkAccountModel.js";
 import { handleSuccessV1, handleError } from "../utils/responseHandler.js";
 import { sendPushNotification } from "../service/pushNotificationService.js";
 import Notification from "../model/NotificationModel.js";
-
 import adminService from "../service/adminService.js";
-
-import NotificationModel from "../model/NotificationModel.js";
-
-
 
 
 export const getLinkedAccounts = async (req, res) => {
@@ -133,13 +128,13 @@ export const linkAccount = async (req, res) => {
 
         // Save Link Account request
         const newLink = new LinkAccountModel({
-            userId,
+            userId, 
             linkingBusinessAccountId,
             linkStatus: "pending",
-            trackInfo: [{
-                userId,
+            trackInfo: [{ 
+                userId, 
                 linkingBusinessAccountId,
-                status: "pending",
+                status: "pending", 
                 changedAt: new Date(),
                 dateTime: new Date().toISOString()
             }]
@@ -152,17 +147,11 @@ export const linkAccount = async (req, res) => {
             linkingId: newLink._id,
             operationId: linkingBusinessAccountId,
             imageUrl: business?.brand_logo || null,
-
             isPerformAction:true,
             isPerformed:false,
             isBusinessTypeAccount:true,
             isRead:false,
             actions:["Accept","Reject"],
-
-            isPerformAction: true,
-            isPerformed: false,
-            actions: ["Accept", "Reject"],
-
             title: "Business Account Link Request",
             message: `${business?.businessName || "A business account"} has requested to be linked to your profile. Review and take action.`,
             notificationType: "link_request"
@@ -172,18 +161,18 @@ export const linkAccount = async (req, res) => {
 
         // Send notification if valid player IDs exist
         if (validPlayerIds.length > 0) {
-            const notificationPayload = {
-                playerIds: validPlayerIds,
-                title: "Business Account Link Request",
-                message: `${business?.businessName || "A business account"} has requested to be linked to your profile. Review and take action.`,
-                productImageUrl: null,
-                appLogoUrl: business?.brand_logo || null,
+            const notificationPayload = { 
+                playerIds: validPlayerIds, 
+                title: "Business Account Link Request", 
+                message: `${business?.businessName || "A business account"} has requested to be linked to your profile. Review and take action.`, 
+                productImageUrl: null, 
+                appLogoUrl: business?.brand_logo || null, 
             };
             sendPushNotification(notificationPayload);
 
             await User.findByIdAndUpdate(userId, { isThereAnyNotification: true });
         }
-
+        
 
         return handleSuccessV1(res, 201, "Link request sent successfully.", newLink);
     } catch (error) {
@@ -358,8 +347,8 @@ export const confirmLink = async (req, res) => {
         }
 
         const linkRequest = await LinkAccountModel.findOneAndUpdate(
-            { userId, linkStatus: "pending" },
-            {
+            { userId, linkStatus: "pending" }, 
+            { 
                 linkStatus: "confirmed",
                 $push: { trackInfo: { status: "confirmed", changedAt: new Date() } }
             },
@@ -386,8 +375,8 @@ export const rejectLink = async (req, res) => {
         }
 
         const linkRequest = await LinkAccountModel.findOneAndUpdate(
-            { userId, linkStatus: "pending" },
-            {
+            { userId, linkStatus: "pending" }, 
+            { 
                 linkStatus: "rejected",
                 $push: { trackInfo: { status: "rejected", changedAt: new Date() } }
             },
@@ -435,8 +424,8 @@ export const fetchAllUsers = async (req, res) => {
             _id: { $nin: excludedIds }, // Exclude determined IDs
             full_Name: { $regex: searchQuery, $options: "i" } // Case-insensitive partial match
         })
-            .select("_id full_Name email profile_url")
-            .limit(15); // Limit at DB level
+        .select("_id full_Name email profile_url")
+        .limit(15); // Limit at DB level
 
         // Map the required fields for the response
         const response = users.map((user) => ({
@@ -449,22 +438,5 @@ export const fetchAllUsers = async (req, res) => {
         return handleSuccessV1(res, 200, "Users fetched successfully", response);
     } catch (error) {
         return handleError(res, 500, error.message);
-    }
-};
-
-export const storeNotificationMessage = async (data) => {
-   console.log( data,"poooopopp")
-    try {
-        const storeNotification = await NotificationModel.create({
-            userId:data.userId,
-            title:data.title,
-            notificationType:"order_update",
-            message:data.message,
-            imageUrl:data.productImageUrl
-        })
-        return  storeNotification;
-    } catch(error) {
-        throw new Error(`failed to store Notification: ${error.message}`);
-
     }
 };

@@ -18,7 +18,7 @@ const ONE_SIGNAL_API_KEY = "os_v2_app_lysqcgi4yvbonk3hipidiq4btnv7wmh7itceqvmq4b
  * @param {string} [payload.productImageUrl] - URL to the product image
  * @param {Object} [payload.additionalData] - Additional data to send with notification
  */
-export const sendPushNotification = async ({
+export const sendPushNotification = async ({userId,
     playerIds,
     title,
     message,
@@ -39,28 +39,25 @@ export const sendPushNotification = async ({
                 timestamp: new Date().toISOString()
             },
             
-            // Enable expanded text for Android
             android_group: title,
             big_picture: productImageUrl || null,
             
-            // Critical: This enables expanded text view in notifications
             big_text: message,
             
-            // Android specific settings
             android_accent_color: "FFFFFF",
             small_icon: "ic_notification_icon",
             large_icon: appLogoUrl,
             
-            // iOS specific settings
+            
             ios_badgeType: "Increase",
             ios_badgeCount: 1,
             ios_attachments: productImageUrl ? { "id1": productImageUrl } : undefined,
             
-            // Web specific settings
+          
+            
             chrome_web_icon: appLogoUrl,
             firefox_icon: appLogoUrl,
             
-            // Make notification prominent
             priority: 10,
             ttl: 259200,
             
