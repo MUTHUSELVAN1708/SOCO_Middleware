@@ -6,21 +6,23 @@ import followerModel from "../model/followerModel.js";
 import mongoose from "mongoose";
 import FavoriteModel from "../model/favoriteModel.js";
 import BookmarkModel from "../model/BookmarkModel.js";
+import Follow from "../model/FollowModel.js";
+import businessregisterModel from "../model/BusinessModel.js";
 
 export const getDashboardFeed = async (req, res) => {
     try {
-        const { 
-            user_id, 
-            lat, 
-            lon, 
-            pinCode, 
-            address, 
+        const {
+            user_id,
+            lat,
+            lon,
+            pinCode,
+            address,
             isBusinessAccount,
-            page = 1, 
-            limit: requestedLimit = 15 
+            page = 1,
+            limit: requestedLimit = 15
         } = req.body;
 
-        const limit = 15; 
+        const limit = 15;
         let user = isBusinessAccount
             ? await businessRegisterModel.findById(user_id)
             : await registerModel.findById(user_id);
@@ -29,11 +31,11 @@ export const getDashboardFeed = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const tracking = await trackingModel.findOne({ 
-            user_id: new mongoose.Types.ObjectId(user_id) 
+        const tracking = await trackingModel.findOne({
+            user_id: new mongoose.Types.ObjectId(user_id)
         });
-        
-        const trackedPostIds = tracking?.sentPosts?.map(post => 
+
+        const trackedPostIds = tracking?.sentPosts?.map(post =>
             new mongoose.Types.ObjectId(post.post_id)
         ) || [];
 
@@ -60,9 +62,9 @@ export const getDashboardFeed = async (req, res) => {
                 creator_id: { $in: followingIds },
                 language: { $in: [...(user.languages || []), null] }
             })
-            .sort({ timestamp: -1 })
-            .limit(Math.ceil(limit * 0.25))
-            .select(baseSelect);
+                .sort({ timestamp: -1 })
+                .limit(Math.ceil(limit * 0.25))
+                .select(baseSelect);
 
             posts = [...posts, ...followingPosts];
         }
@@ -73,7 +75,7 @@ export const getDashboardFeed = async (req, res) => {
                 ...baseFilters,
                 _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
                 $or: [
-                    { 
+                    {
                         pinCode: { $in: pinCodeVariations },
                         language: { $in: user.languages || [] }
                     },
@@ -86,16 +88,16 @@ export const getDashboardFeed = async (req, res) => {
                     }
                 ]
             })
-            .sort({ timestamp: -1, viewsCount: -1 })
-            .limit(Math.ceil((limit - posts.length) * 0.35))
-            .select(baseSelect);
-            
+                .sort({ timestamp: -1, viewsCount: -1 })
+                .limit(Math.ceil((limit - posts.length) * 0.35))
+                .select(baseSelect);
+
             posts = [...posts, ...locationPosts];
         }
 
         if (posts.length < limit && user.interestField?.length) {
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            const trendingPosts = await createPostModel.find({ 
+            const trendingPosts = await createPostModel.find({
                 ...baseFilters,
                 _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
                 $or: [
@@ -105,10 +107,10 @@ export const getDashboardFeed = async (req, res) => {
                 language: { $in: [...(user.languages || []), null] },
                 timestamp: { $gte: weekAgo }
             })
-            .sort({ viewsCount: -1, likesCount: -1 })
-            .limit(limit - posts.length)
-            .select(baseSelect);
-            
+                .sort({ viewsCount: -1, likesCount: -1 })
+                .limit(limit - posts.length)
+                .select(baseSelect);
+
             posts = [...posts, ...trendingPosts];
         }
 
@@ -118,9 +120,9 @@ export const getDashboardFeed = async (req, res) => {
                 _id: { $nin: [...trackedPostIds, ...posts.map(p => p._id)] },
                 language: { $in: [...(user.languages || []), null] }
             })
-            .sort({ viewsCount: -1, timestamp: -1 })
-            .limit(limit - posts.length)
-            .select(baseSelect);
+                .sort({ viewsCount: -1, timestamp: -1 })
+                .limit(limit - posts.length)
+                .select(baseSelect);
 
             posts = [...posts, ...fallbackPosts];
         }
@@ -152,7 +154,7 @@ export const getDashboardFeed = async (req, res) => {
                         sentPosts: {
                             $each: newViewedPosts,
                             $sort: { viewedAt: -1 },
-                            $slice: 1000  
+                            $slice: 1000
                         }
                     }
                 },
@@ -161,15 +163,15 @@ export const getDashboardFeed = async (req, res) => {
         }
 
         const favoritePosts = await FavoriteModel.find({ user_id }).select("post_id");
-     const bookmarkedPosts = await BookmarkModel.find({ user_id }).select("post_id");
+        const bookmarkedPosts = await BookmarkModel.find({ user_id }).select("post_id");
 
-      const favoritePostIds = new Set(favoritePosts.map(fav => fav.post_id.toString()));
-      const bookmarkedPostIds = new Set(bookmarkedPosts.map(bookmark => bookmark.post_id.toString()));
-      posts = posts.map(post => ({
-        ...post.toObject(),
-        isFavorite: favoritePostIds.has(post._id.toString()),
-        isBookmarked: bookmarkedPostIds.has(post._id.toString())
-    }));
+        const favoritePostIds = new Set(favoritePosts.map(fav => fav.post_id.toString()));
+        const bookmarkedPostIds = new Set(bookmarkedPosts.map(bookmark => bookmark.post_id.toString()));
+        posts = posts.map(post => ({
+            ...post.toObject(),
+            isFavorite: favoritePostIds.has(post._id.toString()),
+            isBookmarked: bookmarkedPostIds.has(post._id.toString())
+        }));
 
         return res.json({
             posts,
@@ -198,3 +200,74 @@ function escapeRegExp(string) {
 function shuffleArray(array) {
     return array.sort(() => Math.random() - 0.5);
 }
+
+
+export const getRecommendedFollow = async (req, res) => {
+    try {
+      const userId = req.query.userId;
+  
+      if (!userId) {
+        return res.status(400).json({ message: 'User ID is required in query params' });
+      }
+  
+      const directFollows = await Follow.find({ userId });
+      const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
+  
+      const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
+        .limit(10)
+        .select('_id full_Name profile_url');
+  
+      // Step 2: Get second-degree follows
+      const secondDegreeFollows = await Follow.find({ userId: { $in: directlyFollowedIds } });
+      const secondDegreeIds = secondDegreeFollows.map(f => f.followingId.toString());
+  
+      // Step 3: Exclude already followed and self
+      const excludedIds = new Set([...directlyFollowedIds, userId]);
+      const recommendedIds = [...new Set(secondDegreeIds.filter(id => !excludedIds.has(id)))];
+  
+      // Step 4a: Get user-based recommendations
+      const userRecommendations = await registerModel.find({ _id: { $in: recommendedIds } })
+        .select('_id full_Name profile_url');
+  
+      const foundUserIds = userRecommendations.map(user => user._id.toString());
+  
+      // Map to unified format
+      const formattedUserRecs = userRecommendations.map(user => ({
+        _id: user._id,
+        name: user.full_Name,
+        profile: user.profile_url,
+        type: 'user'
+      }));
+  
+      // Step 4b: Get remaining IDs not in register
+      const remainingIds = recommendedIds.filter(id => !foundUserIds.includes(id));
+  
+      // Step 4c: Check remaining IDs in businessModel
+      const businessRecommendations = await businessregisterModel.find({ _id: { $in: remainingIds } })
+        .select('_id businessName brand_logo userId');
+  
+      const formattedBusinessRecs = businessRecommendations.map(biz => ({
+        _id: biz._id,
+        name: biz.businessName,
+        profile: biz.brand_logo,
+        userId: biz.userId,
+        type: 'business'
+      }));
+  
+      const combinedRecommendations = [...formattedUserRecs, ...formattedBusinessRecs];
+  
+      // Step 5: Response
+      res.status(200).json({
+        message: 'Recommended users fetched successfully',
+        directFollowsdetails,
+        recommendations: combinedRecommendations
+      });
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  };
+  
+  
+  
+

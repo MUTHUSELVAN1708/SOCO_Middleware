@@ -106,7 +106,7 @@ const adminService = {
                 lowerCaseAlphabets: false,
                 upperCaseAlphabets: false,
             });
-
+            console.log(otp,"otp")
             const emailSent = await adminService.SendOTPEmail(email, otp);
             const existingOtpRecord = await otpModel.findOne({ email });
             if (existingOtpRecord) {
