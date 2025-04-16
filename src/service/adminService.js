@@ -1926,163 +1926,85 @@ const adminService = {
     //     }
     // },
 
+
+
+
     createPost: async (data) => {
-        console.log("Received postData:", data);
-        const {
-            user_id,
-            creatorName,
-            creatorProfileImageUrl,
-            lat,
-            lng,
-            pinCode,
-            city,
-            district,
-            state,
-            completeAddress,
-            postLanguage,
-            interestPeoples,
-            postCategories,
-            likesCount,
-            commentsCount,
-            viewsCount,
-            sharesCount,
-            isBusinessPost,
-            isUserPost,
-            isProductPost,
-            productId,
-            productPrice,
-            imageUrl,
-            caption,
-            isScheduled,
-            scheduleDateTime,
-            tags,
-            description,
-            isVideo,
-            location,
-            mediaFile,
-            thumbnailFile,
-            videoDuration,
-            enableComments,
-            enableFavorites,
-            ageGroup,
-            uploadProgress,
-            isProcessing,
-            isTrimming,
-            mentions,
-            filters,
-            quality,
-            visibility,
-            aspectRatio,
-            typeOfAccount,
-        } = data;
-
-
         try {
-            let user;
-            console.log("Inside create Post call ", data);
-            console.log("scheduleDateTime value:", scheduleDateTime);
-
-            if (typeOfAccount === "business") {
-                user = await businessregisterModel.findById(user_id);
-            } else {
-                user = await registerModel.findById(user_id);
-            }
-
-            if (!user) {
-                throw new Error("User not found");
-            }
-
-            const filtersArray = Array.isArray(filters) ? filters : [];
-
-            let newPost = {
-                user_id,
-                creatorName,
-                creatorProfileImageUrl,
-                lat,
-                lng,
-                pinCode,
-                city,
-                // location: {
-                //     type: "Point",
-                //     coordinates: [lng, lat]  // ✅ Longitude first, then latitude
-                // },
-                district,
-                state,
-                productId: productId ?? '',
-                completeAddress,
-                postLanguage: postLanguage ?? [],
-                postCategories: postCategories ?? [],
-                interestPeoples: interestPeoples ?? [],
-                productPrice:productPrice,
-                likesCount,
-                commentsCount,
-                viewsCount,
-                sharesCount,
-                isBusinessPost,
-                isUserPost,
-                isProductPost,
-                imageUrl,
-                caption,
-                isScheduled,
-                scheduleDateTime,
-                tags,
-                description,
-                isVideo,
-                location,
-                mediaFile,
-                thumbnailFile,
-                videoDuration,
-                enableComments,
-                enableFavorites,
-                ageGroup,
-                uploadProgress,
-                isProcessing,
-                isTrimming,
-                mentions,
-                filters: filtersArray,
-                quality,
-                visibility,
-                aspectRatio,
-                status: isScheduled ? "scheduled" : "published",
-            };
-
-            if (isScheduled && scheduleDateTime) {
-
-                const scheduleTime = moment(scheduleDateTime).toDate();
-
-                const cronExpression = `${scheduleTime.getMinutes()} ${scheduleTime.getHours()} ${scheduleTime.getDate()} ${scheduleTime.getMonth() + 1} *`;
-
-
-                if (cron.validate(cronExpression)) {
-                    cron.schedule(cronExpression, async () => {
-                        try {
-                            newPost.status = "published";
-                            await createPostModel.create(newPost);
-                        } catch (error) {
-                            console.error("Error publishing scheduled post:", error);
-                        }
-                    });
-                } else {
-                    throw new Error("Failed to schedule the post due to invalid cron expression.");
-                }
-            }
-
-
-            const userPost = new createPostModel(newPost);
-            await userPost.save();
-
-            if (typeOfAccount === "business") {
-                await businessregisterModel.findByIdAndUpdate(user_id, { $inc: { postCount: 1 } });
-            } else {
-                await registerModel.findByIdAndUpdate(user_id, { $inc: { postCount: 1 } });
-            }
-
-            return userPost;
+          const {
+            user_id,
+            isBusinessAccount,
+            caption,
+            webSiteLink,
+            mediaItems = [],
+            isRepost = false,
+            isOwnPost = true,
+            isProductPost = false,
+            repostDetails = null,
+          } = data;
+      
+          let user;
+      
+          // Fetch the user based on whether it is a business account or not
+          if (isBusinessAccount) {
+            user = await businessregisterModel.findById(user_id);
+          } else {
+            user = await registerModel.findById(user_id);
+          }
+      
+          if (!user) {
+            throw new Error("User not found");
+          }
+      
+          const userName = isBusinessAccount ? user.businessName || "Business User" : user.full_Name || "User";
+          const userAvatar = isBusinessAccount ? user.brand_logo || "" : user.profile_url || "";
+      
+          // Create the new post object
+          const newPost = new createPostModel({
+            userId: user_id,
+            userName,
+            userAvatar,
+            caption,
+            webSiteLink,
+            mediaItems,
+            isRepost,
+            isOwnPost,
+            isProductPost,
+            isBusinessAccount,
+            repostDetails: isRepost ? repostDetails : null,
+          });
+      
+          // Save the post
+          const savedPost = await newPost.save();
+      
+          // Count total posts for the user
+          let totalPosts;
+          if (isBusinessAccount) {
+            totalPosts = await createPostModel.countDocuments({ userId: user_id });  // Count posts for business account
+            await businessregisterModel.updateOne(
+              { _id: user_id },
+              { $set: { postCount: totalPosts } }  // Update the post count with the total number of posts
+            );
+          } else {
+            totalPosts = await createPostModel.countDocuments({ userId: user_id });  // Count posts for user
+            await registerModel.updateOne(
+              { _id: user_id },
+              { $set: { postCount: totalPosts } }  // Update the post count with the total number of posts
+            );
+          }
+      
+          return {
+            success: true,
+            message: "Post created successfully",
+            post: savedPost,
+          };
         } catch (error) {
-            console.error("Error creating post:", error); // Log the actual error
-            throw new Error(`Failed to create the post: ${error.message}`);
+          console.error("Error creating post:", error);
+          throw new Error(`Failed to create the post: ${error.message}`);
         }
-    },
+      },
+      
+      
 
 
     // createPost: async (data) => {

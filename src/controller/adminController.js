@@ -445,7 +445,7 @@ const adminController = {
         }
     },
     // =====================
-    createpost: async (req, res, next) => {
+    createPost: async (req, res, next) => {
         try {
             console.log("Received request to create post:", req.body);
 
