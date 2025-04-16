@@ -69,17 +69,18 @@ export const getLinkedAccounts = async (req, res) => {
         ];
 
         let businessOwner = null;
-        const businessOwnerId = business.userId?.toString();
+        const businessOwnerId = business.user_id?.toString();
 
         if (businessOwnerId && !allUserIds.includes(businessOwnerId)) {
             const ownerUser = await User.findById(businessOwnerId).select("full_Name profile_url email");
+            console.log(ownerUser,"ownerUser")
             if (ownerUser) {
                 businessOwner = {
                     id: ownerUser._id.toString(),
                     name: ownerUser.full_Name,
                     imageUrl: ownerUser.profile_url || null,
                     email: ownerUser.email || null,
-                    status: "owner"
+                    status: "confirmed"
                 };
             }
         }

@@ -22,7 +22,7 @@ const registerSchema = new mongoose.Schema(
     full_Name: { type: String, required: true },
     password: { type: String, required: true },
     phn_number: { type: Number, required: true },
-    languages: [{ type: String, required: false,default:[] }],
+    languages: [{ type: String, required: false, default: [] }],
     email: { type: String, required: true },
     gender: { type: String, required: true },
     DOB: { type: String, required: true },
@@ -75,25 +75,25 @@ const registerSchema = new mongoose.Schema(
       type: Number,
       required: false
     },
-    onlineStatus: { 
-      type: Boolean, 
+    onlineStatus: {
+      type: Boolean,
       default: false,  // Default to false, indicating the user is offline
-      required: false 
+      required: false
     },
-    isTyping: { 
-      type: Boolean, 
+    isTyping: {
+      type: Boolean,
       default: false,  // Default to false, indicating the user is not typing
-      required: false 
+      required: false
     },
-    lastOnline: { 
-      type: Date, 
+    lastOnline: {
+      type: Date,
       default: null,  // Default to null, indicating the user hasn't been online yet
-      required: false 
+      required: false
     },
-    currentChatRoom: { 
-      type: mongoose.Schema.Types.ObjectId, 
+    currentChatRoom: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'ChatRoom',  // Reference to a ChatRoom model (optional)
-      required: false 
+      required: false
     },
     unreadMessagesCount: {
       type: Number,
@@ -104,7 +104,7 @@ const registerSchema = new mongoose.Schema(
     // Notification fields
     oneSignalIDs: { type: [String], default: [] },
     subscriptionIDs: { type: [String], default: [] },
-    
+
 
     // bio Details
     bio: { type: String, default: '', required: false },
@@ -118,7 +118,7 @@ const registerSchema = new mongoose.Schema(
     year: { type: Number, default: 0, required: false },
     grade: { type: Number, default: 0, required: false },
     achievements: { type: String, default: '', required: false },
-    deviceToken:{type:[String], required:false},
+    deviceToken: { type: [String], required: false },
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }
@@ -133,7 +133,7 @@ registerSchema.virtual("user_id").get(function () {
 const registerModel = mongoose.model("user", registerSchema);
 
 
-export default  registerModel;
+export default registerModel;
 
 
 

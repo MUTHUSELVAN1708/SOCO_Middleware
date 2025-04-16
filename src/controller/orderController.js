@@ -776,8 +776,7 @@ export const createOrder = async (req, res) => {
         };
 
         sendPushNotification(notificationPayload);
-        
-        return handleSuccessV1(res, 201, "Order placed successfully", {
+                return handleSuccessV1(res, 201, "Order placed successfully", {
             order: savedOrder,
             tracking: {
                 number: trackingNumber,

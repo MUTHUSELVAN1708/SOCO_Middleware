@@ -1,6 +1,6 @@
 import Comment from '../model/Comment.js';
 import registerModel from '../model/registerModel.js';
-import businessregisterModel from '../model/BusinessModel.js';
+import businessRegisterModel from '../model/BusinessModel.js';
 import createPostModel from '../model/createPostModel.js';
 import CommentLike from '../model/CommentLike.js'; 
 import UserInfo from '../model/UserInfo.js';
