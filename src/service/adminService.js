@@ -106,7 +106,7 @@ const adminService = {
                 lowerCaseAlphabets: false,
                 upperCaseAlphabets: false,
             });
-            console.log(otp,"otp")
+            console.log(otp, "otp")
             const emailSent = await adminService.SendOTPEmail(email, otp);
             const existingOtpRecord = await otpModel.findOne({ email });
             if (existingOtpRecord) {
@@ -271,43 +271,43 @@ const adminService = {
     updateNotificationDetails: async (data) => {
         try {
             const { userId, oneSignalID, subscriptionID } = data;
-    
+
             if (!userId || !oneSignalID || !subscriptionID) {
                 throw { status: 400, message: "User ID, OneSignal ID, and Subscription ID are required." };
             }
-    
+
             let userToUpdate = await registerModel.findById(userId);
             let businessToUpdate = await businessregisterModel.findOne({ user_id: userId });
             let linkedUserId = null;
             let relatedBusinesses = []; // Declare it outside to avoid "not defined" error
-    
+
             if (!userToUpdate && !businessToUpdate) {
                 throw { status: 404, message: "User or Business account not found." };
             }
-    
+
             if (businessToUpdate) {
                 linkedUserId = businessToUpdate.user_id;
-    
+
                 const businessUpdateFields = {
                     oneSignalIDs: businessToUpdate.oneSignalIDs || [],
                     subscriptionIDs: businessToUpdate.subscriptionIDs || []
                 };
-    
+
                 if (!businessUpdateFields.oneSignalIDs.includes(oneSignalID)) {
                     businessUpdateFields.oneSignalIDs.push(oneSignalID);
                 }
                 if (!businessUpdateFields.subscriptionIDs.includes(subscriptionID)) {
                     businessUpdateFields.subscriptionIDs.push(subscriptionID);
                 }
-    
+
                 await businessregisterModel.findByIdAndUpdate(
                     businessToUpdate._id,
                     { $set: businessUpdateFields },
                     { new: true }
                 );
-    
+
                 relatedBusinesses = await businessregisterModel.find({ user_id: linkedUserId });
-    
+
                 for (let business of relatedBusinesses) {
                     const updateFields = {
                         oneSignalIDs: business.oneSignalIDs || [],
@@ -325,10 +325,10 @@ const adminService = {
                         { new: true }
                     );
                 }
-    
+
                 userToUpdate = await registerModel.findById(linkedUserId);
             }
-    
+
             if (userToUpdate) {
                 const userUpdateFields = {
                     oneSignalIDs: userToUpdate.oneSignalIDs || [],
@@ -346,7 +346,7 @@ const adminService = {
                     { new: true }
                 );
             }
-    
+
             return {
                 success: true,
                 updatedUser: userToUpdate,
@@ -739,7 +739,7 @@ const adminService = {
 
     addAccessIdToBusinessAccount: async (data) => {
         try {
-            const {id, includeId} = data;
+            const { id, includeId } = data;
             if (!id || !includeId) {
                 throw { status: 400, message: "Business ID and Include ID are required." };
             }
@@ -803,24 +803,24 @@ const adminService = {
                 unreadMessagesCount = 0,
                 accessAccountsIds = [] // New field for additional linked accounts
             } = data;
-    
+
             let errors = [];
-    
+
             if (!user_id) errors.push("User ID is required.");
             if (!businessName) errors.push("Business name is required.");
             if (!businessType) errors.push("Business type is required.");
             if (!natureOfBusiness) errors.push("Nature of business is required.");
-    
+
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-    
+
             // Check if the main user exists
             const existingUser = await registerModel.findById(user_id);
             if (!existingUser) {
                 throw { status: 404, message: "User not found for the given user ID in business profile." };
             }
-    
+
             // Validate accessAccountsIds if provided
             if (accessAccountsIds.length > 0) {
                 const validAccounts = await registerModel.find({ _id: { $in: accessAccountsIds } });
@@ -828,13 +828,13 @@ const adminService = {
                     throw { status: 400, message: "One or more access account IDs are invalid." };
                 }
             }
-    
+
             // Ensure business name is unique
             const existingBusiness = await businessregisterModel.findOne({ businessName });
             if (existingBusiness) {
                 throw { status: 400, message: "Business name already exists. Business name must be unique." };
             }
-    
+
             // Create the business
             const business = await businessregisterModel.create({
                 user_id,
@@ -876,15 +876,15 @@ const adminService = {
                 unreadMessagesCount,
                 accessAccountsIds // Store linked account IDs
             });
-    
+
             return { success: true, user: existingUser, business: [business] };
-    
+
         } catch (error) {
             console.error("Error in registerBusinessAccount:", error);
             throw { status: error.status || 500, message: error.message || "Internal Server Error" };
         }
     },
-    
+
 
 
     updateBusinessProfile: async (data) => {
@@ -1152,56 +1152,56 @@ const adminService = {
         const { email, phn_number, password, deviceToken } = data;
         try {
             let user;
-    
+
             if (phn_number) {
                 user = await registerModel.findOne({ phn_number });
             } else if (email) {
                 user = await registerModel.findOne({ email });
             }
-    
+
             if (!user) {
                 throw { msg: "Account not found. Please register to continue." };
             }
-    
+
             if (email) {
                 const isPasswordMatch = await bcrypt.compare(password, user.password);
                 if (!isPasswordMatch) {
                     throw { msg: "Invalid credentials. Please try again or reset your password." };
                 }
             }
-    
+
             console.log("User ID:", user._id, "Device Token:", deviceToken);
-    
+
             const updatedUser = await registerModel.findOneAndUpdate(
                 { _id: user._id },
                 { $addToSet: { deviceToken: deviceToken } },
                 { new: true }
             );
-    
+
             if (updatedUser) {
                 console.log("Device tokens updated successfully:", updatedUser.deviceToken);
             } else {
                 console.error("Failed to update device tokens.");
             }
-    
+
             // Fetch businesses where the user is the owner
             const ownedBusinesses = await businessregisterModel.find({ user_id: user._id });
-    
+
             // Fetch businesses where the user has access via accessAccountsIds
             const accessibleBusinesses = await businessregisterModel.find({ accessAccountsIds: user._id.toString() });
-    
+
             // Merge and remove duplicates
             const allBusinesses = [...ownedBusinesses, ...accessibleBusinesses].filter(
                 (business, index, self) =>
                     index === self.findIndex((b) => b._id.toString() === business._id.toString())
             );
-    
+
             const token = jwt.sign(
                 { user_id: user._id },
                 SECRET_KEY,
                 { expiresIn: "7d" }
             );
-    
+
             return {
                 status: 200,
                 msg: "Login successful",
@@ -1220,7 +1220,7 @@ const adminService = {
             };
         }
     },
-    
+
 
 
     // ===================
@@ -1931,80 +1931,82 @@ const adminService = {
 
     createPost: async (data) => {
         try {
-          const {
-            user_id,
-            isBusinessAccount,
-            caption,
-            webSiteLink,
-            mediaItems = [],
-            isRepost = false,
-            isOwnPost = true,
-            isProductPost = false,
-            repostDetails = null,
-          } = data;
-      
-          let user;
-      
-          // Fetch the user based on whether it is a business account or not
-          if (isBusinessAccount) {
-            user = await businessregisterModel.findById(user_id);
-          } else {
-            user = await registerModel.findById(user_id);
-          }
-      
-          if (!user) {
-            throw new Error("User not found");
-          }
-      
-          const userName = isBusinessAccount ? user.businessName || "Business User" : user.full_Name || "User";
-          const userAvatar = isBusinessAccount ? user.brand_logo || "" : user.profile_url || "";
-      
-          // Create the new post object
-          const newPost = new createPostModel({
-            userId: user_id,
-            userName,
-            userAvatar,
-            caption,
-            webSiteLink,
-            mediaItems,
-            isRepost,
-            isOwnPost,
-            isProductPost,
-            isBusinessAccount,
-            repostDetails: isRepost ? repostDetails : null,
-          });
-      
-          // Save the post
-          const savedPost = await newPost.save();
-      
-          // Count total posts for the user
-          let totalPosts;
-          if (isBusinessAccount) {
-            totalPosts = await createPostModel.countDocuments({ userId: user_id });  // Count posts for business account
-            await businessregisterModel.updateOne(
-              { _id: user_id },
-              { $set: { postCount: totalPosts } }  // Update the post count with the total number of posts
-            );
-          } else {
-            totalPosts = await createPostModel.countDocuments({ userId: user_id });  // Count posts for user
-            await registerModel.updateOne(
-              { _id: user_id },
-              { $set: { postCount: totalPosts } }  // Update the post count with the total number of posts
-            );
-          }
-      
-          return {
-            success: true,
-            message: "Post created successfully",
-            post: savedPost,
-          };
+            const {
+                user_id,
+                isBusinessAccount,
+                caption,
+                webSiteLink,
+                mediaItems = [],
+                isRepost = false,
+                isOwnPost = true,
+                isProductPost = false,
+                repostDetails = null,
+            } = data;
+
+            let user;
+
+            // Fetch the user based on whether it is a business account or not
+            if (isBusinessAccount) {
+                user = await businessregisterModel.findById(user_id);
+                console.log(user, "user")
+            } else {
+                user = await registerModel.findById(user_id);
+                console.log(user, "user2")
+            }
+
+            if (!user) {
+                throw new Error("User not found");
+            }
+
+            const userName = isBusinessAccount ? user.businessName || "Business User" : user.full_Name || "User";
+            const userAvatar = isBusinessAccount ? user.brand_logo || "" : user.profile_url || "";
+
+            // Create the new post object
+            const newPost = new createPostModel({
+                userId: user_id,
+                userName,
+                userAvatar,
+                caption,
+                webSiteLink,
+                mediaItems,
+                isRepost,
+                isOwnPost,
+                isProductPost,
+                isBusinessAccount,
+                repostDetails: isRepost ? repostDetails : null,
+            });
+
+            // Save the post
+            const savedPost = await newPost.save();
+
+            // Count total posts for the user
+            let totalPosts;
+            if (isBusinessAccount) {
+                totalPosts = await createPostModel.countDocuments({ userId: user_id });  // Count posts for business account
+                await businessregisterModel.updateOne(
+                    { _id: user_id },
+                    { $set: { postCount: totalPosts } }  // Update the post count with the total number of posts
+                );
+            } else {
+                totalPosts = await createPostModel.countDocuments({ userId: user_id });  // Count posts for user
+                await registerModel.updateOne(
+                    { _id: user_id },
+                    { $set: { postCount: totalPosts } }  // Update the post count with the total number of posts
+                );
+            }
+
+            return {
+                success: true,
+                message: "Post created successfully",
+                post: savedPost,
+            };
         } catch (error) {
-          console.error("Error creating post:", error);
-          throw new Error(`Failed to create the post: ${error.message}`);
+            console.error("Error creating post:", error);
+            throw new Error(`Failed to create the post: ${error.message}`);
         }
-      },
-      
-      
+    },
+
+
 
 
     // createPost: async (data) => {
@@ -2126,24 +2128,24 @@ const adminService = {
     // },
 
     //   ==================
-    getPosts: async (user_id, page = 1, limit = 25) => {
+    getPosts: async (userId, page = 1, limit = 25) => {
         try {
             const skip = (page - 1) * 10;
-
+            console.log(userId, "userId")
             // Fetch posts sorted by likesCount in descending order
-            const posts = await createPostModel.find({ user_id, isProductPost: false })
+            const posts = await createPostModel.find({ userId, isProductPost: false })
                 .sort({ likesCount: -1 }) // Sort by likesCount (highest first)
                 .skip(skip)
                 .limit(10)
-                .select('imageUrl likesCount caption likes tags timestamp isVideo thumbnailFile aspectRatio viewsCount isProductPost productId productPrice');
-
+                .select('mediaItems.url  mediaItems.aspectRatio likesCount webSiteLink caption   timestamp isRepost isOwnPost  sharesCount repostDetails   viewsCount isProductPost mediaItems.productId ');
+            console.log(posts, "posts")
             // Count total results for pagination
-            const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
+            const totalResults = await createPostModel.countDocuments({ userId, isProductPost: false });
             const totalPages = Math.ceil(totalResults / 10);
 
             return {
                 posts,
-                pagination: {
+                pagination: { 
                     totalResults,
                     totalPages,
                     currentPage: page,
@@ -2209,7 +2211,7 @@ const adminService = {
                 mediaFile: post.mediaFile,
                 thumbnailFile: post.thumbnailFile,
                 videoDuration: post.videoDuration,
-                description:post.description,
+                description: post.description,
                 aspectRatio: post.aspectRatio,
                 isVideo: post.isVideo,
                 likesCount: post.likesCount,
@@ -3556,27 +3558,27 @@ const adminService = {
     getUserProfile: async (id, userId, accountBusinessType) => {
         try {
             console.log(`Fetching user profile for ID: ${id}`);
-    
+
             // First, try to find the user in registerModel
             let user = await registerModel.findById(id);
-    
+
             // If not found, try businessregisterModel
             const isBusinessAccount = !user;
             if (!user) {
                 user = await businessregisterModel.findById(id);
             }
-    
+
             if (!user) {
                 console.log(`User not found for ID: ${id}`);
                 return null;
             }
-    
+
             console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.businessName : user.full_Name}`);
-    
+
             const fullName = isBusinessAccount ? user.businessName || "Business Owner" : user.full_Name || "";
-    
+
             console.log(`Checking friendship status for userId: ${userId} and profileId: ${id}`);
-    
+
             // Fetch friendship details
             const friendRecord = await Friend.findOne({
                 userId,
@@ -3599,11 +3601,11 @@ const adminService = {
                     }
                 }
             ]);
-            
+
             console.log('------ friendRecordV1 ------');
             console.log(friendRecordV1);
-            
-    
+
+
             let friendStatus = "Not Friends";
             if (friendRecord) {
                 const friendEntry = friendRecord.friends.find(f => f.friendId === id);
@@ -3618,11 +3620,11 @@ const adminService = {
                     friendStatus = "Accepted";
                 }
             }
-    
+
             console.log(`Friendship status: ${friendStatus}`);
-    
+
             console.log(`Checking follow status for userId: ${userId} and profileId: ${id}`);
-    
+
             // Check if userId is already following
             const isAlreadyFollow = await Follow.exists({
                 userId,
@@ -3630,9 +3632,9 @@ const adminService = {
                 followingId: id,
                 followingReference: isBusinessAccount ? "businessRegister" : "User",
             });
-    
+
             console.log(`Follow status: ${isAlreadyFollow ? "Already following" : "Not following"}`);
-    
+
             const profileData = {
                 id: user._id.toString(),
                 username: `@${fullName.trim() || (isBusinessAccount ? `Business${id}` : `User${id}`)}`,
@@ -3651,16 +3653,16 @@ const adminService = {
                 isBusinessAccount,
                 friendStatus, // ✅ Added friend status
             };
-    
+
             console.log(`Returning profile data:`, profileData);
-    
+
             return profileData;
         } catch (error) {
             console.error("Error fetching user profile:", error);
             return null;
         }
     },
-    
+
 
 
 
