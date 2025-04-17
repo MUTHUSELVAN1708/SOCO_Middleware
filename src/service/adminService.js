@@ -2007,6 +2007,53 @@ const adminService = {
     },
 
 
+    // =====================
+    repostPost:async (data) => {
+        try {
+      const {userId, userName, userAvatar, postIdToRepost}=data
+          if (!userId || !postIdToRepost) {
+            throw new Error({ message: "userId and postIdToRepost are required." });
+          }
+      
+          // Fetch the original post
+          const originalPost = await createPostModel.findById(postIdToRepost);
+      
+          if (!originalPost) {
+            throw new Error({ message: "Original post not found." });
+          }
+      
+          // Create the new repost
+          const repost = new createPostModel({
+            userId,
+            userName,
+            userAvatar,
+            isRepost: true,
+            isOwnPost: false,
+            caption: originalPost.caption, // Optional: You can allow users to add their own caption too if you want
+            mediaItems: originalPost.mediaItems,
+            repostDetails: {
+              originalPostId: originalPost._id,
+              originalUserId: originalPost.userId,
+              originalUserName: originalPost.userName,
+              originalUserAvatar: originalPost.userAvatar,
+              originalCaption: originalPost.caption,
+              originalMediaItems: originalPost.mediaItems,
+            },
+          });
+      
+          await repost.save();
+      
+          await createPostModel.findByIdAndUpdate(postIdToRepost, {
+            $inc: { rePostCount: 1 },
+          });
+      
+         return{ message: "Post reposted successfully.", repost };
+      
+        } catch (error) {
+          console.error("Error in repostPost:", error);
+          throw error;
+        }
+    },
 
 
     // createPost: async (data) => {

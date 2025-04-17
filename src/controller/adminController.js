@@ -463,6 +463,23 @@ const adminController = {
             next(error);  // Pass error to the next middleware for centralized error handling
         }
     },
+
+    // =================
+    repostPost: async (req, res, next) => {
+        try {
+            console.log("Received request to repost post:", req.body);
+
+            const repostPost = await adminService.repostPost(req.body);
+            res.status(200).json({
+                status: 200,
+                repostPost
+            });
+        } catch (error) {
+            console.error("Error repost post:", error.message);
+            error.statuscode = 400;  // Set a status code for error
+            next(error);  // Pass error to the next middleware for centralized error handling
+        }
+    },
     // ==================
     updateUserDetails: async (req, res, next) => {
 

@@ -3,7 +3,6 @@ import { getDashboardFeed ,getRecommendedFollow} from '../controller/feedControl
 
 
 const router = express.Router();
-
 router.post('/dashboard-feed', getDashboardFeed);
 router.get("/getRecommendedFollow",getRecommendedFollow);
 export default router;
