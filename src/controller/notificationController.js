@@ -13,7 +13,7 @@ export const getNotifications = async (req, res) => {
 
     const query = {
       userId,
-      isRead: false,
+      // isRead: false,
       isPerformed: false
     };
 
