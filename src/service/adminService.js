@@ -12,6 +12,8 @@ import Comment from "../model/Comment.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
+import CommentModel from "../model/Comment.js";
+import UserInfo from "../model/UserInfo.js";
 // import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
 import levenshtein from "fast-levenshtein";
@@ -2004,9 +2006,198 @@ const adminService = {
         }
       },
       
+
+      createRepost: async (data) => {
+        try {
+          const {
+            user_id,
+            isBusinessAccount,
+            originalPostId,
+            caption = "",
+            mediaItems = []
+          } = data;
       
+          const user = isBusinessAccount
+            ? await businessregisterModel.findById(user_id)
+            : await registerModel.findById(user_id);
+      
+          if (!user) {
+            throw new Error("User not found");
+          }
+      
+          const originalPost = await createPostModel.findById(originalPostId);
+          if (!originalPost) {
+            throw new Error("Original post not found");
+          }
+      
+          const userName = isBusinessAccount ? user.businessName || "Business User" : user.full_Name || "User";
+          const userAvatar = isBusinessAccount ? user.brand_logo || "" : user.profile_url || "";
+      
+          const combinedMediaItems = [...mediaItems, ...originalPost.mediaItems];
+      
+          const repost = new createPostModel({
+            userId: user_id,
+            userName,
+            userAvatar,
+            caption,
+            isRepost: true,
+            isOwnPost: false,
+            isBusinessAccount,
+            mediaItems: combinedMediaItems,
+            repostDetails: {
+              originalPostId: originalPost._id,
+              originalUserId: originalPost.userId,
+              originalUserName: originalPost.userName,
+              originalUserAvatar: originalPost.userAvatar,
+              originalCaption: originalPost.caption,
+              originalMediaItems: originalPost.mediaItems,
+            }
+          });
+      
+          const savedRepost = await repost.save();
+      
+          await createPostModel.updateOne(
+            { _id: originalPostId },
+            { $inc: { rePostCount: 1 } }
+          );
+      
+          return {
+            success: true,
+            message: "Post reposted successfully",
+            post: savedRepost,
+          };
+        } catch (error) {
+          console.error("Error reposting post:", error);
+          throw new Error(`Failed to repost: ${error.message}`);
+        }
+      },
+    // adjust the path based on your project
 
+    createPostByProduct: async (data) => {
+        try {
+          const { user_id, productId, mediaItems, caption } = data;
+      
+          const user = await businessregisterModel.findById(user_id);
+          if (!user) throw new Error("Business user not found");
+      
+          const product = await Product.findById(productId);
+          if (!product) throw new Error("Product not found");
+      
+          const userName = user.businessName || "Business User";
+          const userAvatar = user.brand_logo || "";
+      
+          let finalMediaItems = mediaItems || [];
+          let finalCaption = caption || "";
+      
+          // If mediaItems or caption are missing, derive from product
+          if (!mediaItems || mediaItems.length === 0) {
+            const regularPrice = parseFloat(product.pricing?.regularPrice || 0);
+            const salePrice = parseFloat(product.pricing?.salePrice || regularPrice);
+      
+            let totalTaxPercentage = 0;
+      
+            if (product.pricing?.gstDetails?.gstIncluded === false) {
+              totalTaxPercentage += product.pricing.gstDetails.gstPercentage || 0;
+            }
+      
+            if (Array.isArray(product.pricing?.additionalTaxes)) {
+              for (const tax of product.pricing.additionalTaxes) {
+                totalTaxPercentage += parseFloat(tax.percentage || 0);
+              }
+            }
+      
+            const totalPrice = salePrice + (salePrice * totalTaxPercentage / 100);
+      
+            finalMediaItems = (product.images || []).map((imgUrl) => ({
+              url: imgUrl,
+              type: "image",
+              thumbnailUrl: imgUrl,
+              productId: product._id.toString(),
+              productName: product.basicInfo?.productTitle || "",
+              price: totalPrice.toFixed(2),
+              originalPrice: regularPrice.toFixed(2),
+              hasDiscount: !!product.pricing?.discount,
+              aspectRatio: 1,
+            }));
+          }
+      
+          if (!finalCaption) {
+            finalCaption = product.basicInfo?.productTitle || "";
+          }
+      
+          const newPost = new createPostModel({
+            userId: user_id,
+            userName,
+            userAvatar,
+            caption: finalCaption,
+            webSiteLink: "",
+            mediaItems: finalMediaItems,
+            isRepost: false,
+            isOwnPost: false,
+            isProductPost: true,
+            isBusinessAccount: true,
+            repostDetails: null,
+          });
+      
+          const savedPost = await newPost.save();
+      
+          const totalPosts = await createPostModel.countDocuments({ userId: user_id });
+          await businessregisterModel.updateOne({ _id: user_id }, { $set: { postCount: totalPosts } });
+      
+          return {
+            success: true,
+            message: "Product post created successfully",
+            post: savedPost,
+          };
+        } catch (error) {
+          console.error("Error creating product post:", error);
+          throw new Error(`Failed to create product post: ${error.message}`);
+        }
+      },
 
+     returnMySearchProduct : async ({ createdBy, query }) => {
+        try {
+          const searchCriteria = {
+            createdBy
+          };
+      
+          if (query && query.trim()) {
+            const regex = new RegExp(query.trim(), 'i');
+            searchCriteria.$or = [
+              { 'basicInfo.productTitle': regex },
+              { 'basicInfo.tags': regex },
+              { 'basicInfo.brand': regex }
+            ];
+          }
+      
+          const products = await Product.find(searchCriteria)
+            .sort(query ? {} : { createdAt: -1 })
+            .limit(15);
+      
+          return products.map((product) => {
+            const regular = parseFloat(product.pricing?.regularPrice || 0);
+            const sale = parseFloat(product.pricing?.salePrice || regular);
+            const discount = product.pricing?.discount || (
+              regular && sale && regular > sale
+                ? Math.round(((regular - sale) / regular) * 100)
+                : 0
+            );
+      
+            return {
+              id: product._id.toString(),
+              name: product.basicInfo?.productTitle || '',
+              price: sale,
+              description: product.descriptionHighlights?.description || '',
+              discount,
+              imageUrl: product.images?.[0] || ''
+            };
+          });
+        } catch (error) {
+          console.error("Error in returnMySearchProduct:", error);
+          throw new Error("Failed to fetch products");
+        }
+      },
+      
     // createPost: async (data) => {
     //     console.log("Received data for creating post:", data);
 
@@ -2138,7 +2329,7 @@ const adminService = {
                 .select('imageUrl likesCount caption likes tags timestamp isVideo thumbnailFile aspectRatio viewsCount isProductPost productId productPrice');
 
             // Count total results for pagination
-            const totalResults = await createPostModel.countDocuments({ user_id, isProductPost: false });
+            const totalResults = await createPostModel.countDocuments({ user_id });
             const totalPages = Math.ceil(totalResults / 10);
 
             return {
@@ -2156,6 +2347,37 @@ const adminService = {
             throw error;
         }
     },
+
+    // getPosts: async (userId, page = 1, limit = 25) => {
+    //     try {
+    //         const skip = (page - 1) * limit;
+    
+    //         const query = { userId, isProductPost: false };
+    
+    //         const posts = await createPostModel.find(query)
+    //             .sort({ likesCount: -1 })
+    //             .skip(skip)
+    //             .limit(limit)
+    //             .select('mediaItems likesCount caption timestamp viewsCount isProductPost');
+    
+    //         const totalResults = await createPostModel.countDocuments(query);
+    //         const totalPages = Math.ceil(totalResults / limit);
+    
+    //         return {
+    //             posts,
+    //             pagination: {
+    //                 totalResults,
+    //                 totalPages,
+    //                 currentPage: page,
+    //                 limit,
+    //                 hasNextPage: page < totalPages,
+    //                 hasPreviousPage: page > 1,
+    //             },
+    //         };
+    //     } catch (error) {
+    //         throw new Error(error.message || 'Failed to fetch posts');
+    //     }
+    // },
 
 
     getPostDetails: async (postId) => {
@@ -3705,44 +3927,124 @@ const adminService = {
             };
         }
     },
-
     fetchUserPosts: async (userId, page = 1, limit = 12) => {
         try {
-            const skip = (page - 1) * limit;
-
-            const totalPostsCount = await createPostModel.countDocuments({ user_id: userId });
-
-            const posts = await createPostModel
-                .find({ user_id: userId })
-                .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 }) // Sort by popularity
-                .skip(skip)
-                .limit(limit);
-
-            const postDetails = posts.map((post) => ({
+          const skip = (page - 1) * limit;
+          const objectId = new mongoose.Types.ObjectId(userId);
+      
+          const totalPostsCount = await createPostModel.countDocuments({ userId });
+      
+          const posts = await createPostModel
+            .find({ userId })
+            .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
+            .skip(skip)
+            .limit(limit);
+      
+          const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
+          const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
+      
+          const favoriteSet = new Set(favoritePosts.map((f) => f.post_id.toString()));
+          const bookmarkSet = new Set(bookmarkedPosts.map((b) => b.post_id.toString()));
+      
+          const formattedPosts = await Promise.all(
+            posts.map(async (post) => {
+              const isFavorite = favoriteSet.has(post._id.toString());
+              const isBookmarked = bookmarkSet.has(post._id.toString());
+      
+              let topComments = await CommentModel.find({ postId: post._id })
+                .sort({ likesCount: -1, createdAt: -1 })
+                .limit(2)
+                .lean();
+      
+              if (!topComments.length) {
+                topComments = await CommentModel.find({ postId: post._id })
+                  .sort({ createdAt: -1 })
+                  .limit(2)
+                  .lean();
+              }
+      
+              const formattedComments = await Promise.all(
+                topComments.map(async (comment) => {
+                  const user = await UserInfo.findOne({ id: comment.userId });
+                  return {
+                    commentId: comment._id.toString(),
+                    id: comment._id.toString(),
+                    content: comment.content,
+                    createdAt: comment.createdAt,
+                    userInfo: {
+                      name: user?.name || "",
+                      avatar: user?.avatarUrl || "",
+                    },
+                  };
+                })
+              );
+      
+              return {
                 id: post._id.toString(),
-                userId: post.user_id,
-                imageUrl: post.imageUrl || '',
-                caption: post.caption || '',
-                likes: post.likesCount || 0,
-                comments: post.commentsCount || 0,
-                createdAt: post.timestamp,
-                tags: post.tags || [],
-            }));
-
-            return {
-                posts: postDetails,
-                hasMorePosts: totalPostsCount > skip + posts.length,
-                totalPostsCount,
-            };
+                username: post.userName,
+                userAvatar: post.userAvatar,
+                caption: post.caption,
+                thumbnailUrl: post.thumbnailUrl,
+                likesCount: post.likesCount,
+                commentsCount: post.commentsCount,
+                viewsCount: post.viewsCount,
+                sharesCount: post.sharesCount,
+                rePostCount: post.rePostCount,
+                isRepost: post.isRepost,
+                isOwnPost: post.isOwnPost,
+                isProductPost: post.isProductPost,
+                mediaItems: post.mediaItems.map((media) => ({
+                  url: media.url,
+                  type: media.type,
+                  thumbnailUrl: media.thumbnailUrl,
+                  productName: media.productName,
+                  price: media.price,
+                  originalPrice: media.originalPrice,
+                  hasDiscount: media.hasDiscount,
+                })),
+                repostDetails: post.repostDetails
+                  ? {
+                      originalPostId: post.repostDetails.originalPostId?.toString() || "",
+                      originalUserId: post.repostDetails.originalUserId || "",
+                      originalUserName: post.repostDetails.originalUserName || "",
+                      originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+                      originalCaption: post.repostDetails.originalCaption || "",
+                      originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
+                        url: media.url,
+                        type: media.type,
+                        thumbnailUrl: media.thumbnailUrl,
+                        productName: media.productName,
+                        price: media.price,
+                        originalPrice: media.originalPrice,
+                        hasDiscount: media.hasDiscount,
+                      })),
+                    }
+                  : null,
+                likes: post.likesCount,
+                comments: formattedComments,
+                timestamp: post.timestamp,
+                isFavorite,
+                isBookmarked,
+              };
+            })
+          );
+      
+          return {
+            posts: formattedPosts,
+            hasMorePosts: totalPostsCount > skip + posts.length,
+            totalPostsCount,
+          };
         } catch (error) {
-            console.error('Error fetching user posts:', error);
-            return {
-                posts: [],
-                hasMorePosts: false,
-                totalPostsCount: 0,
-            };
+          console.error("Error fetching user posts:", error);
+          return {
+            posts: [],
+            hasMorePosts: false,
+            totalPostsCount: 0,
+          };
         }
-    },
+      },
+      
+
 
 
 

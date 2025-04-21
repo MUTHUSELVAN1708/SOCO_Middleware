@@ -69,6 +69,7 @@ import mongoose from "mongoose";
 const mediaItemSchema = new mongoose.Schema({
   url: { type: String, required: true },
   type: { type: String, enum: ["image", "video"], required: true },
+  thumbnailUrl: { type: String },
   productId: { type: String },
   productName: { type: String },
   price: { type: String },
@@ -90,6 +91,7 @@ const createPostSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   userName: { type: String, required: true },
   userAvatar: { type: String },
+
 
   likesCount: { type: Number, default: 0 },
   commentsCount: { type: Number, default: 0 },

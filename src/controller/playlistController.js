@@ -12,14 +12,14 @@ const addToWatchLater = async (req, res) => {
     }
 
     try {
-        let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Watch Later" });
+        let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Keep for Later" });
 
         if (!watchLaterPlaylist) {
             // Create Watch Later playlist if it doesn't exist
             watchLaterPlaylist = new Playlist({
                 playlistId: uuidv4(),
                 userId: new mongoose.Types.ObjectId(userId),
-                name: "Watch Later",
+                name: "Keep for Later",
                 videos: [videoId],
             });
             await watchLaterPlaylist.save();
@@ -31,9 +31,9 @@ const addToWatchLater = async (req, res) => {
             }
         }
 
-        return handleSuccess(res, 200, "Video added to Watch Later", watchLaterPlaylist);
+        return handleSuccess(res, 200, "Video added to Keep for Later", watchLaterPlaylist);
     } catch (error) {
-        return handleError(res, 500, `Error updating Watch Later: ${error.message}`);
+        return handleError(res, 500, `Error updating Keep for Later: ${error.message}`);
     }
 };
 
@@ -98,13 +98,13 @@ const getUserPlaylistsWithVideoStatus = async (req, res) => {
     }
 
     try {
-        let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Watch Later" });
+        let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Keep for Later" });
 
         if (!watchLaterPlaylist) {
             watchLaterPlaylist = new Playlist({
                 playlistId: uuidv4(),
                 userId: new mongoose.Types.ObjectId(userId),
-                name: "Watch Later",
+                name: "Keep for Later",
                 videos: [],
             });
             await watchLaterPlaylist.save();
@@ -120,8 +120,8 @@ const getUserPlaylistsWithVideoStatus = async (req, res) => {
 
         // Sorting logic
         formattedPlaylists.sort((a, b) => {
-            if (a.name === "Watch Later") return -1; // Watch Later first
-            if (b.name === "Watch Later") return 1;
+            if (a.name === "Keep for Later") return -1; // Watch Later first
+            if (b.name === "Keep for Later") return 1;
             if (a.isVideoInPlaylist && !b.isVideoInPlaylist) return -1; // Videos that contain the video come next
             if (!a.isVideoInPlaylist && b.isVideoInPlaylist) return 1;
             return 0; // Maintain original date order for others

@@ -463,6 +463,66 @@ const adminController = {
             next(error);  // Pass error to the next middleware for centralized error handling
         }
     },
+
+    repostPost: async (req, res, next) => {
+        try {
+            console.log("Received request to repost post:", req.body);
+
+            // Pass the request body to the service for processing
+            const post = await adminService.createRepost(req.body);
+
+            // Respond with the status and created post
+            res.status(200).json({
+                status: 200,
+                post
+            });
+        } catch (error) {
+            console.error("Error re-post:", error.message);
+            error.statuscode = 400;  // Set a status code for error
+            next(error);  // Pass error to the next middleware for centralized error handling
+        }
+    },
+
+    createPostByProduct: async (req, res, next) => {
+        try {
+            console.log("Received request to productPost:", req.body);
+
+            // Pass the request body to the service for processing
+            const post = await adminService.createPostByProduct(req.body);
+
+            // Respond with the status and created post
+            res.status(200).json({
+                status: 200,
+                post
+            });
+        } catch (error) {
+            console.error("Error productPost:", error.message);
+            error.statuscode = 400;  // Set a status code for error
+            next(error);  // Pass error to the next middleware for centralized error handling
+        }
+    },
+    returnMySearchProduct: async (req, res, next) => {
+        try {
+          console.log("Received query:", req.query);
+      
+          const { createdBy, query } = req.query;
+      
+          const post = await adminService.returnMySearchProduct({
+            createdBy,
+            query
+          });
+      
+          res.status(200).json({
+            status: 200,
+            post
+          });
+        } catch (error) {
+          console.error("Error productPost:", error.message);
+          error.statuscode = 400;
+          next(error);
+        }
+      },
+      
     // ==================
     updateUserDetails: async (req, res, next) => {
 
