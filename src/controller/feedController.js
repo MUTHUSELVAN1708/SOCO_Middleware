@@ -32,7 +32,7 @@
 //         const tracking = await trackingModel.findOne({ 
 //             user_id: new mongoose.Types.ObjectId(user_id) 
 //         });
-        
+
 //         const trackedPostIds = tracking?.sentPosts?.map(post => 
 //             new mongoose.Types.ObjectId(post.post_id)
 //         ) || [];
@@ -89,7 +89,7 @@
 //             .sort({ timestamp: -1, viewsCount: -1 })
 //             .limit(Math.ceil((limit - posts.length) * 0.35))
 //             .select(baseSelect);
-            
+
 //             posts = [...posts, ...locationPosts];
 //         }
 
@@ -108,7 +108,7 @@
 //             .sort({ viewsCount: -1, likesCount: -1 })
 //             .limit(limit - posts.length)
 //             .select(baseSelect);
-            
+
 //             posts = [...posts, ...trendingPosts];
 //         }
 
@@ -230,27 +230,25 @@ export const getDashboardFeed = async (req, res) => {
       .lean();
 
     // Filter out duplicate posts
-    const seenPosts = new Map();
-    const uniquePosts = [];
+    const uniquePostsMap = new Map();
 
-    for (const post of allPosts) {
-      let uniqueKey;
+for (const post of allPosts) {
+  let uniqueKey;
 
-      if (post.isRepost && post.repostDetails?.originalPostId) {
-        // If it's a repost, key = originalPostId + userId
-        uniqueKey = post.repostDetails.originalPostId.toString() + "_" + post.userId.toString();
-      } else {
-        // If it's an original post, key = postId
-        uniqueKey = post._id.toString();
-      }
+  if (post.isRepost && post.repostDetails?.originalPostId) {
+    uniqueKey = post.repostDetails.originalPostId.toString() + "_" + post.userId.toString();
+  } else {
+    uniqueKey = post._id.toString() + "_" + post.userId.toString();
+  }
 
-      if (!seenPosts.has(uniqueKey)) {
-        seenPosts.set(uniqueKey, true);
-        uniquePosts.push(post);
-      }
-    }
+  if (!uniquePostsMap.has(uniqueKey)) {
+    uniquePostsMap.set(uniqueKey, post);
+  }
+}
 
+const uniquePosts = Array.from(uniquePostsMap.values());
     const paginatedPosts = uniquePosts.slice(skip, skip + limit);
+
 
     const totalResults = uniquePosts.length;
     const totalPages = Math.ceil(totalResults / limit);
@@ -345,74 +343,74 @@ export const getDashboardFeed = async (req, res) => {
 }
 
 
-  
+
 
 export const getRecommendedFollow = async (req, res) => {
-    try {
-      const userId = req.query.userId;
-  
-      if (!userId) {
-        return res.status(400).json({ message: 'User ID is required in query params' });
-      }
-  
-      const directFollows = await Follow.find({ userId });
-      const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
-  
-      const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
-        .limit(10)
-        .select('_id full_Name profile_url');
-  
-      // Step 2: Get second-degree follows
-      const secondDegreeFollows = await Follow.find({ userId: { $in: directlyFollowedIds } });
-      const secondDegreeIds = secondDegreeFollows.map(f => f.followingId.toString());
-  
-      // Step 3: Exclude already followed and self
-      const excludedIds = new Set([...directlyFollowedIds, userId]);
-      const recommendedIds = [...new Set(secondDegreeIds.filter(id => !excludedIds.has(id)))];
-  
-      // Step 4a: Get user-based recommendations
-      const userRecommendations = await registerModel.find({ _id: { $in: recommendedIds } })
-        .select('_id full_Name profile_url');
-  
-      const foundUserIds = userRecommendations.map(user => user._id.toString());
-  
-      // Map to unified format
-      const formattedUserRecs = userRecommendations.map(user => ({
-        _id: user._id,
-        name: user.full_Name,
-        profile: user.profile_url,
-        type: 'user'
-      }));
-  
-      // Step 4b: Get remaining IDs not in register
-      const remainingIds = recommendedIds.filter(id => !foundUserIds.includes(id));
-  
-      // Step 4c: Check remaining IDs in businessModel
-      const businessRecommendations = await businessregisterModel.find({ _id: { $in: remainingIds } })
-        .select('_id businessName brand_logo userId');
-  
-      const formattedBusinessRecs = businessRecommendations.map(biz => ({
-        _id: biz._id,
-        name: biz.businessName,
-        profile: biz.brand_logo,
-        userId: biz.userId,
-        type: 'business'
-      }));
-  
-      const combinedRecommendations = [...formattedUserRecs, ...formattedBusinessRecs];
-  
-      // Step 5: Response
-      res.status(200).json({
-        message: 'Recommended users fetched successfully',
-        directFollowsdetails,
-        recommendations: combinedRecommendations
-      });
-    } catch (error) {
-      console.error('Error fetching recommendations:', error);
-      res.status(500).json({ message: 'Internal server error' });
+  try {
+    const userId = req.query.userId;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required in query params' });
     }
-  };
-  
-  
-  
+
+    const directFollows = await Follow.find({ userId });
+    const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
+
+    const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
+      .limit(10)
+      .select('_id full_Name profile_url');
+
+    // Step 2: Get second-degree follows
+    const secondDegreeFollows = await Follow.find({ userId: { $in: directlyFollowedIds } });
+    const secondDegreeIds = secondDegreeFollows.map(f => f.followingId.toString());
+
+    // Step 3: Exclude already followed and self
+    const excludedIds = new Set([...directlyFollowedIds, userId]);
+    const recommendedIds = [...new Set(secondDegreeIds.filter(id => !excludedIds.has(id)))];
+
+    // Step 4a: Get user-based recommendations
+    const userRecommendations = await registerModel.find({ _id: { $in: recommendedIds } })
+      .select('_id full_Name profile_url');
+
+    const foundUserIds = userRecommendations.map(user => user._id.toString());
+
+    // Map to unified format
+    const formattedUserRecs = userRecommendations.map(user => ({
+      _id: user._id,
+      name: user.full_Name,
+      profile: user.profile_url,
+      type: 'user'
+    }));
+
+    // Step 4b: Get remaining IDs not in register
+    const remainingIds = recommendedIds.filter(id => !foundUserIds.includes(id));
+
+    // Step 4c: Check remaining IDs in businessModel
+    const businessRecommendations = await businessregisterModel.find({ _id: { $in: remainingIds } })
+      .select('_id businessName brand_logo userId');
+
+    const formattedBusinessRecs = businessRecommendations.map(biz => ({
+      _id: biz._id,
+      name: biz.businessName,
+      profile: biz.brand_logo,
+      userId: biz.userId,
+      type: 'business'
+    }));
+
+    const combinedRecommendations = [...formattedUserRecs, ...formattedBusinessRecs];
+
+    // Step 5: Response
+    res.status(200).json({
+      message: 'Recommended users fetched successfully',
+      directFollowsdetails,
+      recommendations: combinedRecommendations
+    });
+  } catch (error) {
+    console.error('Error fetching recommendations:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+
 
