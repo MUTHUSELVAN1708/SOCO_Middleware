@@ -275,25 +275,54 @@ export const getDashboardFeed = async (req, res) => {
             })
           );
 
-        return {
-          id: post._id.toString(),
-          username: post.userName,
-          userAvatar: post.userAvatar,
-          caption: post.caption,
-          mediaItems: post.mediaItems.map((media) => ({
-            url: media.url,
-            type: media.type,
-            productName: media.productName,
-            price: media.price,
-            originalPrice: media.originalPrice,
-            hasDiscount: media.hasDiscount,
-          })),
-          likes: post.likesCount,
-          comments: formattedComments,
-          timestamp: post.timestamp,
-          isFavorite,
-          isBookmarked,
-        };
+          return {
+            id: post._id.toString(),
+            username: post.userName,
+            userAvatar: post.userAvatar,
+            caption: post.caption,
+            thumbnailUrl: post.thumbnailUrl,
+            likesCount: post.likesCount,
+            commentsCount: post.commentsCount,
+            viewsCount: post.viewsCount,
+            sharesCount: post.sharesCount,
+            rePostCount: post.rePostCount,
+            isRepost: post.isRepost,
+            isOwnPost: post.isOwnPost,
+            isProductPost: post.isProductPost,
+            mediaItems: post.mediaItems.map((media) => ({
+              url: media.url,
+              type: media.type,
+              thumbnailUrl: media.thumbnailUrl,
+              productName: media.productName,
+              price: media.price,
+              originalPrice: media.originalPrice,
+              hasDiscount: media.hasDiscount,
+            })),
+            repostDetails: post.repostDetails
+              ? {
+                  originalPostId: post.repostDetails.originalPostId?.toString() || "",
+                  originalUserId: post.repostDetails.originalUserId || "",
+                  originalUserName: post.repostDetails.originalUserName || "",
+                  originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+                  originalCaption: post.repostDetails.originalCaption || "",
+                  originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
+                    url: media.url,
+                    type: media.type,
+                    thumbnailUrl: media.thumbnailUrl,
+                    productName: media.productName,
+                    price: media.price,
+                    originalPrice: media.originalPrice,
+                    hasDiscount: media.hasDiscount,
+                  })),
+                }
+              : null,
+            likes: post.likesCount,
+            comments: formattedComments,
+            timestamp: post.timestamp,
+            isFavorite,
+            isBookmarked,
+          };
+          
       })
     );
 
