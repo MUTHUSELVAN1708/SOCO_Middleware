@@ -278,6 +278,9 @@ export const getDashboardFeed = async (req, res) => {
           return {
             id: post._id.toString(),
             username: post.userName,
+            userId: post.userId,
+            productId: post.productId,
+            isBusinessAccount: post.isBusinessAccount,
             userAvatar: post.userAvatar,
             caption: post.caption,
             thumbnailUrl: post.thumbnailUrl,

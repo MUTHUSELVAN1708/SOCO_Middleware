@@ -2042,6 +2042,7 @@ const adminService = {
             caption,
             isRepost: true,
             isOwnPost: false,
+            isProductPost: originalPost.isProductPost,
             isBusinessAccount,
             mediaItems: combinedMediaItems,
             repostDetails: {
@@ -2129,6 +2130,7 @@ const adminService = {
             userId: user_id,
             userName,
             userAvatar,
+            productId:productId,
             caption: finalCaption,
             webSiteLink: "",
             mediaItems: finalMediaItems,
