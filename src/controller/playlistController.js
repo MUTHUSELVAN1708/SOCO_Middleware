@@ -133,6 +133,130 @@ const getUserPlaylistsWithVideoStatus = async (req, res) => {
     }
 };
 
+const getAllPlaylistsPaginated = async (req, res) => {
+    try {
+        const { userId, page = 1, limit = 10 } = req.query;
+
+        if (!userId) {
+            return handleError(res, 400, "User ID is required");
+        }
+
+        const pageNumber = parseInt(page);
+        const pageSize = parseInt(limit);
+
+        const playlistQuery = { userId, videos: { $exists: true, $ne: [] } };
+
+        const totalPlayListCount = await Playlist.countDocuments(playlistQuery);
+
+        const playlists = await Playlist.find(playlistQuery)
+            .select("playlistId name videos")
+            .skip((pageNumber - 1) * pageSize)
+            .limit(pageSize);
+
+        const formattedPlaylists = await Promise.all(
+            playlists.map(async (playlist) => {
+                const videos = await createPostModel
+                    .find({ _id: { $in: playlist.videos } })
+                    .select("mediaItems videoDuration userName");
+
+                const firstMedia = videos[0]?.mediaItems?.find(item => item.thumbnailUrl || item.url);
+
+                return {
+                    title: playlist.name || "Untitled",
+                    thumbnailUrl: firstMedia?.thumbnailUrl || firstMedia?.url || "",
+                    channelName: videos[0]?.userName || "Unknown",
+                    videoCount: playlist.videos.length,
+                    playlistId: playlist.playlistId,
+                    videoLength: formatTotalDuration(videos),
+                };
+            })
+        );
+
+        formattedPlaylists.sort((a, b) => b.videoCount - a.videoCount);
+
+        const hasMorePlaylist = (pageNumber * pageSize) < totalPlayListCount;
+
+        return handleSuccessV1(res, 200, "Playlists fetched successfully", {
+            playlists: formattedPlaylists,
+            hasMorePlaylist,
+            totalPlayListCount,
+        });
+    } catch (error) {
+        return handleError(res, 500, error.message);
+    }
+};
+
+
+const getPlaylistItems = async (req, res) => {
+    try {
+      const { playlistId, page = 1, limit = 15 } = req.query;
+  
+      if (!playlistId) {
+        return handleError(res, 400, "Playlist ID is required");
+      }
+  
+      const pageNumber = parseInt(page);
+      const pageSize = parseInt(limit);
+  
+      const playlist = await Playlist.findOne({ playlistId });
+  
+      if (!playlist || !Array.isArray(playlist.videos) || playlist.videos.length === 0) {
+        return handleSuccessV1(res, 200, "No posts found in this playlist", {
+          posts: [],
+          pagination: {
+            totalResults: 0,
+            totalPages: 0,
+            currentPage: pageNumber,
+            limit: pageSize,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          }
+        });
+      }
+  
+      const totalResults = playlist.videos.length;
+      const totalPages = Math.ceil(totalResults / pageSize);
+      const startIndex = (pageNumber - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedVideoIds = playlist.videos.slice(startIndex, endIndex);
+  
+      const posts = await createPostModel.find({ _id: { $in: paginatedVideoIds } });
+  
+      const formattedPosts = posts.map(post => {
+        return {
+          id: post._id,
+          username: post.userName || "Unknown",
+          userAvatar: post.userAvatar || "",
+          caption: post.caption || "",
+          likesCount: post.likesCount || 0,
+          commentsCount: post.commentsCount || 0,
+          viewsCount: post.viewsCount || 0,
+          sharesCount: post.sharesCount || 0,
+          rePostCount: post.rePostCount || 0,
+          isRepost: post.isRepost || false,
+          isOwnPost: false,
+          isProductPost: post.isProductPost || false,
+          mediaItems: post.mediaItems || [],
+        };
+      });
+  
+      return handleSuccessV1(res, 200, "Playlist items fetched successfully", {
+        posts: formattedPosts,
+        pagination: {
+          totalResults,
+          totalPages,
+          currentPage: pageNumber,
+          limit: pageSize,
+          hasNextPage: pageNumber < totalPages,
+          hasPreviousPage: pageNumber > 1,
+        }
+      });
+    } catch (error) {
+      return handleError(res, 500, error.message);
+    }
+  };
+  
+
 
 const getAllPlaylists = async (req, res) => {
     try {
@@ -354,4 +478,6 @@ export {
   addVideoToPlaylists,
   removeVideoFromPlaylist,
   deletePlaylist,
+  getAllPlaylistsPaginated,
+  getPlaylistItems,
 };

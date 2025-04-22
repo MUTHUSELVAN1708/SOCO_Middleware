@@ -9,6 +9,8 @@ import {
   addVideoToPlaylists,
   removeVideoFromPlaylist,
   deletePlaylist,
+  getAllPlaylistsPaginated,
+  getPlaylistItems,
 } from "../controller/playlistController.js";
 
 const router = express.Router();
@@ -16,6 +18,8 @@ const router = express.Router();
 router.post("/addToWatchLater", addToWatchLater);
 router.post("/create", createPlaylist);
 router.get("/user-playlists", getUserPlaylistsWithVideoStatus);
+router.get("/getAllPlaylistsPaginated", getAllPlaylistsPaginated);
+router.get("/getPlaylistItems", getPlaylistItems);
 router.get("/all", getAllPlaylists);
 router.get("/getPlaylistDetails", getPlaylistDetails);
 router.get("/:playlistId", getPlaylistById);
