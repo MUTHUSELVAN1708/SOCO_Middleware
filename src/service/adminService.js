@@ -2043,6 +2043,7 @@ const adminService = {
             isRepost: true,
             isOwnPost: false,
             isProductPost: originalPost.isProductPost,
+            productId: originalPost.productId,
             isBusinessAccount,
             mediaItems: combinedMediaItems,
             repostDetails: {
