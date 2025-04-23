@@ -257,9 +257,8 @@ const getPlaylistItems = async (req, res) => {
     } catch (error) {
       return handleError(res, 500, error.message);
     }
-  };
+};
   
-
 
 const getAllPlaylists = async (req, res) => {
     try {
