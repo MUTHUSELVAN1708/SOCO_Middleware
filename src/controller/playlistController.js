@@ -233,6 +233,9 @@ const getPlaylistItems = async (req, res) => {
           viewsCount: post.viewsCount || 0,
           sharesCount: post.sharesCount || 0,
           rePostCount: post.rePostCount || 0,
+          userId: post.userId,
+          productId: post.productId,
+          isBusinessAccount: post.isBusinessAccount,
           isRepost: post.isRepost || false,
           isOwnPost: false,
           isProductPost: post.isProductPost || false,
@@ -254,9 +257,8 @@ const getPlaylistItems = async (req, res) => {
     } catch (error) {
       return handleError(res, 500, error.message);
     }
-  };
+};
   
-
 
 const getAllPlaylists = async (req, res) => {
     try {
