@@ -60,7 +60,7 @@ export const getLinkedAccounts = async (req, res) => {
             name: user.full_Name,
             imageUrl: user.profile_url || null,
             email: user.email || null,
-            status: "confirmed"
+             status: "confirmed"
         }));
 
         const allUserIds = [
@@ -69,7 +69,7 @@ export const getLinkedAccounts = async (req, res) => {
         ];
 
         let businessOwner = null;
-        const businessOwnerId = business.userId?.toString();
+        const businessOwnerId = business.user_id?.toString();
 
         if (businessOwnerId && !allUserIds.includes(businessOwnerId)) {
             const ownerUser = await User.findById(businessOwnerId).select("full_Name profile_url email");
