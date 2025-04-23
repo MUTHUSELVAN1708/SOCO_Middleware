@@ -41,22 +41,43 @@ const adminController = {
 
     verifyNameUnique: async (req, res, next) => {
         try {
-            let { full_Name } = req.query; // Use req.query instead of req.params
-    
-            if (!full_Name || typeof full_Name !== 'string' || !full_Name.trim()) {
-                throw new Error('Invalid name format. Must be a non-empty string.');
-            }
-    
-            full_Name = full_Name.trim(); // Trim spaces
-    
-            const existingUser = await registerModel.findOne({ full_Name });
-    
-            res.status(200).json({ isUnique: !existingUser }); // Returns true if unique, false otherwise
+          let { full_Name } = req.query;
+      
+          if (!full_Name || typeof full_Name !== 'string' || !full_Name.trim()) {
+            throw new Error('Invalid name format. Must be a non-empty string.');
+          }
+      
+          full_Name = full_Name.trim();
+      
+          const existingUser = await registerModel.findOne({
+            full_Name: { $regex: `^${full_Name}$`, $options: 'i' } // case-insensitive exact match
+          });
+      
+          res.status(200).json({ isUnique: !existingUser });
         } catch (error) {
-            console.error('Error in verifyNameUnique:', error);
-            next({ statuscode: 400, error: error.message });
+          console.error('Error in verifyNameUnique:', error);
+          next({ statuscode: 400, error: error.message });
         }
-    } ,
+      },
+      
+      checkMobileNumber: async (req, res, next) => {
+        try {
+          let { phn_number } = req.query;
+      
+          if (!phn_number || !/^\d{10}$/.test(phn_number.trim())) {
+            throw new Error('Invalid phone number. Must be exactly 10 digits.');
+          }
+      
+          phn_number = phn_number.trim();
+      
+          const existingUser = await registerModel.findOne({ phn_number });
+      
+          res.status(200).json({ isUnique: !existingUser });
+        } catch (error) {
+          console.error('Error in checkMobileNumber:', error);
+          next({ statuscode: 400, error: error.message });
+        }
+      },      
 
     // ==========
     verifyOtp: async (req, res, next) => {
