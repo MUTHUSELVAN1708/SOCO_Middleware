@@ -79,7 +79,7 @@ export const getLinkedAccounts = async (req, res) => {
                     name: ownerUser.full_Name,
                     imageUrl: ownerUser.profile_url || null,
                     email: ownerUser.email || null,
-                    status: "owner"
+                    status: "confirmed"
                 };
             }
         }
