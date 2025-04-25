@@ -2327,7 +2327,7 @@ const adminService = {
           const totalResults = await createPostModel.countDocuments({ userId: user_id });
           const totalPages = Math.ceil(totalResults / limit);
       
-          const posts = await createPostModel.find({ userId: user_id, isProductPost: false })
+          const posts = await createPostModel.find({ userId: user_id })
             .sort({ likesCount: -1 })
             .skip(skip)
             .limit(limit);
