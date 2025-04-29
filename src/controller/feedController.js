@@ -208,6 +208,8 @@ import FavoriteModel from "../model/favoriteModel.js";
 import BookmarkModel from "../model/BookmarkModel.js";
 import CommentModel from "../model/Comment.js";
 import UserInfo from "../model/UserInfo.js";
+import Follow from "../model/FollowModel.js";
+import businessregisterModel from "../model/BusinessModel.js";
 
 export const getDashboardFeed = async (req, res) => {
   try {
@@ -347,4 +349,106 @@ export const getDashboardFeed = async (req, res) => {
 };
 
 
-  
+export const suggestion = async (req, res) => {
+  try {
+    const userId = req.query.userId;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required in query params' });
+    }
+
+    // 1. Direct follows of the user
+    const directFollows = await Follow.find({ userId });
+    const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
+console.log(directlyFollowedIds,"directlyFollowedIds")
+    // Get their details
+    const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
+      .select('_id full_Name profile_url');
+console.log(directFollowsdetails,"directFollowsdetails")
+    // 2. Get second-degree follows (followed by those you follow)
+    const secondDegreeFollows = await Follow.find({ userId: { $in: directlyFollowedIds } });
+    const secondDegreeIds = secondDegreeFollows.map(f => f.followingId.toString());
+console.log(secondDegreeFollows,"secondDegreeFollows")
+    // 3. Filter out already followed users and yourself
+    const excludedIds = new Set([...directlyFollowedIds, userId]);
+    console.log(excludedIds,"excludedIds")
+    const recommendedIds = [...new Set(secondDegreeIds)];
+console.log(recommendedIds,"recommendedIds")
+    // 4. Separate user and business recommendations
+    const userRecommendations = await registerModel.find({ _id: { $in: recommendedIds } })
+      .select('_id full_Name profile_url username');
+
+    const foundUserIds = userRecommendations.map(user => user._id.toString());
+    const remainingIds = recommendedIds.filter(id => !foundUserIds.includes(id));
+
+    const businessRecommendations = await businessRegisterModel.find({ _id: { $in: remainingIds } })
+      .select('_id businessName brand_logo userId');
+      
+      console.log("User recommendations:", userRecommendations);
+console.log("Business recommendations:", businessRecommendations);
+
+    // 5. For each recommendation, get mutual followers and follower count
+    const formattedUserRecs = await Promise.all(userRecommendations.map(async (user) => {
+      // Get followers of this recommended user
+      const followers = await Follow.find({ followingId: user._id });
+      const followerIds = followers.map(f => f.userId.toString());
+// console.log(formattedUserRecs,"formattedUserRecs")
+      // Mutuals = intersection with your follows
+      const mutualIds = followerIds.filter(followerId => directlyFollowedIds.includes(followerId));
+console.log(mutualIds,"mutualIds")
+      // Get details of mutuals
+      const mutuals = await registerModel.find({ _id: { $in: mutualIds } })
+        .select('_id full_Name profile_url');
+
+      const mutualFollowers = mutuals.map(m => ({
+        id: m._id,
+        name: m.full_Name,
+        profileImage: m.profile_url
+      }));
+console.log(mutualFollowers,"mutualFollowers")
+      return {
+        id: user._id,
+        username: user.username || user.full_Name.toLowerCase().replace(/\s+/g, ''),
+        fullName: user.full_Name,
+        profileImage: user.profile_url,
+        mutualFollowers,
+        totalFollowers: followerIds.length
+      };
+    }));
+
+    const formattedBusinessRecs = await Promise.all(businessRecommendations.map(async (biz) => {
+      // Get followers of this business
+      const followers = await Follow.find({ followingId: biz.userId });
+      const followerIds = followers.map(f => f.userId.toString());
+
+      // Mutuals = intersection
+      const mutualIds = followerIds.filter(followerId => directlyFollowedIds.includes(followerId));
+
+      const mutuals = await registerModel.find({ _id: { $in: mutualIds } })
+        .select('_id full_Name profile_url');
+
+      const mutualFollowers = mutuals.map(m => ({
+        id: m._id,
+        name: m.full_Name,
+        profileImage: m.profile_url
+      }));
+
+      return {
+        id: biz._id,
+        username: biz.businessName.toLowerCase().replace(/\s+/g, ''),
+        fullName: biz.businessName,
+        profileImage: biz.brand_logo,
+        mutualFollowers,
+        totalFollowers: followerIds.length
+      };
+    }));
+
+    // Combine and return
+    const combined = [...formattedUserRecs, ...formattedBusinessRecs];
+
+    res.status(200).json(combined);
+  } catch (error) {
+    console.error('Error fetching recommendations:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

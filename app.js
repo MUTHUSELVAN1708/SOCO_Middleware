@@ -20,7 +20,6 @@ import chatMessageRoutes from "./src/router/chatMessageRoutes.js";
 import linkAccountRoutes from "./src/router/linkAccountRouters.js";
 import notificationRoutes from "./src/router/notificationRoutes.js";
 import errorHandling from "./errorHandling.js";
-import likeRouter from "./src/router/likeRouter.js"
 // import  {initializeSocket} from "./socket.js";
 import chatSocket from "./src/service/chatSocket.js";
 // import redisService from "./src/service/redisService.js";
@@ -50,7 +49,7 @@ app.use('/preferenceRouter', PreferenceRouter);
 app.use("/messages", chatMessageRoutes);
 app.use("/link", linkAccountRoutes);
 app.use("/notification", notificationRoutes);
-app.use("/like", likeRouter);
+
 
 // Error Handling
 app.use(errorHandling);

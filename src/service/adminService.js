@@ -108,7 +108,7 @@ const adminService = {
                 lowerCaseAlphabets: false,
                 upperCaseAlphabets: false,
             });
-
+console.log(otp)
             const emailSent = await adminService.SendOTPEmail(email, otp);
             const existingOtpRecord = await otpModel.findOne({ email });
             if (existingOtpRecord) {
@@ -4470,24 +4470,26 @@ const adminService = {
     toggleFav: async (data) => {
         const { user_id, post_id, isBusinessAccount, isProduct } = data;
         try {
-            const existingLike = await FavoriteModel.findOne({ user_id, post_id });
-
-            if (existingLike) {
-                await FavoriteModel.findOneAndDelete({ user_id, post_id });
-                await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
-
-                return { message: "Removed from favorites", liked: false };
-            }
-
-            const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
-            await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
-
-            return { message: "Added to favorites", liked: true, data: newLike };
+          const existingLike = await FavoriteModel.findOne({ user_id, post_id });
+      
+          if (existingLike) {
+            await FavoriteModel.findOneAndDelete({ user_id, post_id });
+            await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
+            await registerModel.findByIdAndUpdate(user_id, { $pull: { likedPosts: post_id } }); // remove from user's likedPosts
+      
+            return { message: "Removed from favorites", liked: false };
+          }
+      
+          const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
+          await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
+          await registerModel.findByIdAndUpdate(user_id, { $addToSet: { likedPosts: post_id } }); // add to user's likedPosts (no duplicates)
+      
+          return { message: "Added to favorites", liked: true, data: newLike };
         } catch (error) {
-            throw new Error(error.message || "Something went wrong while processing your request.");
+          throw new Error(error.message || "Something went wrong while processing your request.");
         }
-    },
-
+      }
+,
 
     getUserFavorites: async (user_id, page = 1, limit = 15) => {
         try {
@@ -4507,7 +4509,7 @@ const adminService = {
             const totalFavorites = await FavoriteModel.countDocuments({ user_id });
 
             const posts = await createPostModel.find({ _id: { $in: postIds } })
-                .select("productId likesCount imageUrl thumbnailFile isVideo aspectRatio isBusinessPost isUserPost isProductPost viewsCount")
+                .select("productId likesCount mediaItems userName userAvatar thumbnailFile  caption isBusinessPost isUserPost isProductPost viewsCount")
                 .lean();
 
             return {
