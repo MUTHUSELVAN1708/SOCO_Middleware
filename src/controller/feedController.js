@@ -32,7 +32,7 @@
 //         const tracking = await trackingModel.findOne({ 
 //             user_id: new mongoose.Types.ObjectId(user_id) 
 //         });
-        
+
 //         const trackedPostIds = tracking?.sentPosts?.map(post => 
 //             new mongoose.Types.ObjectId(post.post_id)
 //         ) || [];
@@ -89,7 +89,7 @@
 //             .sort({ timestamp: -1, viewsCount: -1 })
 //             .limit(Math.ceil((limit - posts.length) * 0.35))
 //             .select(baseSelect);
-            
+
 //             posts = [...posts, ...locationPosts];
 //         }
 
@@ -108,7 +108,7 @@
 //             .sort({ viewsCount: -1, likesCount: -1 })
 //             .limit(limit - posts.length)
 //             .select(baseSelect);
-            
+
 //             posts = [...posts, ...trendingPosts];
 //         }
 
@@ -261,73 +261,73 @@ export const getDashboardFeed = async (req, res) => {
         }
 
         const formattedComments = await Promise.all(
-            topComments.map(async (comment) => {
-              const user = await UserInfo.findOne({ id: comment.userId }); // userId should exist on comment
-          
-              return {
-                commentId: comment._id.toString(),
-                id: comment._id.toString(),
-                content: comment.content,
-                createdAt: comment.createdAt,
-                userInfo: {
-                  name: user?.name || "",
-                  avatar: user?.avatarUrl || "",
-                },
-              };
-            })
-          );
+          topComments.map(async (comment) => {
+            const user = await UserInfo.findOne({ id: comment.userId }); // userId should exist on comment
 
-          return {
-            id: post._id.toString(),
-            username: post.userName,
-            userId: post.userId,
-            productId: post.productId,
-            isBusinessAccount: post.isBusinessAccount,
-            userAvatar: post.userAvatar,
-            caption: post.caption,
-            thumbnailUrl: post.thumbnailUrl,
-            likesCount: post.likesCount,
-            commentsCount: post.commentsCount,
-            viewsCount: post.viewsCount,
-            sharesCount: post.sharesCount,
-            rePostCount: post.rePostCount,
-            isRepost: post.isRepost,
-            isOwnPost: post.isOwnPost,
-            isProductPost: post.isProductPost,
-            mediaItems: post.mediaItems.map((media) => ({
-              url: media.url,
-              type: media.type,
-              thumbnailUrl: media.thumbnailUrl,
-              productName: media.productName,
-              price: media.price,
-              originalPrice: media.originalPrice,
-              hasDiscount: media.hasDiscount,
-            })),
-            repostDetails: post.repostDetails
-              ? {
-                  originalPostId: post.repostDetails.originalPostId?.toString() || "",
-                  originalUserId: post.repostDetails.originalUserId || "",
-                  originalUserName: post.repostDetails.originalUserName || "",
-                  originalUserAvatar: post.repostDetails.originalUserAvatar || "",
-                  originalCaption: post.repostDetails.originalCaption || "",
-                  originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
-                    url: media.url,
-                    type: media.type,
-                    thumbnailUrl: media.thumbnailUrl,
-                    productName: media.productName,
-                    price: media.price,
-                    originalPrice: media.originalPrice,
-                    hasDiscount: media.hasDiscount,
-                  })),
-                }
-              : null,
-            likes: post.likesCount,
-            comments: formattedComments,
-            timestamp: post.timestamp,
-            isFavorite,
-            isBookmarked,
-          };
-          
+            return {
+              commentId: comment._id.toString(),
+              id: comment._id.toString(),
+              content: comment.content,
+              createdAt: comment.createdAt,
+              userInfo: {
+                name: user?.name || "",
+                avatar: user?.avatarUrl || "",
+              },
+            };
+          })
+        );
+
+        return {
+          id: post._id.toString(),
+          username: post.userName,
+          userId: post.userId,
+          productId: post.productId,
+          isBusinessAccount: post.isBusinessAccount,
+          userAvatar: post.userAvatar,
+          caption: post.caption,
+          thumbnailUrl: post.thumbnailUrl,
+          likesCount: post.likesCount,
+          commentsCount: post.commentsCount,
+          viewsCount: post.viewsCount,
+          sharesCount: post.sharesCount,
+          rePostCount: post.rePostCount,
+          isRepost: post.isRepost,
+          isOwnPost: post.isOwnPost,
+          isProductPost: post.isProductPost,
+          mediaItems: post.mediaItems.map((media) => ({
+            url: media.url,
+            type: media.type,
+            thumbnailUrl: media.thumbnailUrl,
+            productName: media.productName,
+            price: media.price,
+            originalPrice: media.originalPrice,
+            hasDiscount: media.hasDiscount,
+          })),
+          repostDetails: post.repostDetails
+            ? {
+              originalPostId: post.repostDetails.originalPostId?.toString() || "",
+              originalUserId: post.repostDetails.originalUserId || "",
+              originalUserName: post.repostDetails.originalUserName || "",
+              originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+              originalCaption: post.repostDetails.originalCaption || "",
+              originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
+                url: media.url,
+                type: media.type,
+                thumbnailUrl: media.thumbnailUrl,
+                productName: media.productName,
+                price: media.price,
+                originalPrice: media.originalPrice,
+                hasDiscount: media.hasDiscount,
+              })),
+            }
+            : null,
+          likes: post.likesCount,
+          comments: formattedComments,
+          timestamp: post.timestamp,
+          isFavorite,
+          isBookmarked,
+        };
+
       })
     );
 
@@ -349,106 +349,212 @@ export const getDashboardFeed = async (req, res) => {
 };
 
 
+// export const suggestion = async (req, res) => {
+//   try {
+//     const userId = req.query.userId;
+
+//     if (!userId) {
+//       return res.status(400).json({ message: 'User ID is required in query params' });
+//     }
+
+//     const directFollows = await Follow.find({ userId });
+//     const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
+
+//     let directFollowsdetails = [];
+//     if (directlyFollowedIds.length > 0) {
+//       directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
+//         .limit(10)
+//         .select('_id full_Name profile_url');
+//     }
+
+//     if (directlyFollowedIds.length === 0) {
+//       // If user doesn't follow anyone, return some business accounts
+//       const businessSuggestions = await businessregisterModel.find({ _id: { $ne: userId } }) 
+//       .sort({ followerCount: -1 })
+//         .limit(10)
+//         .select('_id businessName brand_logo followerCount user_id');
+//       console.log(businessSuggestions, "businessSuggestions")
+//       const formattedBusinessRecs = businessSuggestions.map(biz => ({
+//         _id: biz._id,
+//         name: biz.businessName,
+//         followerCount: biz.followerCount,
+//         profile: biz.brand_logo, 
+//         userId: biz.user_id,
+//         type: 'business'
+//       }));
+
+//       return res.status(200).json({
+//         message: 'Suggested business accounts (no follows yet)',
+//         directFollowsdetails: [],
+//         recommendations: formattedBusinessRecs
+//       });
+//     }
+
+//     // Step 2: Get second-degree follows
+//     const secondDegreeFollows = await Follow.find({ userId: { $in: directlyFollowedIds } });
+//     const secondDegreeIds = secondDegreeFollows.map(f => f.followingId.toString());
+
+//     // Step 3: Exclude already followed and self
+//     const excludedIds = new Set([...directlyFollowedIds, userId]);
+//     const recommendedIds = [...new Set(secondDegreeIds.filter(id => !excludedIds.has(id)))];
+
+//     // Step 4a: Get user-based recommendations
+//     const userRecommendations = await registerModel.find({ _id: { $in: recommendedIds } })
+//       .select('_id full_Name profile_url');
+
+//     const foundUserIds = userRecommendations.map(user => user._id.toString());
+
+//     const formattedUserRecs = userRecommendations.map(user => ({
+//       _id: user._id,
+//       name: user.full_Name,
+//       profile: user.profile_url,
+//       type: 'user'
+//     }));
+
+//     // Step 4b: Get remaining IDs not in register
+//     const remainingIds = recommendedIds.filter(id => !foundUserIds.includes(id));
+
+//     // Step 4c: Check remaining IDs in businessModel
+//     const businessRecommendations = await businessregisterModel.find({ _id: { $in: remainingIds } })
+//       .select('_id businessName brand_logo followerCount userId');
+
+//     const formattedBusinessRecs = businessRecommendations.map(biz => ({
+//       _id: biz._id,
+//       name: biz.businessName,
+//       followerCount:biz.followerCount,
+//       profile: biz.brand_logo,
+//       userId: biz.user_id,
+//       type: 'business'
+//     }));
+
+//     const combinedRecommendations = [...formattedUserRecs, ...formattedBusinessRecs];
+
+//     res.status(200).json({
+//       message: 'Recommended users fetched successfully',
+//       directFollowsdetails,
+//       recommendations: combinedRecommendations
+//     });
+//   } catch (error) {
+//     console.error('Error fetching recommendations:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// };
+
+
 export const suggestion = async (req, res) => {
   try {
     const userId = req.query.userId;
+    const type = req.query.type;
 
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required in query params' });
+    if (!userId || !type) {
+      return res.status(400).json({ message: 'User ID and type are required in query params' });
     }
 
-    // 1. Direct follows of the user
-    const directFollows = await Follow.find({ userId });
-    const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
-console.log(directlyFollowedIds,"directlyFollowedIds")
-    // Get their details
-    const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
-      .select('_id full_Name profile_url');
-console.log(directFollowsdetails,"directFollowsdetails")
-    // 2. Get second-degree follows (followed by those you follow)
-    const secondDegreeFollows = await Follow.find({ userId: { $in: directlyFollowedIds } });
-    const secondDegreeIds = secondDegreeFollows.map(f => f.followingId.toString());
-console.log(secondDegreeFollows,"secondDegreeFollows")
-    // 3. Filter out already followed users and yourself
-    const excludedIds = new Set([...directlyFollowedIds, userId]);
-    console.log(excludedIds,"excludedIds")
-    const recommendedIds = [...new Set(secondDegreeIds)];
-console.log(recommendedIds,"recommendedIds")
-    // 4. Separate user and business recommendations
-    const userRecommendations = await registerModel.find({ _id: { $in: recommendedIds } })
-      .select('_id full_Name profile_url username');
+    if (type === 'user') {
+      const directFollows = await Follow.find({ userId });
+      const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
 
-    const foundUserIds = userRecommendations.map(user => user._id.toString());
-    const remainingIds = recommendedIds.filter(id => !foundUserIds.includes(id));
-
-    const businessRecommendations = await businessRegisterModel.find({ _id: { $in: remainingIds } })
-      .select('_id businessName brand_logo userId');
-      
-      console.log("User recommendations:", userRecommendations);
-console.log("Business recommendations:", businessRecommendations);
-
-    // 5. For each recommendation, get mutual followers and follower count
-    const formattedUserRecs = await Promise.all(userRecommendations.map(async (user) => {
-      // Get followers of this recommended user
-      const followers = await Follow.find({ followingId: user._id });
-      const followerIds = followers.map(f => f.userId.toString());
-// console.log(formattedUserRecs,"formattedUserRecs")
-      // Mutuals = intersection with your follows
-      const mutualIds = followerIds.filter(followerId => directlyFollowedIds.includes(followerId));
-console.log(mutualIds,"mutualIds")
-      // Get details of mutuals
-      const mutuals = await registerModel.find({ _id: { $in: mutualIds } })
+      const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
         .select('_id full_Name profile_url');
 
-      const mutualFollowers = mutuals.map(m => ({
-        id: m._id,
-        name: m.full_Name,
-        profileImage: m.profile_url
+      const followsByDirects = await Follow.find({ userId: { $in: directlyFollowedIds } });
+
+      const bizToFollowerMap = {};
+      followsByDirects.forEach(f => {
+        const followeeId = f.followingId.toString();
+        const followerId = f.userId.toString();
+
+        if (!bizToFollowerMap[followeeId]) {
+          bizToFollowerMap[followeeId] = new Set();
+        }
+        bizToFollowerMap[followeeId].add(followerId);
+      });
+
+      const businessIds = Object.keys(bizToFollowerMap);
+      let recommendations = [];
+
+      if (businessIds.length > 0) {
+        const businessesFollowed = await businessregisterModel.find({ _id: { $in: businessIds } }).limit(10)
+          .select('_id businessName brand_logo followerCount user_id');
+
+        recommendations = businessesFollowed.map(biz => {
+          const mutualFollowerIds = Array.from(bizToFollowerMap[biz._id.toString()] || []);
+          const mutualFollowers = directFollowsdetails.filter(d =>
+            mutualFollowerIds.includes(d._id.toString())
+          );
+
+          return {
+            _id: biz._id,
+            name: biz.businessName,
+            profile: biz.brand_logo,
+            followerCount: biz.followerCount,
+            userId: biz.user_id,
+            type: 'business',
+            mutualFollowers
+          };
+        });
+      } else {
+        const allBusinesses = await businessregisterModel.find({ _id: { $ne: userId } })
+          .sort({ followerCount: -1 })
+          .limit(10)
+          .select('_id businessName brand_logo followerCount user_id');
+
+        recommendations = allBusinesses.map(biz => ({
+          _id: biz._id,
+          name: biz.businessName,
+          profile: biz.brand_logo,
+          followerCount: biz.followerCount,
+          userId: biz.user_id,
+          type: 'business',
+          mutualFollowers: []
+        }));
+      }
+
+      return res.status(200).json({
+        message: 'Recommended business accounts fetched successfully',
+        directFollowsdetails,
+        recommendations
+      });
+    }
+
+    else if (type === 'business') {
+      const currentBusiness = await businessregisterModel.findById(userId).select('natureOfBusiness');
+
+      if (!currentBusiness) {
+        return res.status(404).json({ message: 'Business not found' });
+      }
+
+      // You can customize the logic here for "related" businesses, e.g., by category
+      const relatedBusinesses = await businessregisterModel.find({
+        _id: { $ne: userId },
+        natureOfBusiness: currentBusiness.natureOfBusiness // example field to find related businesses
+      })
+        .sort({ followerCount: -1 })
+        .limit(10)
+        .select('_id businessName brand_logo followerCount user_id');
+
+      const recommendations = relatedBusinesses.map(biz => ({
+        _id: biz._id,
+        name: biz.businessName,
+        profile: biz.brand_logo,
+        followerCount: biz.followerCount,
+        userId: biz.user_id,
+        type: 'business',
+        mutualFollowers: [] // not applicable for business-type suggestions
       }));
-console.log(mutualFollowers,"mutualFollowers")
-      return {
-        id: user._id,
-        username: user.username || user.full_Name.toLowerCase().replace(/\s+/g, ''),
-        fullName: user.full_Name,
-        profileImage: user.profile_url,
-        mutualFollowers,
-        totalFollowers: followerIds.length
-      };
-    }));
 
-    const formattedBusinessRecs = await Promise.all(businessRecommendations.map(async (biz) => {
-      // Get followers of this business
-      const followers = await Follow.find({ followingId: biz.userId });
-      const followerIds = followers.map(f => f.userId.toString());
-
-      // Mutuals = intersection
-      const mutualIds = followerIds.filter(followerId => directlyFollowedIds.includes(followerId));
-
-      const mutuals = await registerModel.find({ _id: { $in: mutualIds } })
-        .select('_id full_Name profile_url');
-
-      const mutualFollowers = mutuals.map(m => ({
-        id: m._id,
-        name: m.full_Name,
-        profileImage: m.profile_url
-      }));
-
-      return {
-        id: biz._id,
-        username: biz.businessName.toLowerCase().replace(/\s+/g, ''),
-        fullName: biz.businessName,
-        profileImage: biz.brand_logo,
-        mutualFollowers,
-        totalFollowers: followerIds.length
-      };
-    }));
-
-    // Combine and return
-    const combined = [...formattedUserRecs, ...formattedBusinessRecs];
-
-    res.status(200).json(combined);
+      return res.status(200).json({
+        message: 'Recommended related businesses fetched successfully',
+        recommendations
+      });
+    } else {
+      return res.status(400).json({ message: 'Invalid type parameter. Must be "user" or "business".' });
+    }
   } catch (error) {
-    console.error('Error fetching recommendations:', error);
+    console.error('Error fetching business recommendations:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+
+
