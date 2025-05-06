@@ -375,3 +375,177 @@ export const getProductDetail = async (req, res) => {
       );
     }
   };
+
+  export const getProductCategories = async (req, res) => {
+    const { createdBy } = req.query;
+  
+    try {
+      const products = await Product.find({ createdBy }).select("basicInfo.categories images");
+  
+      const categoryMap = {};
+  
+      products.forEach(product => {
+        const categories = product.basicInfo?.categories || [];
+        const image = product.images?.[0] || null;
+  
+        categories.forEach(mainCategory => {
+          if (!categoryMap[mainCategory]) {
+            categoryMap[mainCategory] = image;
+          }
+        });
+      });
+  
+      const formattedCategories = Object.keys(categoryMap).map(category => ({
+        category,
+        image: categoryMap[category]
+      }));
+  
+      // Add default "All" category at the beginning
+      formattedCategories.unshift({
+        category: "All",
+        image: "" // Or use a placeholder image like "/default/all.png"
+      });
+  
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: "Categories fetched successfully",
+        categories: formattedCategories
+      });
+  
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return res.status(500).json({
+        success: false,
+        status: 500,
+        message: error.message
+      });
+    }
+  };
+
+
+  export const getProduct = async (req, res) => {
+    try {
+      const { 
+        category, 
+        sortBy, 
+        color, 
+        discount, 
+        priceRange, 
+        createdBy 
+      } = req.query;
+  
+      // Ensure the createdBy is passed
+      if (!createdBy) {
+        return res.status(400).json({ message: "createdBy is required." });
+      }
+  
+      // Convert createdBy to ObjectId if it's not already
+      const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
+  
+      // Step 1: Start with match for creator only
+      const pipeline = [
+        {
+          $match: {
+            createdBy: createdByObjectId
+          }
+        }
+      ];
+
+      // Debugging: Check the pipeline
+      console.log("Aggregation Pipeline (Step 1): ", pipeline);
+  
+      // Optional: Apply discount filter if provided
+      if (discount) {
+        pipeline.push({
+          $match: {
+            $expr: {
+              $gte: [{ $toDouble: "$pricing.discount" }, Number(discount)]
+            }
+          }
+        });
+      }
+  
+      // Optional: Apply additional filters (category, color)
+      const additionalFilter = {};
+  
+      if (category) {
+        additionalFilter["basicInfo.categories." + category] = { $exists: true };
+      }
+  
+      if (color) {
+        additionalFilter["variants.color"] = color;
+      }
+  
+      if (Object.keys(additionalFilter).length > 0) {
+        pipeline.push({ $match: additionalFilter });
+      }
+  
+      // Project fields to be returned
+      pipeline.push({
+        $project: {
+          image: { $arrayElemAt: ["$images", 0] },
+          stock: "$availability.inStock",
+          stockQuantity: "$availability.stockQuantity",
+          amount: { $toDouble: "$pricing.salePrice" },
+          brand: "$basicInfo.brand",
+          productTitle: "$basicInfo.productTitle",
+          createdAt: 1,
+          discount: "$pricing.discount",
+          postCommentsCount: 1,
+          "ratings.averageRating": 1
+        }
+      });
+
+      // Apply price range if provided
+      if (priceRange) {
+        const [minPrice, maxPrice] = priceRange.split(',').map(Number);
+        pipeline.push({
+          $match: {
+            $expr: {
+              $and: [
+                { $gte: ["$amount", minPrice] },
+                { $lte: ["$amount", maxPrice] }
+              ]
+            }
+          }
+        });
+        let sort = {};
+        switch (sortBy) {
+          case 'lowToHigh':
+            sort = { amount: 1 };
+            break;
+          case 'highToLow':
+            sort = { amount: -1 };
+            break;
+          case 'whatsNew':
+            sort = { createdAt: -1 };
+            break;
+          case 'discount':
+            sort = { discount: -1 };
+            break;
+          case 'popularity':
+            sort = { postCommentsCount: -1, 'ratings.averageRating': -1 };
+            break;
+          default:
+            sort = { createdAt: -1 };
+        }
+    
+        pipeline.push({ $sort: sort });
+    
+        // Debugging: Check the final pipeline before aggregation
+        console.log("Final Aggregation Pipeline: ", pipeline);
+    
+        // Execute aggregation
+        const products = await Product.aggregate(pipeline);
+    
+        // Debugging: Check if any products are returned
+        console.log("Returned Products: ", products);
+    
+        res.status(200).json({ products });
+    
+      }} catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Something went wrong', error });
+      }
+    };
