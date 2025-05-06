@@ -25,6 +25,10 @@ const BusinessregisterSchema = new mongoose.Schema(
     needPermissionForFollowing: { type: Boolean, default: false },
     friendPermission: { type: Boolean, default: false },
     isThereAnyNotification: { type: Boolean, default: false },
+    isVerified: {
+      type: Boolean,
+      required: false
+    },
     ownerName: { type: String, required: false },
     businessAddress: { type: String, required: false },
     businessCity: { type: String, required: false },
