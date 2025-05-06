@@ -357,7 +357,6 @@ export const suggestion = async (req, res) => {
   try {
     const userId = req.query.userId;
     const type = req.query.type;
-
     const MAX_LIMIT = 10;
 
     if (!userId || !type) {
@@ -365,19 +364,25 @@ export const suggestion = async (req, res) => {
     }
 
     if (type === 'user') {
+      // Fetch followed accounts
       const directFollows = await Follow.find({ userId });
       const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
 
-      const directFollowsdetails = await registerModel.find({ _id: { $in: directlyFollowedIds } })
+      // Get user accounts followed
+      const followedUsers = await registerModel.find({ _id: { $in: directlyFollowedIds } })
         .select('_id full_Name profile_url');
+      const followedUserIds = followedUsers.map(u => u._id.toString());
 
+      // Determine which followed accounts are businesses
+      const followedBusinessIds = directlyFollowedIds.filter(id => !followedUserIds.includes(id));
+
+      // Get followings of followed accounts (second-degree follows)
       const followsByDirects = await Follow.find({ userId: { $in: directlyFollowedIds } });
 
       const bizToFollowerMap = {};
       followsByDirects.forEach(f => {
         const followeeId = f.followingId.toString();
         const followerId = f.userId.toString();
-
         if (!bizToFollowerMap[followeeId]) {
           bizToFollowerMap[followeeId] = new Set();
         }
@@ -387,16 +392,23 @@ export const suggestion = async (req, res) => {
       const businessIds = Object.keys(bizToFollowerMap);
       let recommendations = [];
 
+      // Try to recommend mutual business follows first
       if (businessIds.length > 0) {
-        const businessesFollowed = await businessRegisterModel.find({ _id: { $in: businessIds } })
+        const businessesFollowed = await businessRegisterModel.find({
+          _id: { $in: businessIds, $nin: followedBusinessIds }
+        })
           .limit(MAX_LIMIT)
           .select('_id businessName brand_logo followerCount user_id');
 
         recommendations = businessesFollowed.map(biz => {
           const mutualFollowerIds = Array.from(bizToFollowerMap[biz._id.toString()] || []);
-          const mutualFollowers = directFollowsdetails.filter(d =>
-            mutualFollowerIds.includes(d._id.toString())
-          );
+          const mutualFollowers = followedUsers
+            .filter(d => mutualFollowerIds.includes(d._id.toString()))
+            .map(mf => ({
+              id: mf._id,
+              name: mf.full_Name,
+              profileImage: mf.profile_url
+            }));
 
           return {
             id: biz._id,
@@ -408,13 +420,21 @@ export const suggestion = async (req, res) => {
             mutualFollowers
           };
         });
-      } else {
-        const allBusinesses = await businessRegisterModel.find({ _id: { $ne: userId } })
+      }
+
+      // If no mutuals found or not enough, fallback to top businesses
+      if (recommendations.length < MAX_LIMIT) {
+        const alreadyRecommendedIds = recommendations.map(r => r.id.toString());
+        const excludeIds = [...followedBusinessIds, ...alreadyRecommendedIds, userId];
+
+        const additionalBusinesses = await businessRegisterModel.find({
+          _id: { $nin: excludeIds }
+        })
           .sort({ followerCount: -1 })
-          .limit(MAX_LIMIT)
+          .limit(MAX_LIMIT - recommendations.length)
           .select('_id businessName brand_logo followerCount user_id');
 
-        recommendations = allBusinesses.map(biz => ({
+        const fallbackRecs = additionalBusinesses.map(biz => ({
           id: biz._id,
           username: biz.businessName,
           profileImage: biz.brand_logo,
@@ -423,11 +443,13 @@ export const suggestion = async (req, res) => {
           type: 'business',
           mutualFollowers: []
         }));
+
+        recommendations.push(...fallbackRecs);
       }
 
       return res.status(200).json({
         message: 'Recommended business accounts fetched successfully',
-        directFollowsdetails,
+        directFollowsdetails: followedUsers,
         recommendations
       });
     }
@@ -439,29 +461,98 @@ export const suggestion = async (req, res) => {
         return res.status(404).json({ message: 'Business not found' });
       }
 
-      const relatedBusinesses = await businessRegisterModel.find({
-        _id: { $ne: userId },
-        natureOfBusiness: currentBusiness.natureOfBusiness
-      })
-        .sort({ followerCount: -1 })
-        .limit(MAX_LIMIT)
-        .select('_id businessName brand_logo followerCount user_id');
+      const MAX_LIMIT = 10;
+      const followed = await Follow.find({ userId });
+      const followedIds = followed.map(f => f.followingId.toString());
 
-      const recommendations = relatedBusinesses.map(biz => ({
-        id: biz._id,
-        username: biz.businessName,
-        profileImage: biz.brand_logo,
-        totalFollowers: biz.followerCount,
-        userId: biz.user_id,
-        type: 'business',
-        mutualFollowers: []
-      }));
+      const followers = await Follow.find({ followingId: userId });
+      const followerBusinessIds = followers.map(f => f.userId.toString());
+
+      const secondDegreeFollows = await Follow.find({
+        userId: { $in: followerBusinessIds }
+      });
+
+      const bizToFollowerMap = {};
+      secondDegreeFollows.forEach(f => {
+        const followeeId = f.followingId.toString();
+        const followerId = f.userId.toString();
+        if (!bizToFollowerMap[followeeId]) {
+          bizToFollowerMap[followeeId] = new Set();
+        }
+        bizToFollowerMap[followeeId].add(followerId);
+      });
+
+      const mutualBizIds = Object.keys(bizToFollowerMap).filter(
+        id => id !== userId && !followedIds.includes(id)
+      );
+
+      let recommendations = [];
+
+      if (mutualBizIds.length > 0) {
+        const mutualBusinesses = await businessRegisterModel.find({
+          _id: { $in: mutualBizIds }
+        })
+          .limit(MAX_LIMIT)
+          .select('_id businessName brand_logo cover_img followerCount user_id');
+
+        recommendations = await Promise.all(mutualBusinesses.map(async (biz) => {
+          const mutualFollowerIds = Array.from(bizToFollowerMap[biz._id.toString()] || []);
+
+          const mutualFollowerDetails = await businessRegisterModel.find({
+            _id: { $in: mutualFollowerIds }
+          }).select('_id businessName brand_logo cover_img user_id');
+
+          return {
+            id: biz._id,
+            username: biz.businessName,
+            profileImage: biz.brand_logo,
+
+            totalFollowers: biz.followerCount,
+            userId: biz.user_id,
+            type: 'business',
+            mutualFollowers: mutualFollowerDetails.map(f => ({
+              id: f._id,
+              name: f.businessName,
+              profileImage: f.brand_logo
+            }))
+          };
+        }));
+
+      }
+
+      if (recommendations.length < MAX_LIMIT) {
+        const alreadyRecommendedIds = recommendations.map(r => r.id.toString());
+        const excludeIds = [...followedIds, ...alreadyRecommendedIds, userId];
+        console.log(alreadyRecommendedIds, excludeIds, "kkkkk")
+        const relatedBusinesses = await businessRegisterModel.find({
+          _id: { $nin: excludeIds },
+          natureOfBusiness: currentBusiness.natureOfBusiness
+        })
+          .sort({ followerCount: -1 })
+          .limit(MAX_LIMIT - recommendations.length)
+          .select('_id businessName brand_logo cover_img followerCount user_id');
+        console.log(relatedBusinesses, "relatedBusinesses")
+        const fallbackRecs = relatedBusinesses.map(biz => ({
+          id: biz._id,
+          username: biz.businessName,
+          profileImage: biz.brand_logo,
+          coverImage: biz.cover_img,
+          totalFollowers: biz.followerCount,
+          userId: biz.user_id,
+          type: 'business',
+          mutualFollowers: []
+        }));
+
+        recommendations.push(...fallbackRecs);
+      }
 
       return res.status(200).json({
         message: 'Recommended related businesses fetched successfully',
         recommendations
       });
-    } else {
+    }
+
+    else {
       return res.status(400).json({ message: 'Invalid type parameter. Must be "user" or "business".' });
     }
   } catch (error) {
