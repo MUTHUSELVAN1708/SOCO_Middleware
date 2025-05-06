@@ -45,124 +45,147 @@ const formatResponse = (success, message, data = null, errors = null) => {
 };
 
 
- export const getProductDetail = async (req, res) => {
-    try {
-      const { productId } = req.params;
-  
-      if (!productId) {
-        return res.status(400).json(
-          formatResponse(false, ERROR_MESSAGES.PRODUCT.NOT_FOUND)
-        );
-      }
-  
-      const product = await Product.findById(productId).exec();
-  
-      if (!product) {
-        return res.status(404).json(
-          formatResponse(false, ERROR_MESSAGES.PRODUCT.NOT_FOUND)
-        );
-      }
-  
-      // Transform reviews into the expected format
-      const transformedReviews = product.ratings.reviews.map(review => ({
-        id: review.id,
-        userName: review.userName,
-        userAvatar: review.userAvatar || null,
-        rating: review.rating,
-        review: review.review,
-        datePosted: review.datePosted,
-        isVerifiedPurchase: review.isVerifiedPurchase,
-        reviewImages: review.reviewImages || [],
-        helpfulCount: review.helpfulCount,
-        isEdited: review.isEdited,
-        replies: review.replies.map(reply => ({
-          id: reply.id,
-          userName: reply.userName,
-          userAvatar: reply.userAvatar || null,
-          reply: reply.reply,
-          datePosted: reply.datePosted,
-          isSellerResponse: reply.isSellerResponse,
-          isEdited: reply.isEdited
-        }))
-      }));
-  
-      // Transform rating distribution into the expected format
-      const ratingDistribution = {};
-      product.ratings.ratingDistribution.forEach((value, key) => {
-        ratingDistribution[key] = value;
-      });
-  
-      const productDetailResponse = {
-        productTitle: product.basicInfo.productTitle,
-        brand: product.basicInfo.brand,
-        categories: product.basicInfo.categories,
-        tags: product.basicInfo.tags || [],
-        images: product.images,
-        unit:product.unit,
-        description: product.descriptionHighlights.description,
-        highlights: product.descriptionHighlights.highlights,
-        pricing: {
-          regularPrice: product.pricing.regularPrice.toString(),
-          salePrice: product.pricing.salePrice ? product.pricing.salePrice.toString() : null,
-          discount: product.pricing.discount,
-          currency: product.pricing.currency === 'INR' ? '₹' : product.pricing.currency,
-          gstIncluded: product.pricing.gstDetails.gstIncluded,
-          gstPercentage: product.pricing.gstDetails.gstPercentage,
-        },
-        availability: {
-          inStock: product.availability.inStock,
-          stockQuantity: product.availability.stockQuantity,
-          deliveryTime: product.availability.deliveryTime,
-          availabilityRegions: product.availability.availabilityRegions,
-          codAvailable: product.availability.codAvailable,
-          returnPolicy: {
-            returnApplicable: product.availability.returnPolicy.returnApplicable,
-            returnWindow: product.availability.returnPolicy.returnWindow,
-            returnFees: product.availability.returnPolicy.returnFees,
-          },
-        },
-        variants: product.variants.map(variant => ({
-          id: variant.id,
-          color: variant.color,
-          colorCode: variant.colorCode,
-          variant: variant.variant,
-          quantity: variant.quantity,
-          sku: variant.sku,
-          variantImages: variant.variantImages || [],
-        })),
-        specifications: product.specifications.map(spec => ({
-          key: spec.key,
-          value: spec.value,
-        })),
-        ratings: {
-          averageRating: product.ratings.averageRating,
-          totalReviews: product.ratings.totalReviews,
-          ratingDistribution,
-          reviews: transformedReviews,
-        },
-        crossSellProducts: product.crossSellProducts.map(crossSell => ({
-          productId: crossSell.productId,
-          productTitle: crossSell.productTitle,
-          price: crossSell.price,
-          imageUrl:crossSell.imageUrl,
-          currency: crossSell.currency === 'INR' ? '₹' : crossSell.currency,
-        })),
-      };
-  
-      return res.status(200).json(
-        formatResponse(true, 'Product details fetched successfully', productDetailResponse)
-      );
-    } catch (error) {
-      console.error('Error fetching product details:', error);
-  
-      return res.status(500).json(
-        formatResponse(false, ERROR_MESSAGES.SYSTEM.SERVER_ERROR, null, [{
-          code: error.code || 'UNKNOWN_ERROR',
-          message: error.message,
-        }])
+export const getProductDetail = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json(
+        formatResponse(false, ERROR_MESSAGES.PRODUCT.NOT_FOUND)
       );
     }
-  };
+
+    const product = await Product.findById(productId)
+      .populate('createdBy') // populates business details from businessRegister
+      .exec();
+
+    if (!product) {
+      return res.status(404).json(
+        formatResponse(false, ERROR_MESSAGES.PRODUCT.NOT_FOUND)
+      );
+    }
+
+    const business = product.createdBy;
+
+    const transformedReviews = product.ratings.reviews.map(review => ({
+      id: review.id,
+      userName: review.userName,
+      userAvatar: review.userAvatar || null,
+      rating: review.rating,
+      review: review.review,
+      datePosted: review.datePosted,
+      isVerifiedPurchase: review.isVerifiedPurchase,
+      reviewImages: review.reviewImages || [],
+      helpfulCount: review.helpfulCount,
+      isEdited: review.isEdited,
+      replies: review.replies.map(reply => ({
+        id: reply.id,
+        userName: reply.userName,
+        userAvatar: reply.userAvatar || null,
+        reply: reply.reply,
+        datePosted: reply.datePosted,
+        isSellerResponse: reply.isSellerResponse,
+        isEdited: reply.isEdited
+      }))
+    }));
+
+    const ratingDistribution = {};
+    product.ratings.ratingDistribution.forEach((value, key) => {
+      ratingDistribution[key] = value;
+    });
+
+    const gstIncluded = product.pricing.gstDetails.gstIncluded;
+    const gstPercentage = product.pricing.gstDetails.gstPercentage || 0;
+
+    const additionalTaxes = product.pricing.additionalTaxes || [];
+
+    const totalAdditionalTax = additionalTaxes.reduce((sum, tax) => {
+      return sum + (tax.percentage || 0);
+    }, 0);
+
+    const totalTaxPercentage = gstPercentage + totalAdditionalTax;
+
+    const pricing = {
+      regularPrice: product.pricing.regularPrice?.toString() || null,
+      salePrice: product.pricing.salePrice?.toString() || null,
+      discount: product.pricing.discount,
+      currency: product.pricing.currency === 'INR' ? '₹' : product.pricing.currency,
+      gstIncluded,
+      gstPercentage,
+      additionalTaxes,
+      totalTaxPercentage,
+    };
+
+
+    const productDetailResponse = {
+      productTitle: product.basicInfo.productTitle,
+      businessName: business?.businessName || null,
+      businessAddress: business?.businessAddress || null,
+      BusinessLogo: business?.brand_logo || null,
+      createdBy:product.createdBy._id || null,
+      brand: product.basicInfo.brand,
+      categories: product.basicInfo.categories,
+      tags: product.basicInfo.tags || [],
+      images: product.images,
+      unit: product.unit,
+      description: product.descriptionHighlights.description,
+      highlights: product.descriptionHighlights.highlights,
+      pricing: pricing,
+      availability: {
+        inStock: product.availability.inStock,
+        stockQuantity: product.availability.stockQuantity,
+        deliveryTime: product.availability.deliveryTime,
+        availabilityRegions: product.availability.availabilityRegions,
+        codAvailable: product.availability.codAvailable,
+        returnPolicy: {
+          returnApplicable: product.availability.returnPolicy.returnApplicable,
+          returnWindow: product.availability.returnPolicy.returnWindow,
+          returnFees: product.availability.returnPolicy.returnFees,
+        },
+      },
+      variants: product.variants.map(variant => ({
+        id: variant.id,
+        color: variant.color,
+        colorCode: variant.colorCode,
+        variant: variant.variant,
+        quantity: variant.quantity,
+        sku: variant.sku,
+        variantImages: variant.variantImages || [],
+      })),
+      specifications: product.specifications.map(spec => ({
+        key: spec.key,
+        value: spec.value,
+      })),
+      ratings: {
+        averageRating: product.ratings.averageRating,
+        totalReviews: product.ratings.totalReviews,
+        ratingDistribution,
+        reviews: transformedReviews,
+      },
+      crossSellProducts: product.crossSellProducts.map(crossSell => ({
+        productId: crossSell.productId,
+        productTitle: crossSell.productTitle,
+        price: crossSell.price,
+        imageUrl: crossSell.imageUrl,
+        currency: crossSell.currency === 'INR' ? '₹' : crossSell.currency,
+      })),
+    };
+
+    return res.status(200).json(
+      formatResponse(true, 'Product details fetched successfully', productDetailResponse)
+    );
+  } catch (error) {
+    console.error('Error fetching product details:', error);
+
+    return res.status(500).json(
+      formatResponse(false, ERROR_MESSAGES.SYSTEM.SERVER_ERROR, null, [{
+        code: error.code || 'UNKNOWN_ERROR',
+        message: error.message,
+      }])
+    );
+  }
+};
+
 
   export const createAndUpdateProduct = async (req, res) => {
     try {
