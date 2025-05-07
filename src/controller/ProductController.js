@@ -549,3 +549,151 @@ export const getProductDetail = async (req, res) => {
         res.status(500).json({ message: 'Something went wrong', error });
       }
     };
+
+
+    const getCategoriesFacet = () => [
+      { $project: { categories: { $objectToArray: "$basicInfo.categories" } } },
+      { $unwind: "$categories" },
+      { $unwind: "$categories.v" },
+      { $group: { _id: null, values: { $addToSet: "$categories.v" } } },
+      { $project: { _id: 0, values: 1 } }
+    ];
+    
+    const getTagsFacet = () => [
+      { $unwind: "$basicInfo.tags" },
+      { $group: { _id: "$basicInfo.tags" } },
+      { $project: { _id: 0, value: "$_id" } }
+    ];
+    
+    const getPriceRangeFacet = () => [
+      { $project: { price: { $toDouble: "$pricing.salePrice" } } },
+      {
+        $group: {
+          _id: null,
+          min: { $min: "$price" },
+          max: { $max: "$price" }
+        }
+      },
+      { $project: { _id: 0, min: 1, max: 1 } }
+    ];
+    
+    const getDiscountRangeFacet = () => [
+      { $project: { discount: { $toDouble: "$pricing.discount" } } },
+      {
+        $group: {
+          _id: null,
+          min: { $min: "$discount" },
+          max: { $max: "$discount" }
+        }
+      },
+      { $project: { _id: 0, min: 1, max: 1 } }
+    ];
+    
+    const getBrandFiltersFacet = () => [
+      {
+        $group: {
+          _id: "$basicInfo.brand",
+          colors: { $addToSet: "$variants.color" },
+          prices: { $addToSet: { $toDouble: "$pricing.salePrice" } },
+          discounts: { $addToSet: { $toDouble: "$pricing.discount" } }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id",
+          colors: {
+            $reduce: {
+              input: "$colors",
+              initialValue: [],
+              in: { $setUnion: ["$$value", "$$this"] }
+            }
+          },
+          priceRange: {
+            min: { $min: "$prices" },
+            max: { $max: "$prices" }
+          },
+          discountRange: {
+            min: { $min: "$discounts" },
+            max: { $max: "$discounts" }
+          }
+        }
+      }
+    ];
+
+    const getSizeFacet = () => [
+      { $unwind: "$variants" },
+      { $group: { _id: "$variants.variant" } },
+      { $project: { _id: 0, value: "$_id" } }
+    ];
+
+    const getUnitFacet = () => [
+      { $group: { _id: "$unit" } },
+      { $project: { _id: 0, value: "$_id" } }
+    ];
+
+    const getMaterialFacet = () => [
+      { $unwind: "$materials" },
+      { $group: { _id: "$materials.material" } },
+      { $project: { _id: 0, value: "$_id" } }
+    ];
+
+    
+    const getStockFacet = () => [
+      { $group: { _id: "$availability.inStock" } },
+      { $project: { _id: 0, inStock: "$_id" } }
+    ];
+    
+    
+
+    export const getProductFilters = async (req, res) => {
+      try {
+        const { createdBy } = req.query;
+    
+        if (!createdBy) {
+          return res.status(400).json({ message: "createdBy is required." });
+        }
+    
+        const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
+    
+        const pipeline = [
+          { $match: { createdBy: createdByObjectId } },
+          {
+            $facet: {
+              categories: getCategoriesFacet(),
+              tags: getTagsFacet(),
+              priceRange: getPriceRangeFacet(),
+              discountRange: getDiscountRangeFacet(),
+              productCount: [{ $count: "total" }],
+              brands: getBrandFiltersFacet(),
+              sizes: getSizeFacet(),
+              units: getUnitFacet(),
+              materials: getMaterialFacet(),
+              stockAvailability: getStockFacet()
+            }
+          }
+        ];
+    
+        const [result] = await Product.aggregate(pipeline);
+    
+        res.status(200).json({
+          filters: {
+            categories: result.categories[0]?.values || [],
+            tags: result.tags.map(t => t.value).filter(Boolean),
+            priceRange: result.priceRange[0] || { min: 0, max: 0 },
+            discountRange: result.discountRange[0] || { min: 0, max: 0 },
+            productCount: result.productCount[0]?.total || 0,
+            brands: result.brands,
+            sizes: result.sizes.map(s => s.value).filter(Boolean),
+            units: result.units.map(u => u.value).filter(Boolean),
+            materials: result.materials.map(m => m.value).filter(Boolean),
+            stockAvailability: result.stockAvailability.map(s => s.inStock)
+          }
+        });
+        
+      } catch (error) {
+        console.error("Error in getProductFilters:", error);
+        res.status(500).json({ message: "Failed to fetch filters", error });
+      }
+    };
+    
