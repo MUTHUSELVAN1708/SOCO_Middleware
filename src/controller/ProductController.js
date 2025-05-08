@@ -423,132 +423,119 @@ export const getProductDetail = async (req, res) => {
     }
   };
 
-
   export const getProduct = async (req, res) => {
     try {
-      const { 
-        category, 
-        sortBy, 
-        color, 
-        discount, 
-        priceRange, 
-        createdBy 
+      const {
+        category,
+        sortBy,
+        color,
+        discount,
+        priceRange,
+        createdBy,
+        page = 1,
+        limit = 10
       } = req.query;
   
-      // Ensure the createdBy is passed
       if (!createdBy) {
         return res.status(400).json({ message: "createdBy is required." });
       }
   
-      // Convert createdBy to ObjectId if it's not already
       const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
+      const baseMatch = {
+        createdBy: createdByObjectId
+      };
   
-      // Step 1: Start with match for creator only
-      const pipeline = [
-        {
-          $match: {
-            createdBy: createdByObjectId
-          }
-        }
-      ];
-
-      // Debugging: Check the pipeline
-      console.log("Aggregation Pipeline (Step 1): ", pipeline);
-  
-      // Optional: Apply discount filter if provided
+      // Optional filters
       if (discount) {
-        pipeline.push({
-          $match: {
-            $expr: {
-              $gte: [{ $toDouble: "$pricing.discount" }, Number(discount)]
-            }
-          }
-        });
+        baseMatch["pricing.discount"] = { $gte: Number(discount) };
       }
   
-      // Optional: Apply additional filters (category, color)
-      const additionalFilter = {};
-  
-      if (category) {
-        additionalFilter["basicInfo.categories." + category] = { $exists: true };
+      if (category && category !== "All") {
+        baseMatch[`basicInfo.categories.${category}`] = { $exists: true };
       }
   
       if (color) {
-        additionalFilter["variants.color"] = color;
+        baseMatch["variants.color"] = color;
       }
   
-      if (Object.keys(additionalFilter).length > 0) {
-        pipeline.push({ $match: additionalFilter });
-      }
-  
-      // Project fields to be returned
-      pipeline.push({
-        $project: {
-          image: { $arrayElemAt: ["$images", 0] },
-          stock: "$availability.inStock",
-          stockQuantity: "$availability.stockQuantity",
-          amount: { $toDouble: "$pricing.salePrice" },
-          brand: "$basicInfo.brand",
-          productTitle: "$basicInfo.productTitle",
-          createdAt: 1,
-          discount: "$pricing.discount",
-          postCommentsCount: 1,
-          "ratings.averageRating": 1
-        }
-      });
-
-      // Apply price range if provided
+      // Price range filter
       if (priceRange) {
         const [minPrice, maxPrice] = priceRange.split(',').map(Number);
-        pipeline.push({
-          $match: {
-            $expr: {
-              $and: [
-                { $gte: ["$amount", minPrice] },
-                { $lte: ["$amount", maxPrice] }
-              ]
-            }
-          }
-        });
-        let sort = {};
-        switch (sortBy) {
-          case 'lowToHigh':
-            sort = { amount: 1 };
-            break;
-          case 'highToLow':
-            sort = { amount: -1 };
-            break;
-          case 'whatsNew':
-            sort = { createdAt: -1 };
-            break;
-          case 'discount':
-            sort = { discount: -1 };
-            break;
-          case 'popularity':
-            sort = { postCommentsCount: -1, 'ratings.averageRating': -1 };
-            break;
-          default:
-            sort = { createdAt: -1 };
-        }
-    
-        pipeline.push({ $sort: sort });
-    
-        // Debugging: Check the final pipeline before aggregation
-        console.log("Final Aggregation Pipeline: ", pipeline);
-    
-        // Execute aggregation
-        const products = await Product.aggregate(pipeline);
-    
-        // Debugging: Check if any products are returned
-        console.log("Returned Products: ", products);
-    
-        res.status(200).json({ products });
-    
-      }} catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Something went wrong', error });
+        baseMatch["pricing.salePrice"] = {
+          $gte: minPrice,
+          $lte: maxPrice
+        };
       }
-    };
+  
+      // Total results before pagination
+      const totalResults = await Product.countDocuments(baseMatch);
+      const totalPages = Math.ceil(totalResults / limit);
+      const skip = (page - 1) * limit;
+  
+      // Aggregation Pipeline
+      const pipeline = [
+        { $match: baseMatch },
+        {
+          $project: {
+            image: { $arrayElemAt: ["$images", 0] },
+            stock: "$availability.inStock",
+            stockQuantity: "$availability.stockQuantity",
+            amount: { $toDouble: "$pricing.salePrice" },
+            brand: "$basicInfo.brand",
+            productTitle: "$basicInfo.productTitle",
+            createdAt: 1,
+            discount: "$pricing.discount",
+            postCommentsCount: 1,
+            "ratings.averageRating": 1
+          }
+        }
+      ];
+  
+      // Sorting
+      let sort = {};
+      switch (sortBy) {
+        case 'lowToHigh':
+          sort = { amount: 1 };
+          break;
+        case 'highToLow':
+          sort = { amount: -1 };
+          break;
+        case 'whatsNew':
+          sort = { createdAt: -1 };
+          break;
+        case 'discount':
+          sort = { discount: -1 };
+          break;
+        case 'popularity':
+          sort = { postCommentsCount: -1, 'ratings.averageRating': -1 };
+          break;
+        default:
+          sort = { createdAt: -1 };
+      }
+  
+      pipeline.push({ $sort: sort });
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: Number(limit) });
+  
+      const products = await Product.aggregate(pipeline);
+  
+      res.status(200).json({
+        products,
+        pagination: {
+          totalResults,
+          totalPages,
+          currentPage: Number(page),
+          limit: Number(limit),
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1
+        }
+      });
+  
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Something went wrong', error });
+    }
+  };
 
 
     const getCategoriesFacet = () => [
