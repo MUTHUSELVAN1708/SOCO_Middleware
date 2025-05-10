@@ -16,6 +16,13 @@ const friendModel = new mongoose.Schema({
   },
 });
 
+const likedItemSchema = new mongoose.Schema({
+  itemId: { type: mongoose.Schema.Types.ObjectId, required: true }, // ID of video or image
+  type: { type: String, enum: ['video', 'image'], required: true }, // Type: video or image
+  likedAt: { type: Date, default: Date.now }, // When the user liked it
+});
+
+
 
 const registerSchema = new mongoose.Schema(
   {
@@ -105,7 +112,7 @@ const registerSchema = new mongoose.Schema(
     oneSignalIDs: { type: [String], default: [] },
     subscriptionIDs: { type: [String], default: [] },
     
-
+    likedItems: [likedItemSchema],
     // bio Details
     bio: { type: String, default: '', required: false },
     title: { type: String, default: '', required: false },
@@ -123,6 +130,7 @@ const registerSchema = new mongoose.Schema(
   },
   { versionKey: false }
 );
+
 
 registerSchema.virtual("user_id").get(function () {
   return this._id.toString();
