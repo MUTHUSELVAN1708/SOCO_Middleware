@@ -79,6 +79,7 @@ const productSchema = new mongoose.Schema({
     color: String,
     colorCode:String,
     variant: String,
+    size: String,
     quantity: Number,
     sku: { 
       type: String,
