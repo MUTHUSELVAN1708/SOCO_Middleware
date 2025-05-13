@@ -253,7 +253,7 @@ export const confirmOrderByUser = async (req, res) => {
         const notificationPayload = {
             userId:userId,
             playerIds: validPlayerIds,
-            title: "Order Confirmed ✅",
+            title: "Order Initiated ✅",
             message: `The order for ${product.basicInfo.productTitle.trim()} has been confirmed by the customer. Get ready to process it!`,
             productImageUrl: product.images?.length > 0 ? product.images[0] : null,
         };

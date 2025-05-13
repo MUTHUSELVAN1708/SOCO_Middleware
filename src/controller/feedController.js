@@ -355,8 +355,7 @@ export const getDashboardFeed = async (req, res) => {
 
 export const suggestion = async (req, res) => {
   try {
-    const userId = req.query.userId;
-    const type = req.query.type;
+    const { userId, type } = req.query;
     const MAX_LIMIT = 10;
 
     if (!userId || !type) {
@@ -364,19 +363,15 @@ export const suggestion = async (req, res) => {
     }
 
     if (type === 'user') {
-      // Fetch followed accounts
       const directFollows = await Follow.find({ userId });
       const directlyFollowedIds = directFollows.map(f => f.followingId.toString());
 
-      // Get user accounts followed
       const followedUsers = await registerModel.find({ _id: { $in: directlyFollowedIds } })
         .select('_id full_Name profile_url');
       const followedUserIds = followedUsers.map(u => u._id.toString());
 
-      // Determine which followed accounts are businesses
       const followedBusinessIds = directlyFollowedIds.filter(id => !followedUserIds.includes(id));
 
-      // Get followings of followed accounts (second-degree follows)
       const followsByDirects = await Follow.find({ userId: { $in: directlyFollowedIds } });
 
       const bizToFollowerMap = {};
@@ -392,7 +387,6 @@ export const suggestion = async (req, res) => {
       const businessIds = Object.keys(bizToFollowerMap);
       let recommendations = [];
 
-      // Try to recommend mutual business follows first
       if (businessIds.length > 0) {
         const businessesFollowed = await businessRegisterModel.find({
           _id: { $in: businessIds, $nin: followedBusinessIds }
@@ -422,22 +416,28 @@ export const suggestion = async (req, res) => {
         });
       }
 
-      // If no mutuals found or not enough, fallback to top businesses
       if (recommendations.length < MAX_LIMIT) {
         const alreadyRecommendedIds = recommendations.map(r => r.id.toString());
-        const excludeIds = [...followedBusinessIds, ...alreadyRecommendedIds, userId];
+        const excludeIds = [...directlyFollowedIds, ...alreadyRecommendedIds, userId];
 
-        const additionalBusinesses = await businessRegisterModel.find({
-          _id: { $nin: excludeIds }
-        })
-          .sort({ followerCount: -1 })
-          .limit(MAX_LIMIT - recommendations.length)
-          .select('_id businessName brand_logo followerCount user_id');
+        const currentBusiness = await businessRegisterModel.findOne({ user_id: userId }).select('natureOfBusiness');
 
-        const fallbackRecs = additionalBusinesses.map(biz => ({
+        let relatedBusinesses = [];
+        if (currentBusiness) {
+          relatedBusinesses = await businessRegisterModel.find({
+            _id: { $nin: excludeIds },
+            natureOfBusiness: currentBusiness.natureOfBusiness
+          })
+            .sort({ followerCount: -1 })
+            .limit(MAX_LIMIT - recommendations.length)
+            .select('_id businessName brand_logo cover_img followerCount user_id');
+        }
+
+        const fallbackRecs = relatedBusinesses.map(biz => ({
           id: biz._id,
           username: biz.businessName,
           profileImage: biz.brand_logo,
+          coverImage: biz.cover_img,
           totalFollowers: biz.followerCount,
           userId: biz.user_id,
           type: 'business',
@@ -445,6 +445,30 @@ export const suggestion = async (req, res) => {
         }));
 
         recommendations.push(...fallbackRecs);
+
+        if (recommendations.length < MAX_LIMIT) {
+          const finalExcludeIds = [...excludeIds, ...recommendations.map(r => r.id.toString())];
+
+          const popularFallback = await businessRegisterModel.find({
+            _id: { $nin: finalExcludeIds }
+          })
+            .sort({ followerCount: -1 })
+            .limit(MAX_LIMIT - recommendations.length)
+            .select('_id businessName brand_logo cover_img followerCount user_id');
+
+          const popularRecs = popularFallback.map(biz => ({
+            id: biz._id,
+            username: biz.businessName,
+            profileImage: biz.brand_logo,
+            coverImage: biz.cover_img,
+            totalFollowers: biz.followerCount,
+            userId: biz.user_id,
+            type: 'business',
+            mutualFollowers: []
+          }));
+
+          recommendations.push(...popularRecs);
+        }
       }
 
       return res.status(200).json({
@@ -456,21 +480,17 @@ export const suggestion = async (req, res) => {
 
     else if (type === 'business') {
       const currentBusiness = await businessRegisterModel.findById(userId).select('natureOfBusiness');
-
       if (!currentBusiness) {
         return res.status(404).json({ message: 'Business not found' });
       }
 
-      const MAX_LIMIT = 10;
       const followed = await Follow.find({ userId });
       const followedIds = followed.map(f => f.followingId.toString());
 
       const followers = await Follow.find({ followingId: userId });
       const followerBusinessIds = followers.map(f => f.userId.toString());
 
-      const secondDegreeFollows = await Follow.find({
-        userId: { $in: followerBusinessIds }
-      });
+      const secondDegreeFollows = await Follow.find({ userId: { $in: followerBusinessIds } });
 
       const bizToFollowerMap = {};
       secondDegreeFollows.forEach(f => {
@@ -506,7 +526,6 @@ export const suggestion = async (req, res) => {
             id: biz._id,
             username: biz.businessName,
             profileImage: biz.brand_logo,
-
             totalFollowers: biz.followerCount,
             userId: biz.user_id,
             type: 'business',
@@ -517,13 +536,12 @@ export const suggestion = async (req, res) => {
             }))
           };
         }));
-
       }
 
       if (recommendations.length < MAX_LIMIT) {
         const alreadyRecommendedIds = recommendations.map(r => r.id.toString());
         const excludeIds = [...followedIds, ...alreadyRecommendedIds, userId];
-        console.log(alreadyRecommendedIds, excludeIds, "kkkkk")
+
         const relatedBusinesses = await businessRegisterModel.find({
           _id: { $nin: excludeIds },
           natureOfBusiness: currentBusiness.natureOfBusiness
@@ -531,8 +549,22 @@ export const suggestion = async (req, res) => {
           .sort({ followerCount: -1 })
           .limit(MAX_LIMIT - recommendations.length)
           .select('_id businessName brand_logo cover_img followerCount user_id');
-        console.log(relatedBusinesses, "relatedBusinesses")
-        const fallbackRecs = relatedBusinesses.map(biz => ({
+
+        const remainingSlots = MAX_LIMIT - recommendations.length - relatedBusinesses.length;
+
+        let fallbackBusinesses = [];
+        if (remainingSlots > 0) {
+          const alreadyUsedIds = [...excludeIds, ...relatedBusinesses.map(b => b._id.toString())];
+
+          fallbackBusinesses = await businessRegisterModel.find({
+            _id: { $nin: alreadyUsedIds }
+          })
+            .sort({ followerCount: -1 })
+            .limit(remainingSlots)
+            .select('_id businessName brand_logo cover_img followerCount user_id');
+        }
+
+        const additionalRecs = [...relatedBusinesses, ...fallbackBusinesses].map(biz => ({
           id: biz._id,
           username: biz.businessName,
           profileImage: biz.brand_logo,
@@ -543,7 +575,7 @@ export const suggestion = async (req, res) => {
           mutualFollowers: []
         }));
 
-        recommendations.push(...fallbackRecs);
+        recommendations.push(...additionalRecs);
       }
 
       return res.status(200).json({
@@ -552,12 +584,12 @@ export const suggestion = async (req, res) => {
       });
     }
 
-    else {
-      return res.status(400).json({ message: 'Invalid type parameter. Must be "user" or "business".' });
-    }
+    return res.status(400).json({ message: 'Invalid type parameter. Must be "user" or "business".' });
+
   } catch (error) {
     console.error('Error fetching business recommendations:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 

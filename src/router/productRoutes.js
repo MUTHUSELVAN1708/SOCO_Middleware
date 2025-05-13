@@ -1,5 +1,5 @@
 import express from 'express';
-import { createAndUpdateProduct,getProductDetail,deleteProducts,getProductCategories ,getProduct,getProductFilters} from '../controller/ProductController.js';
+import { createAndUpdateProduct,getProductDetail,deleteProducts,getProductCategories ,getProduct,getProductFilters,getBusinessAnalytics,visitPage} from '../controller/ProductController.js';
 
 const router = express.Router();
 
@@ -8,8 +8,11 @@ router.post('/addProduct', createAndUpdateProduct);
 router.put('/updateProduct/:productId',createAndUpdateProduct);
 router.delete('/deleteProducts',deleteProducts);
 router.get("/getProductCategories",getProductCategories)
-router.get("/getProduct",getProduct)
+router.post("/getProduct",getProduct)
 router.get("/getProductFilters",getProductFilters)
 
+router.get("/analytics/:business_id",getBusinessAnalytics);
 
+// =========visitor
+router.post("/visitPage",visitPage)
 export default router;

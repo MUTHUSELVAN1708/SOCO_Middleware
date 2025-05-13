@@ -2,6 +2,10 @@ import Product from '../model/Product.js';
 import { validateProduct } from '../utils/validators.js';
 import adminService from '../service/adminService.js';
 import mongoose from 'mongoose';
+import Order from "../model/orderModel.js"
+import businessregisterModel from '../model/BusinessModel.js';
+import viewsModel from '../model/VisitModel.js';
+import registerModel from '../model/registerModel.js';
 
 const ERROR_MESSAGES = {
   VALIDATION: {
@@ -40,7 +44,7 @@ const formatResponse = (success, message, data = null, errors = null) => {
 
   if (data) response.data = data;
   if (errors) response.errors = errors;
-  
+
   return response;
 };
 
@@ -122,7 +126,7 @@ export const getProductDetail = async (req, res) => {
       businessName: business?.businessName || null,
       businessAddress: business?.businessAddress || null,
       BusinessLogo: business?.brand_logo || null,
-      createdBy:product.createdBy._id || null,
+      createdBy: product.createdBy._id || null,
       brand: product.basicInfo.brand,
       categories: product.basicInfo.categories,
       tags: product.basicInfo.tags || [],
@@ -187,513 +191,906 @@ export const getProductDetail = async (req, res) => {
 };
 
 
-  export const createAndUpdateProduct = async (req, res) => {
-    try {
-      const { productId } = req.params;
-      const productData = req.body;
-      const userId = req.body['userId'];
-  
-      const validationResult = validateProduct(productData);
-      if (!validationResult.isValid) {
-        return res.status(400).json(
-          formatResponse(false, ERROR_MESSAGES.VALIDATION.INVALID_REQUEST, null, validationResult.errors)
-        );
-      }
-  
-      const defaultRatings = {
-        averageRating: 0,
-        totalReviews: 0,
-        ratingDistribution: {
-          "5": 0,
-          "4": 0,
-          "3": 0,
-          "2": 0,
-          "1": 0
-        },
-        reviews: []
-      };
-  
-      let product;
-      let responseMessage;
-  
-      if (productId) {
-        product = await Product.findOne({ _id: productId });
-        if (!product) return res.status(404).json(formatResponse(false, 'Product not found'));
-  
-        product = await Product.findOneAndUpdate(
-          { _id: productId },
-          { $set: productData },
-          { new: true, runValidators: true }
-        );
-        responseMessage = 'Product updated successfully';
-      } else {
-        product = await Product.create({
-          ...productData,
-          ratings: defaultRatings,
-          createdBy: userId,
-        });
-        responseMessage = 'Product created successfully';
-  
-        const postData = {
-          user_id: userId ?? '',
-          typeOfAccount: "business",
-          creatorName: productData?.creatorName ?? '',
-          creatorProfileImageUrl: productData?.creatorProfileImageUrl ?? '',
-          lat: productData?.lat ?? 0,
-          lng: productData?.lng ?? 0,
-          pinCode: productData?.pinCode ?? '',
-          city: productData?.city ?? '',
-          district: productData?.district ?? '',
-          state: productData?.state ?? '',
-          completeAddress: productData?.completeAddress ?? '',
-          postLanguage: productData?.postLanguage ?? ['English'],
-          postCategories: productData?.postCategories ?? [],
-          interestPeoples: productData?.interestPeoples ?? [],
-          likesCount: 0,
-          commentsCount: 0,
-          viewsCount: 0,
-          sharesCount: 0,
-          isBusinessPost: false,
-          isUserPost: false,
-          isProductPost:true,
-          productId: product._id,
-          productPrice: calculateFinalPrice(productData?.pricing),
-          imageUrl: productData?.images?.[0] ?? '',
-          caption: productData?.basicInfo?.productTitle ?? '',
-          isScheduled: false,
-          scheduleDateTime: productData?.scheduleDateTime,
-          tags: productData?.tags ?? [],
-          description: productData?.description ?? '',
-          isVideo: false,
-          location: productData?.location ?? '',
-          mediaFile: productData?.images?.[0] ?? '',
-          thumbnailFile: productData?.images?.[0] ?? '',
-          enableComments: true,
-          enableFavorites: true,
-          mentions: productData?.mentions ?? [],
-          filters: productData?.filters ?? [],
-          quality: 'HD',
-          visibility: 'public',
-          aspectRatio: productData?.aspectRatio ?? 1.0,
-        };
-  
-        try {
-          await adminService.createPost(postData);
-        } catch (postError) {
-          console.error("Error creating post:", postError);
-        }
-      }
-  
-      return res.status(200).json(formatResponse(true, responseMessage, { productId: product._id }));
-    } catch (error) {
-      return res.status(500).json(formatResponse(false, 'Server error', null, [{ message: error.message }]));
-    }
-  };
-  
+export const createAndUpdateProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const productData = req.body;
+    const userId = req.body['userId'];
 
-  function calculateFinalPrice(pricing) {
-    if (!pricing) return 0.0;
-  
-    let basePrice = parseFloat(pricing.salePrice || pricing.regularPrice || '0');
-    if (isNaN(basePrice) || basePrice <= 0) return 0.0;
-  
-    let finalPrice = basePrice;
-  
-    // Apply GST if included
-    if (pricing.gstDetails?.gstIncluded) {
-      finalPrice += (basePrice * (pricing.gstDetails.gstPercentage || 0)) / 100;
-    }
-  
-    // Apply additional taxes
-    if (pricing.additionalTaxes && Array.isArray(pricing.additionalTaxes)) {
-      pricing.additionalTaxes.forEach(tax => {
-        if (tax.percentage) {
-          finalPrice += (basePrice * tax.percentage) / 100;
-        }
-      });
-    }
-  
-    console.log(finalPrice);
-  
-    return Math.round(finalPrice * 100) / 100; // Ensure two decimal places as a number
-  }
-  
-  
-  
-  export const deleteProducts = async (req, res) => {
-    try {
-      const { productIds } = req.body;
-  
-      // Validate if productIds array is provided
-      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-        return res.status(400).json(
-          formatResponse(false, ERROR_MESSAGES.PRODUCT.INVALID_PRODUCT_IDS, null, [{
-            code: 'INVALID_PRODUCT_IDS',
-            message: 'Please provide valid product IDs array'
-          }])
-        );
-      }
-  
-      // Validate if all IDs are valid MongoDB ObjectIds
-      const validIds = productIds.every(id => mongoose.Types.ObjectId.isValid(id));
-      if (!validIds) {
-        return res.status(400).json(
-          formatResponse(false, ERROR_MESSAGES.PRODUCT.INVALID_PRODUCT_IDS, null, [{
-            code: 'INVALID_PRODUCT_ID_FORMAT',
-            message: 'One or more product IDs are invalid'
-          }])
-        );
-      }
-  
-      // Delete multiple products
-      const deleteResult = await Product.deleteMany({
-        _id: { $in: productIds }
-      });
-  
-      const response = {
-        totalRequested: productIds.length,
-        totalDeleted: deleteResult.deletedCount,
-        success: true
-      };
-  
-      return res.status(200).json(
-        formatResponse(
-          true, 
-          `Successfully deleted ${deleteResult.deletedCount} products`,
-          response
-        )
+    const validationResult = validateProduct(productData);
+    if (!validationResult.isValid) {
+      return res.status(400).json(
+        formatResponse(false, ERROR_MESSAGES.VALIDATION.INVALID_REQUEST, null, validationResult.errors)
       );
-  
-    } catch (error) {
-      console.error('Error deleting products:', error);
-      
-      return res.status(500).json(
-        formatResponse(false, ERROR_MESSAGES.SYSTEM.SERVER_ERROR, null, [{
-          code: error.code || 'DELETE_PRODUCTS_ERROR',
-          message: error.message
+    }
+
+    const defaultRatings = {
+      averageRating: 0,
+      totalReviews: 0,
+      ratingDistribution: {
+        "5": 0,
+        "4": 0,
+        "3": 0,
+        "2": 0,
+        "1": 0
+      },
+      reviews: []
+    };
+
+    let product;
+    let responseMessage;
+
+    if (productId) {
+      product = await Product.findOne({ _id: productId });
+      if (!product) return res.status(404).json(formatResponse(false, 'Product not found'));
+
+      product = await Product.findOneAndUpdate(
+        { _id: productId },
+        { $set: productData },
+        { new: true, runValidators: true }
+      );
+      responseMessage = 'Product updated successfully';
+    } else {
+      product = await Product.create({
+        ...productData,
+        ratings: defaultRatings,
+        createdBy: userId,
+      });
+      responseMessage = 'Product created successfully';
+
+      const postData = {
+        user_id: userId ?? '',
+        typeOfAccount: "business",
+        creatorName: productData?.creatorName ?? '',
+        creatorProfileImageUrl: productData?.creatorProfileImageUrl ?? '',
+        lat: productData?.lat ?? 0,
+        lng: productData?.lng ?? 0,
+        pinCode: productData?.pinCode ?? '',
+        city: productData?.city ?? '',
+        district: productData?.district ?? '',
+        state: productData?.state ?? '',
+        completeAddress: productData?.completeAddress ?? '',
+        postLanguage: productData?.postLanguage ?? ['English'],
+        postCategories: productData?.postCategories ?? [],
+        interestPeoples: productData?.interestPeoples ?? [],
+        likesCount: 0,
+        commentsCount: 0,
+        viewsCount: 0,
+        sharesCount: 0,
+        isBusinessPost: false,
+        isUserPost: false,
+        isProductPost: true,
+        productId: product._id,
+        productPrice: calculateFinalPrice(productData?.pricing),
+        imageUrl: productData?.images?.[0] ?? '',
+        caption: productData?.basicInfo?.productTitle ?? '',
+        isScheduled: false,
+        scheduleDateTime: productData?.scheduleDateTime,
+        tags: productData?.tags ?? [],
+        description: productData?.description ?? '',
+        isVideo: false,
+        location: productData?.location ?? '',
+        mediaFile: productData?.images?.[0] ?? '',
+        thumbnailFile: productData?.images?.[0] ?? '',
+        enableComments: true,
+        enableFavorites: true,
+        mentions: productData?.mentions ?? [],
+        filters: productData?.filters ?? [],
+        quality: 'HD',
+        visibility: 'public',
+        aspectRatio: productData?.aspectRatio ?? 1.0,
+      };
+
+      try {
+        await adminService.createPost(postData);
+      } catch (postError) {
+        console.error("Error creating post:", postError);
+      }
+    }
+
+    return res.status(200).json(formatResponse(true, responseMessage, { productId: product._id }));
+  } catch (error) {
+    return res.status(500).json(formatResponse(false, 'Server error', null, [{ message: error.message }]));
+  }
+};
+
+
+function calculateFinalPrice(pricing) {
+  if (!pricing) return 0.0;
+
+  let basePrice = parseFloat(pricing.salePrice || pricing.regularPrice || '0');
+  if (isNaN(basePrice) || basePrice <= 0) return 0.0;
+
+  let finalPrice = basePrice;
+
+  // Apply GST if included
+  if (pricing.gstDetails?.gstIncluded) {
+    finalPrice += (basePrice * (pricing.gstDetails.gstPercentage || 0)) / 100;
+  }
+
+  // Apply additional taxes
+  if (pricing.additionalTaxes && Array.isArray(pricing.additionalTaxes)) {
+    pricing.additionalTaxes.forEach(tax => {
+      if (tax.percentage) {
+        finalPrice += (basePrice * tax.percentage) / 100;
+      }
+    });
+  }
+
+  console.log(finalPrice);
+
+  return Math.round(finalPrice * 100) / 100; // Ensure two decimal places as a number
+}
+
+
+
+export const deleteProducts = async (req, res) => {
+  try {
+    const { productIds } = req.body;
+
+    // Validate if productIds array is provided
+    if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json(
+        formatResponse(false, ERROR_MESSAGES.PRODUCT.INVALID_PRODUCT_IDS, null, [{
+          code: 'INVALID_PRODUCT_IDS',
+          message: 'Please provide valid product IDs array'
         }])
       );
     }
-  };
 
-  export const getProductCategories = async (req, res) => {
-    const { createdBy } = req.query;
-  
-    try {
-      const products = await Product.find({ createdBy }).select("basicInfo.categories images");
-  
-      const categoryMap = {};
-  
-      products.forEach(product => {
-        const categories = product.basicInfo?.categories || [];
-        const image = product.images?.[0] || null;
-  
-        categories.forEach(mainCategory => {
-          if (!categoryMap[mainCategory]) {
-            categoryMap[mainCategory] = image;
-          }
-        });
-      });
-  
-      const formattedCategories = Object.keys(categoryMap).map(category => ({
-        category,
-        image: categoryMap[category]
-      }));
-  
-      // Add default "All" category at the beginning
-      formattedCategories.unshift({
-        category: "All",
-        image: "" // Or use a placeholder image like "/default/all.png"
-      });
-  
-      return res.status(200).json({
-        success: true,
-        status: 200,
-        message: "Categories fetched successfully",
-        categories: formattedCategories
-      });
-  
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      return res.status(500).json({
-        success: false,
-        status: 500,
+    // Validate if all IDs are valid MongoDB ObjectIds
+    const validIds = productIds.every(id => mongoose.Types.ObjectId.isValid(id));
+    if (!validIds) {
+      return res.status(400).json(
+        formatResponse(false, ERROR_MESSAGES.PRODUCT.INVALID_PRODUCT_IDS, null, [{
+          code: 'INVALID_PRODUCT_ID_FORMAT',
+          message: 'One or more product IDs are invalid'
+        }])
+      );
+    }
+
+    // Delete multiple products
+    const deleteResult = await Product.deleteMany({
+      _id: { $in: productIds }
+    });
+
+    const response = {
+      totalRequested: productIds.length,
+      totalDeleted: deleteResult.deletedCount,
+      success: true
+    };
+
+    return res.status(200).json(
+      formatResponse(
+        true,
+        `Successfully deleted ${deleteResult.deletedCount} products`,
+        response
+      )
+    );
+
+  } catch (error) {
+    console.error('Error deleting products:', error);
+
+    return res.status(500).json(
+      formatResponse(false, ERROR_MESSAGES.SYSTEM.SERVER_ERROR, null, [{
+        code: error.code || 'DELETE_PRODUCTS_ERROR',
         message: error.message
+      }])
+    );
+  }
+};
+
+export const getProductCategories = async (req, res) => {
+  const { createdBy } = req.query;
+
+  try {
+    const products = await Product.find({ createdBy }).select("basicInfo.categories images");
+
+    const categoryMap = {};
+
+    products.forEach(product => {
+      const categories = product.basicInfo?.categories || [];
+      const image = product.images?.[0] || null;
+
+      categories.forEach(mainCategory => {
+        if (!categoryMap[mainCategory]) {
+          categoryMap[mainCategory] = image;
+        }
+      });
+    });
+
+    const formattedCategories = Object.keys(categoryMap).map(category => ({
+      category,
+      image: categoryMap[category]
+    }));
+
+    // Add default "All" category at the beginning
+    formattedCategories.unshift({
+      category: "All",
+      image: "" // Or use a placeholder image like "/default/all.png"
+    });
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Categories fetched successfully",
+      categories: formattedCategories
+    });
+
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: error.message
+    });
+  }
+};
+
+export const getProduct = async (req, res) => {
+  try {
+    const {
+      in_stock,
+      price_min,
+      price_max,
+      discount_min,
+      discount_max,
+      categories,
+      brands,
+      tags,
+      sizes,
+      materials,
+      units,
+      sort_by,
+      createdBy,
+      page = 1,
+      limit = 10
+    } = req.body;
+    console.log(req.body, "kkjhhh")
+    if (!createdBy) {
+      return res.status(400).json({ message: "createdBy is required." });
+    }
+
+    const matchStage = {
+      $match: {
+        "createdBy": new mongoose.Types.ObjectId(createdBy)
+      }
+    };
+
+    if (in_stock === true) {
+      matchStage.$match["availability.inStock"] = true;
+    }
+
+    const pipeline = [matchStage];
+
+    // Unwind variant array to filter sizes
+    if (sizes?.length) {
+      pipeline.push({
+        $match: {
+          "variants": {
+            $elemMatch: {
+              size: { $in: sizes }
+            }
+          }
+        }
       });
     }
-  };
 
-
-  export const getProduct = async (req, res) => {
-    try {
-      const { 
-        category, 
-        sortBy, 
-        color, 
-        discount, 
-        priceRange, 
-        createdBy 
-      } = req.query;
-  
-      // Ensure the createdBy is passed
-      if (!createdBy) {
-        return res.status(400).json({ message: "createdBy is required." });
+    // Add stage to convert price and discount to numbers
+    pipeline.push({
+      $addFields: {
+        salePriceNum: { $toDouble: "$pricing.salePrice" },
+        discountNum: { $toDouble: "$pricing.discount" }
       }
-  
-      // Convert createdBy to ObjectId if it's not already
-      const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
-  
-      // Step 1: Start with match for creator only
-      const pipeline = [
-        {
-          $match: {
-            createdBy: createdByObjectId
-          }
-        }
-      ];
+    });
 
-      // Debugging: Check the pipeline
-      console.log("Aggregation Pipeline (Step 1): ", pipeline);
-  
-      // Optional: Apply discount filter if provided
-      if (discount) {
-        pipeline.push({
-          $match: {
-            $expr: {
-              $gte: [{ $toDouble: "$pricing.discount" }, Number(discount)]
+    // Price range
+    if (price_min !== undefined || price_max !== undefined) {
+      const priceFilter = {};
+      if (price_min !== undefined) {
+        priceFilter.$gte = price_min;
+      }
+      if (price_max !== undefined) {
+        priceFilter.$lte = price_max;
+      }
+      pipeline.push({
+        $match: {
+          salePriceNum: priceFilter
+        }
+      });
+    }
+
+
+    // Discount range
+    if (discount_min !== undefined || discount_max !== undefined) {
+      const discountFilter = {};
+      if (discount_min !== undefined) {
+        discountFilter.$gte = discount_min;
+      }
+      if (discount_max !== undefined) {
+        discountFilter.$lte = discount_max;
+      }
+
+      pipeline.push({
+        $match: {
+          discountNum: discountFilter
+        }
+      });
+    }
+
+    // Brands
+    if (brands?.length) {
+      pipeline.push({
+        $match: {
+          "basicInfo.brand": { $in: brands.map(b => b.trim()) }
+        }
+      });
+    }
+
+    // Units
+    if (units?.length) {
+      pipeline.push({
+        $match: {
+          "unit": { $in: units.map(u => u.trim()) }
+        }
+      });
+    }
+
+    // Tags
+    if (tags?.length) {
+      pipeline.push({
+        $match: {
+          "basicInfo.tags": { $in: tags.map(t => t.trim()) }
+        }
+      });
+    }
+
+    // Materials
+    if (materials?.length) {
+      pipeline.push({
+        $match: {
+          "materials": { $in: materials.map(m => m.trim()) }
+        }
+      });
+    }
+
+    const isAllCategories = categories?.length === 1 && categories[0].toLowerCase() === 'all';
+
+    if (categories?.length && !isAllCategories) {
+      pipeline.push({
+        $addFields: {
+          categoryValues: {
+            $reduce: {
+              input: { $objectToArray: "$basicInfo.categories" },
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this.v"] }
             }
           }
-        });
-      }
-  
-      // Optional: Apply additional filters (category, color)
-      const additionalFilter = {};
-  
-      if (category) {
-        additionalFilter["basicInfo.categories." + category] = { $exists: true };
-      }
-  
-      if (color) {
-        additionalFilter["variants.color"] = color;
-      }
-  
-      if (Object.keys(additionalFilter).length > 0) {
-        pipeline.push({ $match: additionalFilter });
-      }
-  
-      // Project fields to be returned
-      pipeline.push({
-        $project: {
-          image: { $arrayElemAt: ["$images", 0] },
-          stock: "$availability.inStock",
-          stockQuantity: "$availability.stockQuantity",
-          amount: { $toDouble: "$pricing.salePrice" },
-          brand: "$basicInfo.brand",
-          productTitle: "$basicInfo.productTitle",
-          createdAt: 1,
-          discount: "$pricing.discount",
-          postCommentsCount: 1,
-          "ratings.averageRating": 1
         }
       });
 
-      // Apply price range if provided
-      if (priceRange) {
-        const [minPrice, maxPrice] = priceRange.split(',').map(Number);
-        pipeline.push({
-          $match: {
-            $expr: {
-              $and: [
-                { $gte: ["$amount", minPrice] },
-                { $lte: ["$amount", maxPrice] }
-              ]
+      pipeline.push({
+        $match: {
+          categoryValues: {
+            $elemMatch: {
+              $regex: new RegExp(`^(${categories.join('|')})$`, 'i')  // case-insensitive match
             }
           }
-        });
-        let sort = {};
-        switch (sortBy) {
-          case 'lowToHigh':
-            sort = { amount: 1 };
-            break;
-          case 'highToLow':
-            sort = { amount: -1 };
-            break;
-          case 'whatsNew':
-            sort = { createdAt: -1 };
-            break;
-          case 'discount':
-            sort = { discount: -1 };
-            break;
-          case 'popularity':
-            sort = { postCommentsCount: -1, 'ratings.averageRating': -1 };
-            break;
-          default:
-            sort = { createdAt: -1 };
         }
-    
-        pipeline.push({ $sort: sort });
-    
-        // Debugging: Check the final pipeline before aggregation
-        console.log("Final Aggregation Pipeline: ", pipeline);
-    
-        // Execute aggregation
-        const products = await Product.aggregate(pipeline);
-    
-        // Debugging: Check if any products are returned
-        console.log("Returned Products: ", products);
-    
-        res.status(200).json({ products });
-    
-      }} catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Something went wrong', error });
+      });
+    }
+
+
+    const totalPipeline = [...pipeline, { $count: "total" }];
+    const totalResult = await Product.aggregate(totalPipeline);
+    const totalResults = totalResult[0]?.total || 0;
+    const totalPages = Math.ceil(totalResults / limit);
+    const skip = (page - 1) * limit;
+
+    // Sorting
+    let sort = {};
+    switch (sort_by) {
+      case 'newest':
+        sort = { createdAt: -1 };
+        break;
+      case 'nameAsc':
+        sort = { name: 1 };
+        break;
+      case 'nameDesc':
+        sort = { name: -1 };
+        break;
+      case 'priceAsc':
+        sort = { salePriceNum: 1 };
+        break;
+      case 'priceDesc':
+        sort = { salePriceNum: -1 };
+        break;
+      default:
+        sort = { createdAt: -1 };
+    }
+
+
+    pipeline.push({ $sort: sort });
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: Number(limit) });
+
+    // Project final fields
+    pipeline.push({
+      $project: {
+        image: { $arrayElemAt: ["$images", 0] },
+        stock: "$availability.inStock",
+        stockQuantity: "$availability.stockQuantity",
+        amount: "$salePriceNum",
+        brand: "$basicInfo.brand",
+        productTitle: "$basicInfo.productTitle",
+        createdAt: 1,
+        discount: "$discountNum",
+        postCommentsCount: 1,
+        "ratings.averageRating": 1
       }
-    };
+    });
+
+    const products = await Product.aggregate(pipeline);
+
+    res.status(200).json({
+      products,
+      pagination: {
+        totalResults,
+        totalPages,
+        currentPage: Number(page),
+        limit: Number(limit),
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Something went wrong', error });
+  }
+};
 
 
-    const getCategoriesFacet = () => [
-      { $project: { categories: { $objectToArray: "$basicInfo.categories" } } },
-      { $unwind: "$categories" },
-      { $unwind: "$categories.v" },
-      { $group: { _id: null, values: { $addToSet: "$categories.v" } } },
-      { $project: { _id: 0, values: 1 } }
-    ];
-    
-    const getTagsFacet = () => [
-      { $unwind: "$basicInfo.tags" },
-      { $group: { _id: "$basicInfo.tags" } },
-      { $project: { _id: 0, value: "$_id" } }
-    ];
-    
-    const getPriceRangeFacet = () => [
-      { $project: { price: { $toDouble: "$pricing.salePrice" } } },
-      {
-        $group: {
-          _id: null,
-          min: { $min: "$price" },
-          max: { $max: "$price" }
+
+const getCategoriesFacet = () => [
+  { $project: { categories: { $objectToArray: "$basicInfo.categories" } } },
+  { $unwind: "$categories" },
+  { $unwind: "$categories.v" },
+  { $group: { _id: null, values: { $addToSet: "$categories.v" } } },
+  { $project: { _id: 0, values: 1 } }
+];
+
+const getTagsFacet = () => [
+  { $unwind: "$basicInfo.tags" },
+  { $group: { _id: "$basicInfo.tags" } },
+  { $project: { _id: 0, value: "$_id" } }
+];
+
+const getPriceRangeFacet = () => [
+  { $project: { price: { $toDouble: "$pricing.salePrice" } } },
+  {
+    $group: {
+      _id: null,
+      min: { $min: "$price" },
+      max: { $max: "$price" }
+    }
+  },
+  { $project: { _id: 0, min: 1, max: 1 } }
+];
+
+const getDiscountRangeFacet = () => [
+  { $project: { discount: { $toDouble: "$pricing.discount" } } },
+  {
+    $group: {
+      _id: null,
+      min: { $min: "$discount" },
+      max: { $max: "$discount" }
+    }
+  },
+  { $project: { _id: 0, min: 1, max: 1 } }
+];
+
+const getBrandFiltersFacet = () => [
+  {
+    $group: {
+      _id: "$basicInfo.brand",
+      colors: { $addToSet: "$variants.color" },
+      prices: { $addToSet: { $toDouble: "$pricing.salePrice" } },
+      discounts: { $addToSet: { $toDouble: "$pricing.discount" } }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      name: "$_id",
+      colors: {
+        $reduce: {
+          input: "$colors",
+          initialValue: [],
+          in: { $setUnion: ["$$value", "$$this"] }
         }
       },
-      { $project: { _id: 0, min: 1, max: 1 } }
-    ];
-    
-    const getDiscountRangeFacet = () => [
-      { $project: { discount: { $toDouble: "$pricing.discount" } } },
-      {
-        $group: {
-          _id: null,
-          min: { $min: "$discount" },
-          max: { $max: "$discount" }
-        }
+      priceRange: {
+        min: { $min: "$prices" },
+        max: { $max: "$prices" }
       },
-      { $project: { _id: 0, min: 1, max: 1 } }
-    ];
-    
-    const getBrandFiltersFacet = () => [
+      discountRange: {
+        min: { $min: "$discounts" },
+        max: { $max: "$discounts" }
+      }
+    }
+  }
+];
+
+const getSizeFacet = () => [
+  { $unwind: "$variants" },
+  { $group: { _id: "$variants.variant" } },
+  { $project: { _id: 0, value: "$_id" } }
+];
+
+const getUnitFacet = () => [
+  { $group: { _id: "$unit" } },
+  { $project: { _id: 0, value: "$_id" } }
+];
+
+const getMaterialFacet = () => [
+  { $unwind: "$materials" },
+  { $group: { _id: "$materials.material" } },
+  { $project: { _id: 0, value: "$_id" } }
+];
+
+
+const getStockFacet = () => [
+  { $group: { _id: "$availability.inStock" } },
+  { $project: { _id: 0, inStock: "$_id" } }
+];
+
+
+
+export const getProductFilters = async (req, res) => {
+  try {
+    const { createdBy } = req.query;
+
+    if (!createdBy) {
+      return res.status(400).json({ message: "createdBy is required." });
+    }
+
+    const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
+
+    const pipeline = [
+      { $match: { createdBy: createdByObjectId } },
       {
-        $group: {
-          _id: "$basicInfo.brand",
-          colors: { $addToSet: "$variants.color" },
-          prices: { $addToSet: { $toDouble: "$pricing.salePrice" } },
-          discounts: { $addToSet: { $toDouble: "$pricing.discount" } }
+        $facet: {
+          categories: getCategoriesFacet(),
+          tags: getTagsFacet(),
+          priceRange: getPriceRangeFacet(),
+          discountRange: getDiscountRangeFacet(),
+          productCount: [{ $count: "total" }],
+          brands: getBrandFiltersFacet(),
+          sizes: getSizeFacet(),
+          units: getUnitFacet(),
+          materials: getMaterialFacet(),
+          stockAvailability: getStockFacet()
         }
-      },
+      }
+    ];
+
+    const [result] = await Product.aggregate(pipeline);
+
+    res.status(200).json({
+      filters: {
+        categories: result.categories[0]?.values || [],
+        tags: result.tags.map(t => t.value).filter(Boolean),
+        priceRange: result.priceRange[0] || { min: 0, max: 0 },
+        discountRange: result.discountRange[0] || { min: 0, max: 0 },
+        productCount: result.productCount[0]?.total || 0,
+        brands: result.brands,
+        sizes: result.sizes.map(s => s.value).filter(Boolean),
+        units: result.units.map(u => u.value).filter(Boolean),
+        materials: result.materials.map(m => m.value).filter(Boolean),
+        stockAvailability: result.stockAvailability.map(s => s.inStock)
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in getProductFilters:", error);
+    res.status(500).json({ message: "Failed to fetch filters", error });
+  }
+};
+
+
+export const getBusinessAnalytics = async (req, res) => {
+  try {
+    const business_id = req.params.business_id;
+    console.log(business_id, "business_id");
+
+    const business = await businessregisterModel.findById(business_id);
+    if (!business) {
+      return res.status(404).json({ success: false, message: 'Business not found' });
+    }
+
+    // Get all viewer IDs who visited the business page
+    const visitors = await viewsModel.find(
+      { viewed_page_id: business._id },
+      { viewer_id: 1, _id: 0 }
+    );
+    const totalVisitors = visitors.length;
+
+    const repeatVisitors = await viewsModel.aggregate([
+      { $match: { viewed_page_id: business._id } },
       {
         $project: {
-          _id: 0,
-          name: "$_id",
-          colors: {
-            $reduce: {
-              input: "$colors",
-              initialValue: [],
-              in: { $setUnion: ["$$value", "$$this"] }
+          viewer_id: 1,
+          viewCount: { $size: "$viewedAt" }
+        }
+      },
+      {
+        $group: {
+          _id: "$viewer_id",
+          totalViews: { $sum: "$viewCount" }
+        }
+      },
+      { $match: { totalViews: { $gt: 1 } } },
+      { $count: "repeatVisitorCount" }
+    ]);
+
+    // const dateViews = await viewsModel.aggregate([
+    //   { $match: { viewed_page_id: business._id } },
+    //   { $unwind: "$viewedAt" },
+    //   {
+    //     $group: {
+    //       _id: {
+    //         year: { $year: "$viewedAt" },
+    //         month: { $month: "$viewedAt" },
+    //         day: { $dayOfMonth: "$viewedAt" }
+    //       },
+    //       count: { $sum: 1 }
+    //     }
+    //   },
+    //   { $sort: { "_id.year": -1, "_id.month": -1, "_id.day": -1 } },
+    //   { $limit: 7 }
+    // ]);
+
+    const results = await viewsModel.aggregate([
+      { $match: { viewed_page_id: business._id } },
+      {
+        $facet: {
+          // Top 5 cities
+          cityStats: [
+            { $match: { viewer_type: 'User' } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "viewer_id",
+                foreignField: "_id",
+                as: "user"
+              }
+            },
+            { $unwind: "$user" },
+            {
+              $lookup: {
+                from: "locations",
+                localField: "user._id",
+                foreignField: "user_id",
+                as: "location"
+              }
+            },
+            { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } },
+            {
+              $addFields: {
+                city: {
+                  $cond: [
+                    { $ifNull: ["$location.address.city", false] },
+                    { $toLower: { $trim: { input: "$location.address.city" } } },
+                    null
+                  ]
+                }
+              }
+            },
+            { $project: { city: 1 } },
+            {
+              $unionWith: {
+                coll: "viewspages",
+                pipeline: [
+                  { $match: { viewed_page_id: business._id, viewer_type: "Business" } },
+                  {
+                    $lookup: {
+                      from: "businessregisters",
+                      localField: "viewer_id",
+                      foreignField: "_id",
+                      as: "business"
+                    }
+                  },
+                  { $unwind: "$business" },
+                  {
+                    $addFields: {
+                      city: {
+                        $cond: [
+                          { $ifNull: ["$business.businessCity", false] },
+                          { $toLower: { $trim: { input: "$business.businessCity" } } },
+                          null
+                        ]
+                      }
+                    }
+                  },
+                  { $project: { city: 1 } }
+                ]
+              }
+            },
+            {
+              $group: {
+                _id: "$city",
+                count: { $sum: 1 }
+              }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 7 },
+            {
+              $project: {
+                _id: 0,
+                city: "$_id",
+                count: 1
+              }
             }
-          },
-          priceRange: {
-            min: { $min: "$prices" },
-            max: { $max: "$prices" }
-          },
-          discountRange: {
-            min: { $min: "$discounts" },
-            max: { $max: "$discounts" }
-          }
+          ],
+
+          // Age distribution
+          userAges: [
+            { $match: { viewer_type: 'User' } },
+            {
+              $lookup: {
+                from: "users",
+                localField: "viewer_id",
+                foreignField: "_id",
+                as: "user"
+              }
+            },
+            { $unwind: "$user" },
+            {
+              $addFields: {
+                age: {
+                  $floor: {
+                    $divide: [
+                      { $subtract: [new Date(), { $dateFromString: { dateString: "$user.DOB", format: "%d-%m-%Y" } }] },
+                      1000 * 60 * 60 * 24 * 365
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              $bucket: {
+                groupBy: "$age",
+                boundaries: [13, 18, 25, 35, 45, 100],
+                default: "unknown",
+                output: { count: { $sum: 1 } }
+              }
+            },
+            {
+              $addFields: {
+                ageRange: {
+                  $switch: {
+                    branches: [
+                      { case: { $eq: ["$_id", 13] }, then: "13-17" },
+                      { case: { $eq: ["$_id", 18] }, then: "18-24" },
+                      { case: { $eq: ["$_id", 25] }, then: "25-34" },
+                      { case: { $eq: ["$_id", 35] }, then: "35-44" },
+                      { case: { $eq: ["$_id", 45] }, then: "45-99" }
+                    ],
+                    default: "unknown"
+                  }
+                }
+              }
+            },
+            { $project: { _id: 0, ageRange: 1, count: 1 } }
+          ]
         }
       }
-    ];
+    ]);
 
-    const getSizeFacet = () => [
-      { $unwind: "$variants" },
-      { $group: { _id: "$variants.variant" } },
-      { $project: { _id: 0, value: "$_id" } }
-    ];
+    const { cityStats, userAges } = results[0];
 
-    const getUnitFacet = () => [
-      { $group: { _id: "$unit" } },
-      { $project: { _id: 0, value: "$_id" } }
-    ];
-
-    const getMaterialFacet = () => [
-      { $unwind: "$materials" },
-      { $group: { _id: "$materials.material" } },
-      { $project: { _id: 0, value: "$_id" } }
-    ];
-
-    
-    const getStockFacet = () => [
-      { $group: { _id: "$availability.inStock" } },
-      { $project: { _id: 0, inStock: "$_id" } }
-    ];
-    
-    
-
-    export const getProductFilters = async (req, res) => {
-      try {
-        const { createdBy } = req.query;
-    
-        if (!createdBy) {
-          return res.status(400).json({ message: "createdBy is required." });
+    const interestAgg = await viewsModel.aggregate([
+      {
+        $match: {
+          viewed_page_id: business._id,
+          viewer_type: "User",
+          viewer_id: { $ne: business.user_id }
         }
-    
-        const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
-    
-        const pipeline = [
-          { $match: { createdBy: createdByObjectId } },
-          {
-            $facet: {
-              categories: getCategoriesFacet(),
-              tags: getTagsFacet(),
-              priceRange: getPriceRangeFacet(),
-              discountRange: getDiscountRangeFacet(),
-              productCount: [{ $count: "total" }],
-              brands: getBrandFiltersFacet(),
-              sizes: getSizeFacet(),
-              units: getUnitFacet(),
-              materials: getMaterialFacet(),
-              stockAvailability: getStockFacet()
-            }
-          }
-        ];
-    
-        const [result] = await Product.aggregate(pipeline);
-    
-        res.status(200).json({
-          filters: {
-            categories: result.categories[0]?.values || [],
-            tags: result.tags.map(t => t.value).filter(Boolean),
-            priceRange: result.priceRange[0] || { min: 0, max: 0 },
-            discountRange: result.discountRange[0] || { min: 0, max: 0 },
-            productCount: result.productCount[0]?.total || 0,
-            brands: result.brands,
-            sizes: result.sizes.map(s => s.value).filter(Boolean),
-            units: result.units.map(u => u.value).filter(Boolean),
-            materials: result.materials.map(m => m.value).filter(Boolean),
-            stockAvailability: result.stockAvailability.map(s => s.inStock)
-          }
-        });
-        
-      } catch (error) {
-        console.error("Error in getProductFilters:", error);
-        res.status(500).json({ message: "Failed to fetch filters", error });
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "viewer_id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      { $unwind: "$user" },
+      { $unwind: "$user.interest" },
+      {
+        $group: {
+          _id: "$user.interest",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]);
+
+    const genderStats = await viewsModel.aggregate([
+      { $match: { viewed_page_id: business._id, viewer_type: "User" } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "viewer_id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      { $unwind: "$user" },
+      {
+        $group: {
+          _id: "$user.gender",
+          count: { $sum: 1 }
+        }
       }
-    };
-    
+    ]);
+
+    const interestCategory = interestAgg.map(i => i._id);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalVisitors,
+        cityStats: cityStats.slice(0, 7),
+        ageCategory: userAges.slice(0, 5),
+        genderStats: genderStats.slice(0, 3),
+        interestCategory: interestCategory.slice(0, 5),
+        repeatVisitors: repeatVisitors.length > 0 ? repeatVisitors[0].repeatVisitorCount : 0,
+        // dateViews: dateViews.slice(0, 7)
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+
+
+
+
+
+export const visitPage = async (req, res) => {
+  const { viewer_id, viewed_page_id, viewer_type } = req.body;
+
+  try {
+    const time = new Date();
+
+    let view = await viewsModel.findOne({ viewer_id, viewed_page_id });
+
+    if (!view) {
+      const newView = await viewsModel.create({
+        viewer_id,
+        viewed_page_id,
+        viewer_type,
+        viewedAt: [time],
+      });
+      return res.status(200).json({ success: true, data: newView });
+    } else {
+
+      view.viewedAt.push(time);
+      await view.save();
+      return res.status(200).json({ success: true, data: view });
+    }
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+
+
