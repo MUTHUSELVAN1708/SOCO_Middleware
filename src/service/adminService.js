@@ -4817,6 +4817,18 @@ const adminService = {
         } catch (error) {
             throw new Error("Error updating order status");
         }
+    },
+    addInterest: async (data) => {
+        const { user_id, interest } = data;
+        try {
+            const addInterest = await registerModel.findByIdAndUpdate(user_id,
+                { interest: interest },
+                { new: true });
+            return addInterest
+        } catch (error) {
+            console.log(error)
+            throw error
+        }
     }
 
 

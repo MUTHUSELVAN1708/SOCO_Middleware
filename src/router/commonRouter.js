@@ -360,4 +360,5 @@ router.post("/toggleBookmark",adminController.toggleBookmark);
 router.get("/getUserFavorites",adminController.getUserFavorites );
 router.get("/getUserBookmarks",adminController.getUserBookmarks );
 
+router.put("/addInterest",adminController.addInterest)
 export default router;
