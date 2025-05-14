@@ -230,7 +230,7 @@ export const getDashboardFeed = async (req, res) => {
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit);
-
+      
     const totalResults = await createPostModel.countDocuments({});
     const totalPages = Math.ceil(totalResults / limit);
     const hasNextPage = page < totalPages;

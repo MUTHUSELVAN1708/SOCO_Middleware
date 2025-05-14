@@ -79,7 +79,9 @@ const BusinessregisterSchema = new mongoose.Schema(
       enum: ['android', 'ios', 'web'], 
       required: false 
     },
-    
+    viewCount :{
+      type:Number,
+    },
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }

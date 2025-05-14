@@ -156,7 +156,7 @@ const productSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'published', 'archived'],
+    enum: ['draft', 'Activate','Deactivate', 'archived'],
     default: 'draft'
   },
   unit:{type:String,

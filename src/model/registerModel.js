@@ -104,7 +104,7 @@ const registerSchema = new mongoose.Schema(
     // Notification fields
     oneSignalIDs: { type: [String], default: [] },
     subscriptionIDs: { type: [String], default: [] },
-    
+    viewCount :{type:Number},
 
     // bio Details
     bio: { type: String, default: '', required: false },
