@@ -59,9 +59,10 @@ export const getProductDetail = async (req, res) => {
       );
     }
 
-    const product = await Product.findOne(
-      { _id: productId, status: "Activate" }
-    )
+    const product = await Product.findOne({
+  _id: productId,
+  status: { $ne: "Deactivate" }
+})
       .populate('createdBy') // populates business details
       .exec();
 
@@ -978,11 +979,10 @@ export const getBusinessAnalytics = async (req, res, next) => {
 
 
 export const visitPage = async (req, res) => {
-  const { viewer_id, viewed_page_id, viewer_type } = req.body;
+  const { viewer_id, viewed_page_id, viewer_type, viewed_page_account_type } = req.body;
 
   try {
     const time = new Date();
-
     let view = await viewsModel.findOne({ viewer_id, viewed_page_id });
 
     if (!view) {
@@ -991,23 +991,29 @@ export const visitPage = async (req, res) => {
         viewed_page_id,
         viewer_type,
         viewedAt: [time],
+        viewed_page_account_type,
+        viewCount: 1,
       });
+
+      // Also increment viewCount in the appropriate model
+      if (viewed_page_account_type === false) {
+        await registerModel.findByIdAndUpdate(viewed_page_id, { $inc: { viewCount: 1 } });
+      } else {
+        await businessregisterModel.findByIdAndUpdate(viewed_page_id, { $inc: { viewCount: 1 } });
+      }
+
       return res.status(200).json({ success: true, data: newView });
     } else {
-
       view.viewedAt.push(time);
-
+      view.viewCount += 1;
       await view.save();
-      if (viewer_type == "User") {
-        const update = await registerModel.findByIdAndUpdate(viewed_page_id, 
-           { $inc: { viewCount: 1 } },
-          { new: true })
+
+      if (viewed_page_account_type === false) {
+        await registerModel.findByIdAndUpdate(viewed_page_id, { $inc: { viewCount: 1 } });
       } else {
-        const update = await businessregisterModel.findByIdAndUpdate(viewed_page_id,
-           { $inc: { viewCount: 1 } },
-          { new: true }
-        )
+        await businessregisterModel.findByIdAndUpdate(viewed_page_id, { $inc: { viewCount: 1 } });
       }
+
       return res.status(200).json({ success: true, data: view });
     }
 
@@ -1016,8 +1022,6 @@ export const visitPage = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
-
-
 
 
 export const deactivateProduct = async (req, res) => {
