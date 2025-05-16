@@ -103,7 +103,7 @@ const createPostSchema = new mongoose.Schema({
   caption: { type: String },
   webSiteLink: { type: String },
   timestamp: { type: Date, default: Date.now },
-
+  Product_status: { type: String },
   mediaItems: { type: [mediaItemSchema], default: [] },
 
   isRepost: { type: Boolean, default: false },

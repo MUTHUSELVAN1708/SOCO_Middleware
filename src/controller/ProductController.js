@@ -6,6 +6,7 @@ import Order from "../model/orderModel.js"
 import businessregisterModel from '../model/BusinessModel.js';
 import viewsModel from '../model/VisitModel.js';
 import registerModel from '../model/registerModel.js';
+import createPostModel from '../model/createPostModel.js';
 
 const ERROR_MESSAGES = {
   VALIDATION: {
@@ -1029,9 +1030,10 @@ export const deactivateProduct = async (req, res) => {
   console.log(req.query, "Received query params");
 
   try {
+    // Step 1: Update product status in the Product collection
     const updatedProduct = await Product.findByIdAndUpdate(
       product_id,
-      { status: status },
+      { status },
       { new: true }
     );
 
@@ -1039,13 +1041,25 @@ export const deactivateProduct = async (req, res) => {
       return res.status(404).json({ status: false, message: "Product not found" });
     }
 
+    // Step 2: Update all posts where mediaItems contain this productId
+    const updatedPosts = await createPostModel.updateMany(
+      { 'mediaItems.productId': product_id },
+      { $set: { Product_status: status } }
+    );
+
+    console.log(updatedPosts, 'Posts updated with new product status');
+
     res.status(200).json({
       status: true,
       message: "Deactivated successfully",
-      data: updatedProduct
+      data: {
+        updatedProduct,
+        updatedPostsCount: updatedPosts.modifiedCount
+      }
     });
   } catch (error) {
     console.error(error, "Error deactivating product");
     res.status(500).json({ status: false, message: "Something went wrong", error });
   }
 };
+

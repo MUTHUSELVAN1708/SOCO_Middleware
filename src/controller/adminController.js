@@ -654,9 +654,7 @@ const adminController = {
         const isBusinessAccount = req.body.isBusiness;
         const userId = req.body.userId;
         const accountBusinessType = req.body.accountBusinessType;
-
-
-
+        
         try {
             const getUserDetails = await adminService.getUserProfile(id, userId, accountBusinessType);
 
