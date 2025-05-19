@@ -16,5 +16,5 @@ router.get("/getProductFilters",getProductFilters)
 router.get("/analytics",getBusinessAnalytics);
 router.put("/De-ActivateProdct",deactivateProduct);
 // =========deactivateProduct
-router.post("/visitPage",visitPage)
+router.post("/visitPage",visitPage);
 export default router;
