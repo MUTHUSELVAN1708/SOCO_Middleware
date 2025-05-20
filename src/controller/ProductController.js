@@ -7,6 +7,7 @@ import businessregisterModel from '../model/BusinessModel.js';
 import viewsModel from '../model/VisitModel.js';
 import registerModel from '../model/registerModel.js';
 import createPostModel from '../model/createPostModel.js';
+import ReviewModel from '../model/reviewModel.js';
 
 const ERROR_MESSAGES = {
   VALIDATION: {
@@ -75,6 +76,8 @@ export const getProductDetail = async (req, res) => {
       );
     }
 
+    const review=await ReviewModel.find({productId:productId}).sort({rating:-1}).limit(3);
+    console.log(review,"review")
     const business = product.createdBy;
 
     const transformedReviews = product.ratings.reviews.map(review => ({
@@ -179,6 +182,7 @@ export const getProductDetail = async (req, res) => {
         imageUrl: crossSell.imageUrl,
         currency: crossSell.currency === 'INR' ? '₹' : crossSell.currency,
       })),
+      review:review
     };
 
     return res.status(200).json(
@@ -444,7 +448,7 @@ export const getProduct = async (req, res) => {
       createdBy,
       page = 1,
       limit = 10
-    } = req.query;
+    } = req.body;
 
     if (!createdBy) {
       return res.status(400).json({ message: "createdBy is required." });
@@ -453,7 +457,7 @@ export const getProduct = async (req, res) => {
     const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
     const baseMatch = {
       createdBy: createdByObjectId,
-      status: "Activate" // 👈 Add this line
+      status: { $ne: "Deactivate" } 
     };
 
 

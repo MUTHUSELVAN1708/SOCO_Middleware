@@ -209,147 +209,116 @@ import BookmarkModel from "../model/BookmarkModel.js";
 import CommentModel from "../model/Comment.js";
 import UserInfo from "../model/UserInfo.js";
 import Follow from "../model/FollowModel.js";
+import trackingModel from "../model/TrackingModel.js";
 
 export const getDashboardFeed = async (req, res) => {
   try {
-    const { user_id, isBusinessAccount, page = 1, limit = 15 } = req.body;
+    const { user_id, isBusinessAccount, page = 1, limit = 10 } = req.body;
     const skip = (page - 1) * limit;
-
     const objectId = new mongoose.Types.ObjectId(user_id);
 
     const user = isBusinessAccount
       ? await businessRegisterModel.findById(objectId)
       : await registerModel.findById(objectId);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ✅ Main posts fetch with full status filtering
-    const posts = await createPostModel
-      .find({ Product_status: { $ne: "Deactivate" } })
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit);
+    const trackingData = await trackingModel.findOne({ user_id: objectId });
+    const alreadySentIds = new Set((trackingData?.sentPosts || []).map(item => item.post_id.toString()));
 
-    const totalResults = await createPostModel.countDocuments({
-      Product_status: { $ne: "Deactivate" }
-    });
+    const primaryPosts = await createPostModel
+      .find({
+        Product_status: { $ne: "Deactivate" },
+        _id: { $nin: Array.from(alreadySentIds) },
+        viewsCount: { $lt: 1000 },
+      });
 
-    const totalPages = Math.ceil(totalResults / limit);
-    const hasNextPage = page < totalPages;
-    const hasPreviousPage = page > 1;
+    const randomChance = 0.4; // 10% chance to include a popular post
+    const popularPosts = await createPostModel
+      .aggregate([
+        {
+          $match: {
+            Product_status: { $ne: "Deactivate" },
+            _id: { $nin: Array.from(alreadySentIds) },
+            viewsCount: { $gte: 1000 },
+          },
+        },
+        { $sample: { size: Math.floor(limit * randomChance) } }, // Random sample
+      ]);
+    console.log(popularPosts, "popularPosts")
+    const posts = [...primaryPosts, ...popularPosts]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(skip, skip + limit); // pagination manually applied after combining
 
-    // ✅ Favorites
-    const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
-    const postIds = favoritePosts.map(fav => fav.post_id);
-    const favoriteSet = new Set(postIds.map(id => id.toString()));
-
-    const activePostCount = await createPostModel.countDocuments({
-      _id: { $in: postIds },
+    const totalPrimaryResults = await createPostModel.countDocuments({
       Product_status: { $ne: "Deactivate" },
+      _id: { $nin: Array.from(alreadySentIds) },
+      viewsCount: { $lt: 1000 },
     });
 
-    // ✅ Bookmarks - ONLY ACTIVE
-    const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
-    const bookmarkedPostIds = bookmarkedPosts.map((b) => b.post_id);
+    const totalPages = Math.ceil(totalPrimaryResults / limit);
 
+
+    const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
+    const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
+
+    const bookmarkedPostIds = bookmarkedPosts.map(b => b.post_id);
     const activeBookmarkedPosts = await createPostModel.find({
       _id: { $in: bookmarkedPostIds },
       Product_status: { $ne: "Deactivate" },
     }).select("_id");
 
-    const activeBookmarkSet = new Set(activeBookmarkedPosts.map(p => p._id.toString()));
+    const favoriteSet = new Set(favoritePosts.map(f => f.post_id.toString()));
+    const bookmarkSet = new Set(activeBookmarkedPosts.map(p => p._id.toString()));
 
     const formattedPosts = await Promise.all(
-      posts.map(async (post) => {
-        const isFavorite = favoriteSet.has(post._id.toString());
-        const isBookmarked = activeBookmarkSet.has(post._id.toString());
+      posts.map(async post => {
+        const postIdStr = post._id.toString();
 
-        let topComments = await CommentModel.find({ postId: post._id })
+        const topComments = await CommentModel.find({ postId: post._id })
           .sort({ likesCount: -1, createdAt: -1 })
           .limit(2)
           .lean();
 
-        if (!topComments.length) {
-          topComments = await CommentModel.find({ postId: post._id })
-            .sort({ createdAt: -1 })
-            .limit(2)
-            .lean();
-        }
+        const fallbackComments = await CommentModel.find({ postId: post._id })
+          .sort({ createdAt: -1 })
+          .limit(2)
+          .lean();
+
+        const comments = topComments.length ? topComments : fallbackComments;
 
         const formattedComments = await Promise.all(
-          topComments.map(async (comment) => {
+          comments.map(async (comment) => {
             const user = await UserInfo.findOne({ id: comment.userId });
-
             return {
               commentId: comment._id.toString(),
-              id: comment._id.toString(),
               content: comment.content,
               createdAt: comment.createdAt,
               userInfo: {
                 name: user?.name || "",
                 avatar: user?.avatarUrl || "",
-              },
+              }
             };
           })
         );
 
         return {
-          id: post._id.toString(),
+          id: postIdStr,
+          caption: post.caption,
+          userAvatar: post.userAvatar,
           username: post.userName,
           userId: post.userId,
-          productId: post.productId,
-          isBusinessAccount: post.isBusinessAccount,
-          userAvatar: post.userAvatar,
-          caption: post.caption,
           thumbnailUrl: post.thumbnailUrl,
           likesCount: post.likesCount,
           commentsCount: post.commentsCount,
           viewsCount: post.viewsCount,
           sharesCount: post.sharesCount,
           rePostCount: post.rePostCount,
-          isRepost: post.isRepost,
-          isOwnPost: post.isOwnPost,
-          isProductPost: post.isProductPost,
-          mediaItems: post.mediaItems.map((media) => ({
-            url: media.url,
-            type: media.type,
-            thumbnailUrl: media.thumbnailUrl,
-            productName: media.productName,
-            price: media.price,
-            originalPrice: media.originalPrice,
-            hasDiscount: media.hasDiscount,
-          })),
-          repostDetails: post.repostDetails
-            ? {
-                originalPostId: post.repostDetails.originalPostId?.toString() || "",
-                originalUserId: post.repostDetails.originalUserId || "",
-                originalUserName: post.repostDetails.originalUserName || "",
-                originalUserAvatar: post.repostDetails.originalUserAvatar || "",
-                originalCaption: post.repostDetails.originalCaption || "",
-                originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
-                  url: media.url,
-                  type: media.type,
-                  thumbnailUrl: media.thumbnailUrl,
-                  productName: media.productName,
-                  price: media.price,
-                  originalPrice: media.originalPrice,
-                  hasDiscount: media.hasDiscount,
-                })),
-                isBusinessAccount: await (async () => {
-                  const originalUser = await registerModel.findOne({ _id: post.repostDetails.originalUserId });
-                  if (originalUser) return false;
-                  const originalBusinessUser = await businessRegisterModel.findOne({ _id: post.repostDetails.originalUserId });
-                  return !!originalBusinessUser;
-                })(),
-              }
-            : null,
-          likes: post.likesCount,
-          comments: formattedComments,
+          mediaItems: post.mediaItems,
+          isFavorite: favoriteSet.has(postIdStr),
+          isBookmarked: bookmarkSet.has(postIdStr),
           timestamp: post.timestamp,
-          isFavorite,
-          isBookmarked,
+          comments: formattedComments,
         };
       })
     );
@@ -357,19 +326,61 @@ export const getDashboardFeed = async (req, res) => {
     return res.json({
       posts: formattedPosts,
       pagination: {
-        totalResults,
+        totalPrimaryResults,
         totalPages,
         currentPage: Number(page),
         limit,
-        hasNextPage,
-        hasPreviousPage,
-      },
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      }
     });
+
   } catch (error) {
     console.error("Error in getDashboardFeed:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
+
+
+export const trackViewedPost = async (req, res) => {
+  try {
+    const { user_id, post_id } = req.body;
+
+    if (!user_id || !post_id) {
+      return res.status(400).json({ message: "user_id and post_id are required" });
+    }
+
+    const existingTracking = await trackingModel.findOne({ user_id });
+
+    const alreadyTracked = existingTracking?.sentPosts?.some(
+      (entry) => entry.post_id.toString() === post_id
+    );
+
+    if (!alreadyTracked) {
+      await trackingModel.updateOne(
+        { user_id },
+        {
+          $push: {
+            sentPosts: {
+              post_id,
+              viewedAt: new Date(),
+              isWatched: true
+            }
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    return res.status(200).json({ message: "Post tracked" });
+  } catch (error) {
+    console.error("Error in trackViewedPost:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 
 
 

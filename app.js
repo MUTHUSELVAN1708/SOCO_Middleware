@@ -23,7 +23,7 @@ import errorHandling from "./errorHandling.js";
 // import  {initializeSocket} from "./socket.js";
 import chatSocket from "./src/service/chatSocket.js";
 // import redisService from "./src/service/redisService.js";
-
+import reviewRouter from "./src/router/reviewRouter.js"
 const app = express();
 
 
@@ -49,7 +49,7 @@ app.use('/preferenceRouter', PreferenceRouter);
 app.use("/messages", chatMessageRoutes);
 app.use("/link", linkAccountRoutes);
 app.use("/notification", notificationRoutes);
-
+app.use("/review",reviewRouter);
 // Error Handling
 app.use(errorHandling);
 
