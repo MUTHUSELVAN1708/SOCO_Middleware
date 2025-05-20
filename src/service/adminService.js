@@ -37,6 +37,7 @@ import BookmarkModel from "../model/BookmarkModel.js";
 import Friend from "../model/FriendModel.js";
 import Follow from "../model/FollowModel.js";
 import redisService from "./redisService.js";
+import Playlist from "../model/playlistModel.js";
 
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
@@ -4031,140 +4032,140 @@ const adminService = {
     },
 
 
-    fetchUserPosts : async (userId, page = 1, limit = 12) => {
-    try {
-        const skip = (page - 1) * limit;
-        const objectId = new mongoose.Types.ObjectId(userId);
+    fetchUserPosts: async (userId, page = 1, limit = 12) => {
+        try {
+            const skip = (page - 1) * limit;
+            const objectId = new mongoose.Types.ObjectId(userId);
 
-        const totalPostsCount = await createPostModel.countDocuments({ userId, Product_status: { $ne: "Deactivate"  } });
+            const totalPostsCount = await createPostModel.countDocuments({ userId, Product_status: { $ne: "Deactivate" } });
 
-        const posts = await createPostModel
-            .find({ userId, Product_status: { $ne: "Deactivate" } })
-            .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
-            .skip(skip)
-            .limit(limit);
-console.log(posts,"posts")
-        const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
-        const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
+            const posts = await createPostModel
+                .find({ userId, Product_status: { $ne: "Deactivate" } })
+                .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
+                .skip(skip)
+                .limit(limit);
+            console.log(posts, "posts")
+            const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
+            const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
 
-        // Filter only active favorite posts
-        const favoritePostIds = favoritePosts.map((f) => f.post_id);
-        const activeFavoritePosts = await createPostModel.find({
-            _id: { $in: favoritePostIds },
-            Product_status: { $ne: "Deactivate" }
-        }).select("_id");
-        const activeFavoriteSet = new Set(activeFavoritePosts.map((p) => p._id.toString()));
+            // Filter only active favorite posts
+            const favoritePostIds = favoritePosts.map((f) => f.post_id);
+            const activeFavoritePosts = await createPostModel.find({
+                _id: { $in: favoritePostIds },
+                Product_status: { $ne: "Deactivate" }
+            }).select("_id");
+            const activeFavoriteSet = new Set(activeFavoritePosts.map((p) => p._id.toString()));
 
-        // Filter only active bookmarked posts
-        const bookmarkedPostIds = bookmarkedPosts.map((b) => b.post_id);
-        const activeBookmarkedPosts = await createPostModel.find({
-            _id: { $in: bookmarkedPostIds },
-            Product_status: { $ne: "Deactivate" }
-        }).select("_id");
-        const activeBookmarkSet = new Set(activeBookmarkedPosts.map((p) => p._id.toString()));
+            // Filter only active bookmarked posts
+            const bookmarkedPostIds = bookmarkedPosts.map((b) => b.post_id);
+            const activeBookmarkedPosts = await createPostModel.find({
+                _id: { $in: bookmarkedPostIds },
+                Product_status: { $ne: "Deactivate" }
+            }).select("_id");
+            const activeBookmarkSet = new Set(activeBookmarkedPosts.map((p) => p._id.toString()));
 
-        // Format posts
-        const formattedPosts = await Promise.all(
-            posts.map(async (post) => {
-                const isFavorite = activeFavoriteSet.has(post._id.toString());
-                const isBookmarked = activeBookmarkSet.has(post._id.toString());
+            // Format posts
+            const formattedPosts = await Promise.all(
+                posts.map(async (post) => {
+                    const isFavorite = activeFavoriteSet.has(post._id.toString());
+                    const isBookmarked = activeBookmarkSet.has(post._id.toString());
 
-                // Get top comments
-                let topComments = await CommentModel.find({ postId: post._id })
-                    .sort({ likesCount: -1, createdAt: -1 })
-                    .limit(2)
-                    .lean();
-
-                if (!topComments.length) {
-                    topComments = await CommentModel.find({ postId: post._id })
-                        .sort({ createdAt: -1 })
+                    // Get top comments
+                    let topComments = await CommentModel.find({ postId: post._id })
+                        .sort({ likesCount: -1, createdAt: -1 })
                         .limit(2)
                         .lean();
-                }
 
-                const formattedComments = await Promise.all(
-                    topComments.map(async (comment) => {
-                        const user = await UserInfo.findOne({ id: comment.userId });
-                        return {
-                            commentId: comment._id.toString(),
-                            id: comment._id.toString(),
-                            content: comment.content,
-                            createdAt: comment.createdAt,
-                            userInfo: {
-                                name: user?.name || "",
-                                avatar: user?.avatarUrl || "",
-                            },
-                        };
-                    })
-                );
+                    if (!topComments.length) {
+                        topComments = await CommentModel.find({ postId: post._id })
+                            .sort({ createdAt: -1 })
+                            .limit(2)
+                            .lean();
+                    }
 
-                return {
-                    id: post._id.toString(),
-                    username: post.userName,
-                    userAvatar: post.userAvatar,
-                    caption: post.caption,
-                    thumbnailUrl: post.thumbnailUrl,
-                    likesCount: post.likesCount,
-                    commentsCount: post.commentsCount,
-                    viewsCount: post.viewsCount,
-                    sharesCount: post.sharesCount,
-                    rePostCount: post.rePostCount,
-                    userId: post.userId,
-                    productId: post.productId,
-                    isBusinessAccount: post.isBusinessAccount,
-                    isRepost: post.isRepost,
-                    isOwnPost: post.isOwnPost,
-                    isProductPost: post.isProductPost,
-                    mediaItems: post.mediaItems.map((media) => ({
-                        url: media.url,
-                        type: media.type,
-                        thumbnailUrl: media.thumbnailUrl,
-                        productName: media.productName,
-                        price: media.price,
-                        originalPrice: media.originalPrice,
-                        hasDiscount: media.hasDiscount,
-                    })),
-                    repostDetails: post.repostDetails
-                        ? {
-                            originalPostId: post.repostDetails.originalPostId?.toString() || "",
-                            originalUserId: post.repostDetails.originalUserId || "",
-                            originalUserName: post.repostDetails.originalUserName || "",
-                            originalUserAvatar: post.repostDetails.originalUserAvatar || "",
-                            originalCaption: post.repostDetails.originalCaption || "",
-                            originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
-                                url: media.url,
-                                type: media.type,
-                                thumbnailUrl: media.thumbnailUrl,
-                                productName: media.productName,
-                                price: media.price,
-                                originalPrice: media.originalPrice,
-                                hasDiscount: media.hasDiscount,
-                            })),
-                        }
-                        : null,
-                    likes: post.likesCount,
-                    comments: formattedComments,
-                    timestamp: post.timestamp,
-                    isFavorite,
-                    isBookmarked,
-                };
-            })
-        );
+                    const formattedComments = await Promise.all(
+                        topComments.map(async (comment) => {
+                            const user = await UserInfo.findOne({ id: comment.userId });
+                            return {
+                                commentId: comment._id.toString(),
+                                id: comment._id.toString(),
+                                content: comment.content,
+                                createdAt: comment.createdAt,
+                                userInfo: {
+                                    name: user?.name || "",
+                                    avatar: user?.avatarUrl || "",
+                                },
+                            };
+                        })
+                    );
 
-        return {
-            posts: formattedPosts,
-            hasMorePosts: totalPostsCount > skip + posts.length,
-            totalPostsCount,
-        };
-    } catch (error) {
-        console.error("Error fetching user posts:", error);
-        return {
-            posts: [],
-            hasMorePosts: false,
-            totalPostsCount: 0,
-        };
-    }
-},
+                    return {
+                        id: post._id.toString(),
+                        username: post.userName,
+                        userAvatar: post.userAvatar,
+                        caption: post.caption,
+                        thumbnailUrl: post.thumbnailUrl,
+                        likesCount: post.likesCount,
+                        commentsCount: post.commentsCount,
+                        viewsCount: post.viewsCount,
+                        sharesCount: post.sharesCount,
+                        rePostCount: post.rePostCount,
+                        userId: post.userId,
+                        productId: post.productId,
+                        isBusinessAccount: post.isBusinessAccount,
+                        isRepost: post.isRepost,
+                        isOwnPost: post.isOwnPost,
+                        isProductPost: post.isProductPost,
+                        mediaItems: post.mediaItems.map((media) => ({
+                            url: media.url,
+                            type: media.type,
+                            thumbnailUrl: media.thumbnailUrl,
+                            productName: media.productName,
+                            price: media.price,
+                            originalPrice: media.originalPrice,
+                            hasDiscount: media.hasDiscount,
+                        })),
+                        repostDetails: post.repostDetails
+                            ? {
+                                originalPostId: post.repostDetails.originalPostId?.toString() || "",
+                                originalUserId: post.repostDetails.originalUserId || "",
+                                originalUserName: post.repostDetails.originalUserName || "",
+                                originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+                                originalCaption: post.repostDetails.originalCaption || "",
+                                originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
+                                    url: media.url,
+                                    type: media.type,
+                                    thumbnailUrl: media.thumbnailUrl,
+                                    productName: media.productName,
+                                    price: media.price,
+                                    originalPrice: media.originalPrice,
+                                    hasDiscount: media.hasDiscount,
+                                })),
+                            }
+                            : null,
+                        likes: post.likesCount,
+                        comments: formattedComments,
+                        timestamp: post.timestamp,
+                        isFavorite,
+                        isBookmarked,
+                    };
+                })
+            );
+
+            return {
+                posts: formattedPosts,
+                hasMorePosts: totalPostsCount > skip + posts.length,
+                totalPostsCount,
+            };
+        } catch (error) {
+            console.error("Error fetching user posts:", error);
+            return {
+                posts: [],
+                hasMorePosts: false,
+                totalPostsCount: 0,
+            };
+        }
+    },
 
 
     // =======
@@ -4589,11 +4590,22 @@ console.log(posts,"posts")
                 await FavoriteModel.findOneAndDelete({ user_id, post_id });
                 await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
 
+                await Playlist.findOneAndUpdate(
+                    { userId: user_id, name: "Favorites" },
+                    { $pull: { post_id: post_id } }
+                );
+
                 return { message: "Removed from favorites", liked: false };
             }
 
             const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
             await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
+
+            const playlist = await Playlist.findOneAndUpdate(
+                { userId: user_id, name: "Favorites" },
+                { $addToSet: { videos: post_id } },
+                { upsert: true, new: true }
+            );
 
             return { message: "Added to favorites", liked: true, data: newLike };
         } catch (error) {
@@ -4846,7 +4858,49 @@ console.log(posts,"posts")
             console.log(error)
             throw error
         }
+    },
+
+
+
+
+
+getCollection: async (userId) => {
+    console.log(userId, "userId");
+    try {
+        const collection = await Playlist.find({ userId });
+
+        if (!collection || collection.length === 0) {
+            throw new Error("No collections found for this user");
+        }
+
+        // Sort so "Favorites" is first
+        collection.sort((a, b) => {
+            if (a.name === "Favorites") return -1;
+            if (b.name === "Favorites") return 1;
+            return 0;
+        });
+
+        const groupedCollections = await Promise.all(
+            collection.map(async (playlist) => {
+                const posts = await createPostModel.find({ _id: { $in: playlist.post_id } });
+                return {
+                    _id: playlist._id,
+                    name: playlist.name,
+                    userId: playlist.userId,
+                    posts: posts,
+                };
+            })
+        );
+
+        return groupedCollections;
+    } catch (error) {
+        console.log(error);
+        throw error;
     }
+}
+
+
+
 
 
 }
