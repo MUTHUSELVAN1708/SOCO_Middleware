@@ -1649,129 +1649,422 @@ const adminService = {
     //         return { success: false, message: error.message };
     //     }
     // },
-    searchRecommendation: async (query, typeOfSearch = "Name", page = 1, limit = 25) => {
-        try {
-            if (!query || typeof query !== 'string' || !query.trim()) {
-                return { success: false, message: "Invalid or missing query parameter" };
-            }
+searchRecommendation: async (query, typeOfSearch = "Name", page = 1, limit = 25) => {
+    try {
+        if (!query || typeof query !== 'string' || !query.trim()) {
+            return { success: false, message: "Invalid or missing query parameter" };
+        }
 
-            const normalizedQuery = query.toLowerCase();
-            let results;
+        const normalizedQuery = query.toLowerCase().trim();
+        let results = [];
 
-            if (typeOfSearch === "Location") {
-                const conditions = [
+        // Function to calculate relevance score based on match quality
+        const calculateScore = (fieldValue, query) => {
+            if (!fieldValue) return 0;
+            const value = fieldValue.toString().toLowerCase();
+            
+            // Exact match gets highest score
+            if (value === query) return 20;
+            // Starts with query gets high score
+            if (value.startsWith(query)) return 15;
+            // Contains query as a whole word gets medium score
+            if (new RegExp(`\\b${query}\\b`).test(value)) return 12;
+            // Contains query gets lower score
+            if (value.includes(query)) return 10;
+            // Partial match gets lowest score
+            return 5;
+        };
+
+        if (typeOfSearch === "Location") {
+            // Location search for users
+            const locationQuery = {
+                $or: [
                     { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
                     { 'address.city': { $regex: normalizedQuery, $options: 'i' } },
                     { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
                     { 'address.country': { $regex: normalizedQuery, $options: 'i' } }
-                ];
+                ]
+            };
 
-                // If the query is a number, add a condition for Pincode
-                if (!isNaN(query)) {
-                    conditions.push({ 'address.Pincode': Number(query) });
-                }
+            // If the query is a number, add a condition for Pincode
+            if (!isNaN(query)) {
+                locationQuery.$or.push({ 'address.Pincode': Number(query) });
+            }
 
-                const locationResults = await locationModel.find({
-                    $or: conditions
-                }).select('_id address');
+            // Get all matching locations
+            const locationResults = await locationModel.find(locationQuery)
+                .select('_id address lat lng');
 
-
+            // Extract user data based on location IDs
+            if (locationResults.length > 0) {
                 const locationIds = locationResults.map(location => location._id);
+                const locationMap = new Map(locationResults.map(loc => [loc._id.toString(), loc]));
 
                 const userResults = await registerModel.find({
                     location_id: { $in: locationIds }
-                }).select('_id full_Name profile_url');
+                }).select('_id full_Name profile_url location_id');
 
-                const formattedUserResults = userResults.map(user => ({
-                    _id: user._id,
-                    full_Name: user.full_Name,
-                    type: "User",
-                    profile_url: user.profile_url || "",
-                    score: 1 // Assign a base score
-                }));
-                const businessConditions = [
-                    { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
-                    { businessCity: { $regex: normalizedQuery, $options: 'i' } },
-                    { businessState: { $regex: normalizedQuery, $options: 'i' } }
-                ];
+                // Format user results with location data
+                const formattedUserResults = userResults.map(user => {
+                    const locationData = locationMap.get(user.location_id.toString()) || {};
+                    const addressText = locationData.address ? 
+                        [
+                            locationData.address.street,
+                            locationData.address.city,
+                            locationData.address.district,
+                            locationData.address.country,
+                            locationData.address.Pincode
+                        ].filter(Boolean).join(', ') : '';
+                    
+                    // Calculate score based on how well the location matches the query
+                    let score = 0;
+                    if (locationData.address) {
+                        score += calculateScore(locationData.address.street, normalizedQuery);
+                        score += calculateScore(locationData.address.city, normalizedQuery);
+                        score += calculateScore(locationData.address.district, normalizedQuery);
+                        score += calculateScore(locationData.address.country, normalizedQuery);
+                        if (locationData.address.Pincode) {
+                            score += calculateScore(locationData.address.Pincode.toString(), normalizedQuery);
+                        }
+                    }
 
-                if (!isNaN(query)) {
-                    businessConditions.push({ businessPinCode: Number(query) });
-                }
-
-                const businessResults = await businessregisterModel.find({
-                    $or: businessConditions
-                }).select('_id businessName brand_logo');
-
-
-                const formattedBusinessResults = businessResults.map(business => ({
-                    _id: business._id,
-                    name: business.businessName,
-                    type: "Business",
-                    profile_url: business.brand_logo || "",
-                    score: 1 // Assign a base score
-                }));
-
-                results = [...formattedUserResults, ...formattedBusinessResults];
-            } else if (typeOfSearch === "Name") {
-                const userResults = await registerModel.find({
-                    full_Name: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id full_Name profile_url');
-
-                const businessResults = await businessregisterModel.find({
-                    businessName: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id businessName brand_logo');
-
-                results = [
-                    ...userResults.map(user => ({
+                    return {
                         _id: user._id,
                         full_Name: user.full_Name,
                         type: "User",
                         profile_url: user.profile_url || "",
-                        score: user.full_Name.toLowerCase().includes(normalizedQuery) ? 10 : 5 // Higher score for exact matches
-                    })),
-                    ...businessResults.map(business => ({
-                        _id: business._id,
-                        businessName: business.businessName,
-                        type: "Business",
-                        profile_url: business.brand_logo || "",
-                        score: business.businessName.toLowerCase().includes(normalizedQuery) ? 10 : 5 // Higher score for exact matches
-                    }))
-                ];
-            } else {
-                return { success: false, message: "Invalid TypeOfSearch parameter" };
+                        address: addressText,
+                        lat: locationData.lat || "",
+                        lng: locationData.lng || "",
+                        score: score
+                    };
+                });
+
+                results = [...results, ...formattedUserResults];
             }
 
-            if (results.length === 0) {
-                return { success: false, message: "No matching results found" };
-            }
-
-            // Sort results by score (highest first)
-            results.sort((a, b) => b.score - a.score);
-
-            // Pagination
-            const totalResults = results.length;
-            const totalPages = Math.ceil(totalResults / limit);
-            const currentPage = Math.max(1, Math.min(page, totalPages));
-            const startIndex = (currentPage - 1) * limit;
-            const paginatedResults = results.slice(startIndex, startIndex + limit);
-
-            return {
-                success: true,
-                data: paginatedResults,
-                pagination: {
-                    totalResults,
-                    totalPages,
-                    currentPage,
-                    limit,
-                    hasNextPage: currentPage < totalPages,
-                    hasPreviousPage: currentPage > 1
-                }
+            // Business location search
+            const businessQuery = {
+                $or: [
+                    { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
+                    { businessCity: { $regex: normalizedQuery, $options: 'i' } },
+                    { businessState: { $regex: normalizedQuery, $options: 'i' } },
+                    { businessCountry: { $regex: normalizedQuery, $options: 'i' } }
+                ]
             };
-        } catch (error) {
-            return { success: false, message: error.message };
+
+            if (!isNaN(query)) {
+                businessQuery.$or.push({ businessPinCode: Number(query) });
+            }
+
+            const businessResults = await businessregisterModel.find(businessQuery)
+                .select('_id businessName brand_logo businessAddress businessCity businessState businessCountry businessPinCode lat lng');
+
+            // Format business results
+            const formattedBusinessResults = businessResults.map(business => {
+                const addressText = [
+                    business.businessAddress,
+                    business.businessCity,
+                    business.businessState,
+                    business.businessCountry,
+                    business.businessPinCode
+                ].filter(Boolean).join(', ');
+
+                // Calculate score based on how well the location matches the query
+                let score = 0;
+                score += calculateScore(business.businessAddress, normalizedQuery);
+                score += calculateScore(business.businessCity, normalizedQuery);
+                score += calculateScore(business.businessState, normalizedQuery);
+                score += calculateScore(business.businessCountry, normalizedQuery);
+                if (business.businessPinCode) {
+                    score += calculateScore(business.businessPinCode.toString(), normalizedQuery);
+                }
+
+                return {
+                    _id: business._id,
+                    businessName: business.businessName,
+                    type: "Business",
+                    profile_url: business.brand_logo || "",
+                    address: addressText,
+                    lat: business.lat || "",
+                    lng: business.lng || "",
+                    score: score
+                };
+            });
+
+            results = [...results, ...formattedBusinessResults];
+        } 
+        else if (typeOfSearch === "Name") {
+            // User name search - improved to include fuzzy matching
+            const userResults = await registerModel.aggregate([
+                {
+                    $match: { full_Name: { $regex: normalizedQuery, $options: 'i' } }
+                },
+                {
+                    $lookup: {
+                        from: 'locations',
+                        localField: 'location_id',
+                        foreignField: '_id',
+                        as: 'locationData'
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        full_Name: 1,
+                        profile_url: 1,
+                        lat: { $arrayElemAt: ['$locationData.lat', 0] },
+                        lng: { $arrayElemAt: ['$locationData.lng', 0] },
+                        address: {
+                            $concat: [
+                                { $arrayElemAt: ['$locationData.address.street', 0] }, ', ',
+                                { $arrayElemAt: ['$locationData.address.city', 0] }, ', ',
+                                { $arrayElemAt: ['$locationData.address.district', 0] }, ', ',
+                                { $arrayElemAt: ['$locationData.address.country', 0] }
+                            ]
+                        }
+                    }
+                }
+            ]);
+
+            // Calculate score based on name match quality
+            const formattedUserResults = userResults.map(user => ({
+                _id: user._id,
+                full_Name: user.full_Name,
+                type: "User",
+                profile_url: user.profile_url || "",
+                address: user.address || "",
+                lat: user.lat || "",
+                lng: user.lng || "",
+                score: calculateScore(user.full_Name, normalizedQuery)
+            }));
+
+            // Business name search
+            const businessResults = await businessregisterModel.find({
+                businessName: { $regex: normalizedQuery, $options: 'i' }
+            }).select('_id businessName brand_logo businessAddress businessCity businessState businessCountry businessPinCode lat lng');
+
+            const formattedBusinessResults = businessResults.map(business => {
+                const addressText = [
+                    business.businessAddress,
+                    business.businessCity,
+                    business.businessState,
+                    business.businessCountry,
+                    business.businessPinCode
+                ].filter(Boolean).join(', ');
+
+                return {
+                    _id: business._id,
+                    businessName: business.businessName,
+                    type: "Business",
+                    profile_url: business.brand_logo || "",
+                    address: addressText,
+                    lat: business.lat || "",
+                    lng: business.lng || "",
+                    score: calculateScore(business.businessName, normalizedQuery)
+                };
+            });
+
+            results = [...formattedUserResults, ...formattedBusinessResults];
         }
-    },
+        // Add a new search type for proximity search (if lat/lng provided)
+        else if (typeOfSearch === "Proximity") {
+            // Extract user's lat and lng from the query string (format: "lat,lng,radius")
+            const [userLat, userLng, radiusKm = 10] = normalizedQuery.split(',').map(Number);
+            
+            if (isNaN(userLat) || isNaN(userLng)) {
+                return { success: false, message: "Invalid coordinates format. Use 'latitude,longitude' or 'latitude,longitude,radiusKm'" };
+            }
+
+            // Convert radius from km to radians (for MongoDB's $geoNear)
+            const radiusInRadians = radiusKm / 6371; // Earth radius in km
+
+            // Find users within the radius
+            const nearbyLocations = await locationModel.find({
+                lat: { $exists: true },
+                lng: { $exists: true },
+                $where: function() {
+                    if (!this.lat || !this.lng) return false;
+                    
+                    const lat1 = parseFloat(this.lat);
+                    const lng1 = parseFloat(this.lng);
+                    const lat2 = userLat;
+                    const lng2 = userLng;
+                    
+                    if (isNaN(lat1) || isNaN(lng1)) return false;
+                    
+                    // Haversine formula
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLon = (lng2 - lng1) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                              Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    const distance = 6371 * c; // Distance in km
+                    
+                    return distance <= radiusKm;
+                }
+            }).select('_id address lat lng');
+
+            // Process user results
+            if (nearbyLocations.length > 0) {
+                const locationIds = nearbyLocations.map(loc => loc._id);
+                const locationMap = new Map(nearbyLocations.map(loc => [loc._id.toString(), loc]));
+
+                const nearbyUsers = await registerModel.find({
+                    location_id: { $in: locationIds }
+                }).select('_id full_Name profile_url location_id');
+
+                const formattedUserResults = nearbyUsers.map(user => {
+                    const locationData = locationMap.get(user.location_id.toString()) || {};
+                    
+                    // Calculate distance
+                    let distance = 0;
+                    if (locationData.lat && locationData.lng) {
+                        const lat1 = parseFloat(locationData.lat);
+                        const lng1 = parseFloat(locationData.lng);
+                        const lat2 = userLat;
+                        const lng2 = userLng;
+                        
+                        // Haversine formula
+                        const dLat = (lat2 - lat1) * Math.PI / 180;
+                        const dLon = (lng2 - lng1) * Math.PI / 180;
+                        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                                Math.sin(dLon/2) * Math.sin(dLon/2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                        distance = 6371 * c; // Distance in km
+                    }
+                    
+                    const addressText = locationData.address ? 
+                        [
+                            locationData.address.street,
+                            locationData.address.city,
+                            locationData.address.district,
+                            locationData.address.country,
+                            locationData.address.Pincode
+                        ].filter(Boolean).join(', ') : '';
+                    
+                    return {
+                        _id: user._id,
+                        full_Name: user.full_Name,
+                        type: "User",
+                        profile_url: user.profile_url || "",
+                        address: addressText,
+                        lat: locationData.lat || "",
+                        lng: locationData.lng || "",
+                        distance: distance.toFixed(2), // Distance in km
+                        score: 20 - distance // Score based on proximity (closer = higher score)
+                    };
+                });
+
+                results = [...results, ...formattedUserResults];
+            }
+
+            // Find nearby businesses
+            const nearbyBusinesses = await businessregisterModel.find({
+                lat: { $exists: true },
+                lng: { $exists: true },
+                $where: function() {
+                    if (!this.lat || !this.lng) return false;
+                    
+                    const lat1 = parseFloat(this.lat);
+                    const lng1 = parseFloat(this.lng);
+                    const lat2 = userLat;
+                    const lng2 = userLng;
+                    
+                    if (isNaN(lat1) || isNaN(lng1)) return false;
+                    
+                    // Haversine formula
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLon = (lng2 - lng1) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                              Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    const distance = 6371 * c; // Distance in km
+                    
+                    return distance <= radiusKm;
+                }
+            }).select('_id businessName brand_logo businessAddress businessCity businessState businessCountry businessPinCode lat lng');
+
+            const formattedBusinessResults = nearbyBusinesses.map(business => {
+                // Calculate distance
+                let distance = 0;
+                if (business.lat && business.lng) {
+                    const lat1 = parseFloat(business.lat);
+                    const lng1 = parseFloat(business.lng);
+                    const lat2 = userLat;
+                    const lng2 = userLng;
+                    
+                    // Haversine formula
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLon = (lng2 - lng1) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                            Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    distance = 6371 * c; // Distance in km
+                }
+                
+                const addressText = [
+                    business.businessAddress,
+                    business.businessCity,
+                    business.businessState,
+                    business.businessCountry,
+                    business.businessPinCode
+                ].filter(Boolean).join(', ');
+
+                return {
+                    _id: business._id,
+                    businessName: business.businessName,
+                    type: "Business",
+                    profile_url: business.brand_logo || "",
+                    address: addressText,
+                    lat: business.lat || "",
+                    lng: business.lng || "",
+                    distance: distance.toFixed(2), // Distance in km
+                    score: 20 - distance // Score based on proximity (closer = higher score)
+                };
+            });
+
+            results = [...results, ...formattedBusinessResults];
+        }
+        else {
+            return { success: false, message: "Invalid typeOfSearch parameter. Use 'Name', 'Location', or 'Proximity'." };
+        }
+
+        if (results.length === 0) {
+            return { success: false, message: "No matching results found" };
+        }
+
+        // Sort results by score (highest first)
+        results.sort((a, b) => b.score - a.score);
+
+        // Pagination
+        const totalResults = results.length;
+        const totalPages = Math.ceil(totalResults / limit);
+        const currentPage = Math.max(1, Math.min(page, totalPages));
+        const startIndex = (currentPage - 1) * limit;
+        const paginatedResults = results.slice(startIndex, startIndex + limit);
+
+        return {
+            success: true,
+            data: paginatedResults,
+            pagination: {
+                totalResults,
+                totalPages,
+                currentPage,
+                limit,
+                hasNextPage: currentPage < totalPages,
+                hasPreviousPage: currentPage > 1
+            }
+        };
+    } catch (error) {
+        console.error("Search recommendation error:", error);
+        return { success: false, message: error.message };
+    }
+},
 
 
 

@@ -461,6 +461,7 @@ export const getProduct = async (req, res) => {
     };
 
 
+
     // Optional filters
     if (discount) {
       baseMatch["pricing.discount"] = { $gte: Number(discount) };
