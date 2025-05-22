@@ -24,6 +24,7 @@ const BusinessregisterSchema = new mongoose.Schema(
     friendCount: { type: Number, default: 0 },
     lat: { type: String, required: false },
     lng: { type: String, required: false },
+    description: { type: String, required: false },
     needPermissionForFollowing: { type: Boolean, default: false },
     friendPermission: { type: Boolean, default: false },
     isThereAnyNotification: { type: Boolean, default: false },
