@@ -245,6 +245,10 @@ export const getDashboardFeed = async (req, res) => {
 
     const formattedPosts = await Promise.all(
       posts.map(async (post) => {
+        await createPostModel.updateOne(
+          { _id: post._id },
+          { $inc: { viewsCount: 1 } }
+        );
         const isFavorite = favoriteSet.has(post._id.toString());
         const isBookmarked = bookmarkSet.has(post._id.toString());
 
@@ -261,79 +265,79 @@ export const getDashboardFeed = async (req, res) => {
         }
 
         const formattedComments = await Promise.all(
-            topComments.map(async (comment) => {
-              const user = await UserInfo.findOne({ id: comment.userId }); // userId should exist on comment
-          
-              return {
-                commentId: comment._id.toString(),
-                id: comment._id.toString(),
-                content: comment.content,
-                createdAt: comment.createdAt,
-                userInfo: {
-                  name: user?.name || "",
-                  avatar: user?.avatarUrl || "",
-                },
-              };
-            })
-          );
+          topComments.map(async (comment) => {
+            const user = await UserInfo.findOne({ id: comment.userId }); // userId should exist on comment
 
-          return {
-            id: post._id.toString(),
-            username: post.userName,
-            userId: post.userId,
-            productId: post.productId,
-            isBusinessAccount: post.isBusinessAccount,
-            userAvatar: post.userAvatar,
-            caption: post.caption,
-            thumbnailUrl: post.thumbnailUrl,
-            likesCount: post.likesCount,
-            commentsCount: post.commentsCount,
-            viewsCount: post.viewsCount,
-            sharesCount: post.sharesCount,
-            rePostCount: post.rePostCount,
-            isRepost: post.isRepost,
-            isOwnPost: post.isOwnPost,
-            isProductPost: post.isProductPost,
-            mediaItems: post.mediaItems.map((media) => ({
-              url: media.url,
-              type: media.type,
-              thumbnailUrl: media.thumbnailUrl,
-              productName: media.productName,
-              price: media.price,
-              originalPrice: media.originalPrice,
-              hasDiscount: media.hasDiscount,
-            })),
-            repostDetails: post.repostDetails
-  ? {
-      originalPostId: post.repostDetails.originalPostId?.toString() || "",
-      originalUserId: post.repostDetails.originalUserId || "",
-      originalUserName: post.repostDetails.originalUserName || "",
-      originalUserAvatar: post.repostDetails.originalUserAvatar || "",
-      originalCaption: post.repostDetails.originalCaption || "",
-      originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
-        url: media.url,
-        type: media.type,
-        thumbnailUrl: media.thumbnailUrl,
-        productName: media.productName,
-        price: media.price,
-        originalPrice: media.originalPrice,
-        hasDiscount: media.hasDiscount,
-      })),
-      isBusinessAccount: await (async () => {
-        const originalUser = await registerModel.findOne({ _id: post.repostDetails.originalUserId });
-        if (originalUser) return false;
-        const originalBusinessUser = await businessRegisterModel.findOne({ _id: post.repostDetails.originalUserId });
-        return !!originalBusinessUser;
-      })(),
-    }
-  : null,
-            likes: post.likesCount,
-            comments: formattedComments,
-            timestamp: post.timestamp,
-            isFavorite,
-            isBookmarked,
-          };
-          
+            return {
+              commentId: comment._id.toString(),
+              id: comment._id.toString(),
+              content: comment.content,
+              createdAt: comment.createdAt,
+              userInfo: {
+                name: user?.name || "",
+                avatar: user?.avatarUrl || "",
+              },
+            };
+          })
+        );
+
+        return {
+          id: post._id.toString(),
+          username: post.userName,
+          userId: post.userId,
+          productId: post.productId,
+          isBusinessAccount: post.isBusinessAccount,
+          userAvatar: post.userAvatar,
+          caption: post.caption,
+          thumbnailUrl: post.thumbnailUrl,
+          likesCount: post.likesCount,
+          commentsCount: post.commentsCount,
+          viewsCount: post.viewsCount,
+          sharesCount: post.sharesCount,
+          rePostCount: post.rePostCount,
+          isRepost: post.isRepost,
+          isOwnPost: post.isOwnPost,
+          isProductPost: post.isProductPost,
+          mediaItems: post.mediaItems.map((media) => ({
+            url: media.url,
+            type: media.type,
+            thumbnailUrl: media.thumbnailUrl,
+            productName: media.productName,
+            price: media.price,
+            originalPrice: media.originalPrice,
+            hasDiscount: media.hasDiscount,
+          })),
+          repostDetails: post.repostDetails
+            ? {
+              originalPostId: post.repostDetails.originalPostId?.toString() || "",
+              originalUserId: post.repostDetails.originalUserId || "",
+              originalUserName: post.repostDetails.originalUserName || "",
+              originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+              originalCaption: post.repostDetails.originalCaption || "",
+              originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
+                url: media.url,
+                type: media.type,
+                thumbnailUrl: media.thumbnailUrl,
+                productName: media.productName,
+                price: media.price,
+                originalPrice: media.originalPrice,
+                hasDiscount: media.hasDiscount,
+              })),
+              isBusinessAccount: await (async () => {
+                const originalUser = await registerModel.findOne({ _id: post.repostDetails.originalUserId });
+                if (originalUser) return false;
+                const originalBusinessUser = await businessRegisterModel.findOne({ _id: post.repostDetails.originalUserId });
+                return !!originalBusinessUser;
+              })(),
+            }
+            : null,
+          likes: post.likesCount,
+          comments: formattedComments,
+          timestamp: post.timestamp,
+          isFavorite,
+          isBookmarked,
+        };
+
       })
     );
 
@@ -353,6 +357,8 @@ export const getDashboardFeed = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
 
 
 
