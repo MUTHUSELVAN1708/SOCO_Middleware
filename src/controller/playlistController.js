@@ -40,98 +40,106 @@ const addToWatchLater = async (req, res) => {
 
 // Create a new playlist
 const createPlaylist = async (req, res) => {
-    const { userId, name } = req.body;
+  const { userId, name, isPublic = true } = req.body;
 
-    try {
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({
-                success: false,
-                status: 400,
-                message: "Invalid userId format"
-            });
-        }
-
-        const existingPlaylist = await Playlist.findOne({ userId, name });
-        if (existingPlaylist) {
-            return res.status(409).json({
-                success: false,
-                status: 409,
-                message: "A playlist with this name already exists for this user"
-            });
-        }
-
-        const newPlaylist = new Playlist({
-            playlistId: uuidv4(),
-            userId: new mongoose.Types.ObjectId(userId),
-            name,
-            videos: [],
-        });
-
-        await newPlaylist.save();
-
-        return res.status(201).json({
-            success: true,
-            status: 201,
-            message: "Playlist created successfully",
-            playlist: {
-                _id: newPlaylist._id,
-                playlistId: newPlaylist.playlistId,
-                userId: newPlaylist.userId,
-                name: newPlaylist.name,
-            }
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            status: 500,
-            message: error.message
-        });
+  try {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Invalid userId format"
+      });
     }
+
+    const existingPlaylist = await Playlist.findOne({ userId, name });
+    if (existingPlaylist) {
+      return res.status(409).json({
+        success: false,
+        status: 409,
+        message: "A playlist with this name already exists for this user"
+      });
+    }
+
+    const newPlaylist = new Playlist({
+      playlistId: uuidv4(),
+      userId: new mongoose.Types.ObjectId(userId),
+      name,
+      videos: [],
+      isPublic,
+    });
+
+    await newPlaylist.save();
+
+    return res.status(201).json({
+      success: true,
+      status: 201,
+      message: "Playlist created successfully",
+      playlist: {
+        _id: newPlaylist._id,
+        playlistId: newPlaylist.playlistId,
+        userId: newPlaylist.userId,
+        name: newPlaylist.name,
+        isPublic: newPlaylist.isPublic,
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: error.message
+    });
+  }
 };
 
 
 const getUserPlaylistsWithVideoStatus = async (req, res) => {
-    const { userId, videoId } = req.query;
+  const { userId, videoId } = req.query;
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return handleError(res, 400, "Invalid userId format");
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return handleError(res, 400, "Invalid userId format");
+  }
+
+  try {
+    let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Keep for Later" });
+
+    if (!watchLaterPlaylist) {
+      watchLaterPlaylist = new Playlist({
+        playlistId: uuidv4(),
+        userId: new mongoose.Types.ObjectId(userId),
+        name: "Keep for Later",
+        videos: [],
+        isPublic: true,
+      });
+      await watchLaterPlaylist.save();
     }
 
-    try {
-        let watchLaterPlaylist = await Playlist.findOne({ userId, name: "Keep for Later" });
+    const playlists = await Playlist.find({ userId }).sort({ _id: -1 });
 
-        if (!watchLaterPlaylist) {
-            watchLaterPlaylist = new Playlist({
-                playlistId: uuidv4(),
-                userId: new mongoose.Types.ObjectId(userId),
-                name: "Keep for Later",
-                videos: [],
-            });
-            await watchLaterPlaylist.save();
-        }
+    const formattedPlaylists = playlists
+      .filter(playlist => playlist.name !== "LikedPosts")
+      .map(playlist => ({
+        playlistId: playlist.playlistId,
+        name: playlist.name,
+        isVideoInPlaylist: playlist.videos.includes(videoId),
+        isPublic: playlist.isPublic,
+      }));
 
-        const playlists = await Playlist.find({ userId }).sort({ _id: -1 });
+    // Sorting logic
+    formattedPlaylists.sort((a, b) => {
+      if (a.name === "Keep for Later") return -1;
+      if (b.name === "Keep for Later") return 1;
+      if (a.isVideoInPlaylist && !b.isVideoInPlaylist) return -1;
+      if (!a.isVideoInPlaylist && b.isVideoInPlaylist) return 1;
+      return 0;
+    });
 
-        const formattedPlaylists = playlists.map(playlist => ({
-            playlistId: playlist.playlistId,
-            name: playlist.name,
-            isVideoInPlaylist: playlist.videos.includes(videoId),
-        }));
-
-        // Sorting logic
-        formattedPlaylists.sort((a, b) => {
-            if (a.name === "Keep for Later") return -1; // Watch Later first
-            if (b.name === "Keep for Later") return 1;
-            if (a.isVideoInPlaylist && !b.isVideoInPlaylist) return -1; // Videos that contain the video come next
-            if (!a.isVideoInPlaylist && b.isVideoInPlaylist) return 1;
-            return 0; // Maintain original date order for others
-        });
-
-        return handleSuccessV1(res, 200, "Playlists fetched successfully", formattedPlaylists);
-    } catch (error) {
-        return handleError(res, 500, error.message);
-    }
+    return handleSuccessV1(res, 200, "Playlists fetched successfully", formattedPlaylists);
+  } catch (error) {
+    return handleError(res, 500, error.message);
+  }
 };
+
+
 
 const getAllPlaylistsPaginated = async (req, res) => {
     try {
