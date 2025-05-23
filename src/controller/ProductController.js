@@ -394,7 +394,7 @@ export const getProductCategories = async (req, res) => {
   const { createdBy } = req.query;
 
   try {
-    const products = await Product.find({ createdBy, status: "Activate" }).select("basicInfo.categories images");
+    const products = await Product.find({ createdBy, status: { $ne: "Deactivate"}}).select("basicInfo.categories images");
 
     const categoryMap = {};
 
@@ -436,103 +436,209 @@ export const getProductCategories = async (req, res) => {
     });
   }
 };
-
 export const getProduct = async (req, res) => {
   try {
     const {
-      category,
-      sortBy,
-      color,
-      discount,
-      priceRange,
+      in_stock,
+      price_min,
+      price_max,
+      discount_min,
+      discount_max,
+      categories,
+      brands,
+      tags,
+      sizes,
+      materials,
+      units,
+      sort_by,
       createdBy,
       page = 1,
       limit = 10
     } = req.body;
-
+    console.log(req.body, "kkjhhh")
     if (!createdBy) {
       return res.status(400).json({ message: "createdBy is required." });
     }
 
-    const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
-    const baseMatch = {
-      createdBy: createdByObjectId,
-      status: { $ne: "Deactivate" } 
+    const matchStage = {
+      $match: {
+        "createdBy": new mongoose.Types.ObjectId(createdBy),
+        status:{$ne:"Deactivate"}
+      }
     };
 
-
-
-    // Optional filters
-    if (discount) {
-      baseMatch["pricing.discount"] = { $gte: Number(discount) };
+    if (in_stock === true) {
+      matchStage.$match["availability.inStock"] = true;
     }
 
-    if (category && category !== "All") {
-      baseMatch[`basicInfo.categories.${category}`] = { $exists: true };
+    const pipeline = [matchStage];
+
+    // Unwind variant array to filter sizes
+    if (sizes?.length) {
+      pipeline.push({
+        $match: {
+          "variants": {
+            $elemMatch: {
+              size: { $in: sizes }
+            }
+          }
+        }
+      });
     }
 
-    if (color) {
-      baseMatch["variants.color"] = color;
+    // Add stage to convert price and discount to numbers
+    pipeline.push({
+      $addFields: {
+        salePriceNum: { $toDouble: "$pricing.salePrice" },
+        discountNum: { $toDouble: "$pricing.discount" }
+      }
+    });
+
+    // Price range
+    if (price_min !== undefined || price_max !== undefined) {
+      const priceFilter = {};
+      if (price_min !== undefined) {
+        priceFilter.$gte = price_min;
+      }
+      if (price_max !== undefined) {
+        priceFilter.$lte = price_max;
+      }
+      pipeline.push({
+        $match: {
+          salePriceNum: priceFilter
+        }
+      });
     }
 
-    // Price range filter
-    if (priceRange) {
-      const [minPrice, maxPrice] = priceRange.split(',').map(Number);
-      baseMatch["pricing.salePrice"] = {
-        $gte: minPrice,
-        $lte: maxPrice
-      };
+
+    // Discount range
+    if (discount_min !== undefined || discount_max !== undefined) {
+      const discountFilter = {};
+      if (discount_min !== undefined) {
+        discountFilter.$gte = discount_min;
+      }
+      if (discount_max !== undefined) {
+        discountFilter.$lte = discount_max;
+      }
+
+      pipeline.push({
+        $match: {
+          discountNum: discountFilter
+        }
+      });
     }
 
-    // Total results before pagination
-    const totalResults = await Product.countDocuments(baseMatch);
+    // Brands
+    if (brands?.length) {
+      pipeline.push({
+        $match: {
+          "basicInfo.brand": { $in: brands.map(b => b.trim()) }
+        }
+      });
+    }
+
+    // Units
+    if (units?.length) {
+      pipeline.push({
+        $match: {
+          "unit": { $in: units.map(u => u.trim()) }
+        }
+      });
+    }
+
+    // Tags
+    if (tags?.length) {
+      pipeline.push({
+        $match: {
+          "basicInfo.tags": { $in: tags.map(t => t.trim()) }
+        }
+      });
+    }
+
+    // Materials
+    if (materials?.length) {
+      pipeline.push({
+        $match: {
+          "materials": { $in: materials.map(m => m.trim()) }
+        }
+      });
+    }
+
+    const isAllCategories = categories?.length === 1 && categories[0].toLowerCase() === 'all';
+
+    if (categories?.length && !isAllCategories) {
+      pipeline.push({
+        $addFields: {
+          categoryValues: {
+            $reduce: {
+              input: { $objectToArray: "$basicInfo.categories" },
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this.v"] }
+            }
+          }
+        }
+      });
+
+      pipeline.push({
+        $match: {
+          categoryValues: {
+            $elemMatch: {
+              $regex: new RegExp(`^(${categories.join('|')})$`, 'i')  // case-insensitive match
+            }
+          }
+        }
+      });
+    }
+
+
+    const totalPipeline = [...pipeline, { $count: "total" }];
+    const totalResult = await Product.aggregate(totalPipeline);
+    const totalResults = totalResult[0]?.total || 0;
     const totalPages = Math.ceil(totalResults / limit);
     const skip = (page - 1) * limit;
 
-    // Aggregation Pipeline
-    const pipeline = [
-      { $match: baseMatch },
-      {
-        $project: {
-          image: { $arrayElemAt: ["$images", 0] },
-          stock: "$availability.inStock",
-          stockQuantity: "$availability.stockQuantity",
-          amount: { $toDouble: "$pricing.salePrice" },
-          brand: "$basicInfo.brand",
-          productTitle: "$basicInfo.productTitle",
-          createdAt: 1,
-          discount: "$pricing.discount",
-          postCommentsCount: 1,
-          "ratings.averageRating": 1
-        }
-      }
-    ];
-
     // Sorting
     let sort = {};
-    switch (sortBy) {
-      case 'lowToHigh':
-        sort = { amount: 1 };
-        break;
-      case 'highToLow':
-        sort = { amount: -1 };
-        break;
-      case 'whatsNew':
+    switch (sort_by) {
+      case 'newest':
         sort = { createdAt: -1 };
         break;
-      case 'discount':
-        sort = { discount: -1 };
+      case 'nameAsc':
+        sort = { name: 1 };
         break;
-      case 'popularity':
-        sort = { postCommentsCount: -1, 'ratings.averageRating': -1 };
+      case 'nameDesc':
+        sort = { name: -1 };
+        break;
+      case 'priceAsc':
+        sort = { salePriceNum: 1 };
+        break;
+      case 'priceDesc':
+        sort = { salePriceNum: -1 };
         break;
       default:
         sort = { createdAt: -1 };
     }
 
+
     pipeline.push({ $sort: sort });
     pipeline.push({ $skip: skip });
     pipeline.push({ $limit: Number(limit) });
+
+    // Project final fields
+    pipeline.push({
+      $project: {
+        image: { $arrayElemAt: ["$images", 0] },
+        stock: "$availability.inStock",
+        stockQuantity: "$availability.stockQuantity",
+        amount: "$salePriceNum",
+        brand: "$basicInfo.brand",
+        productTitle: "$basicInfo.productTitle",
+        createdAt: 1,
+        discount: "$discountNum",
+        postCommentsCount: 1,
+        "ratings.averageRating": 1
+      }
+    });
 
     const products = await Product.aggregate(pipeline);
 
@@ -553,6 +659,7 @@ export const getProduct = async (req, res) => {
     res.status(500).json({ message: 'Something went wrong', error });
   }
 };
+
 
 
 
