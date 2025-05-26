@@ -276,36 +276,41 @@ const getAllPlaylists = async (req, res) => {
             return handleError(res, 400, "User ID is required");
         }
 
-        // Fetch playlists belonging to the given userId
-        const playlists = await Playlist.find({ userId }).select("playlistId name videos");
+        const playlists = await Playlist.find({ userId, videos: { $exists: true, $ne: [] } })
+            .select("playlistId name videos");
 
-        // Fetch video details for each playlist
         const formattedPlaylists = await Promise.all(
             playlists.map(async (playlist) => {
-                // Fetch video details from createPostModel
                 const videos = await createPostModel
                     .find({ _id: { $in: playlist.videos } })
-                    .select("thumbnailFile videoDuration creatorName ");
+                    .select("mediaItems videoDuration userName");
+
+                const firstMedia = videos[0]?.mediaItems?.find(item => item.thumbnailUrl || item.url);
 
                 return {
                     title: playlist.name || "Untitled",
-                    thumbnailUrl: videos.length > 0 ? videos[0].thumbnailFile || "" : "", 
-                    channelName: videos.length > 0 ? videos[0].creatorName || "Unknown" : "Unknown", // Use first video's creatorName
-                    videoCount: playlist.videos.length, 
+                    thumbnailUrl: firstMedia?.thumbnailUrl || firstMedia?.url || "",
+                    channelName: videos[0]?.userName || "Unknown",
+                    videoCount: playlist.videos.length,
                     playlistId: playlist.playlistId,
-                    videoLength: formatTotalDuration(videos), 
+                    videoLength: formatTotalDuration(videos),
                 };
             })
         );
 
-        // Sort playlists in descending order by videoCount
-        formattedPlaylists.sort((a, b) => b.videoCount - a.videoCount);
+        formattedPlaylists.sort((a, b) => {
+            if (a.title === "LikedPosts") return -1;
+            if (b.title === "LikedPosts") return 1;
+            return b.videoCount - a.videoCount;
+        });
 
         return handleSuccessV1(res, 200, "Playlists fetched successfully", formattedPlaylists);
     } catch (error) {
         return handleError(res, 500, error.message);
     }
 };
+
+
 
 
 const getPlaylistDetails = async (req, res) => {
