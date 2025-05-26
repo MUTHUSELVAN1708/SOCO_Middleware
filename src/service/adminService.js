@@ -39,7 +39,7 @@ import BookmarkModel from "../model/BookmarkModel.js";
 import Friend from "../model/FriendModel.js";
 import Follow from "../model/FollowModel.js";
 import redisService from "./redisService.js";
-import Playlist from "../model/playlistModel.js";
+// import Playlist from "../model/playlistModel.js";
 import { v4 as uuidv4 } from "uuid";
 
 
