@@ -394,7 +394,11 @@ export const getProductCategories = async (req, res) => {
   const { createdBy } = req.query;
 
   try {
-    const products = await Product.find({ createdBy, status: "Activate" }).select("basicInfo.categories images");
+    const products = await Product.find({
+        createdBy,
+        status: { $ne: "Deactivate" }
+    }).select("basicInfo.categories images");
+
 
     const categoryMap = {};
 
