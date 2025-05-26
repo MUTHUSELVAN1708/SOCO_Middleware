@@ -14,6 +14,7 @@ import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import CommentModel from "../model/Comment.js";
+import ServiceModel from "../model/serviceModel.js";
 import UserInfo from "../model/UserInfo.js";
 // import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
@@ -607,6 +608,25 @@ const adminService = {
                 unreadMessagesCount,
             });
 
+            if (natureOfBusiness) {
+            const service = await ServiceModel.findOne({ name: natureOfBusiness });
+            if (service) {
+                service.userCount += 1;
+                await service.save();
+            } else {
+                await ServiceModel.create({
+                    name: natureOfBusiness,
+                    description: type_of_service || "",
+                    iconUrl: brand_logo || "", 
+                    category: category || "General",
+                    userCount: 1,
+                    isPopular: false,
+                    rating: 0
+                });
+            }
+        }
+
+
 
             return { success: true, user: updatedUser, business: [business] };
 
@@ -892,6 +912,24 @@ const adminService = {
                 unreadMessagesCount,
                 accessAccountsIds // Store linked account IDs
             });
+
+            if (natureOfBusiness) {
+            const service = await ServiceModel.findOne({ name: natureOfBusiness });
+            if (service) {
+                service.userCount += 1;
+                await service.save();
+            } else {
+                await ServiceModel.create({
+                    name: natureOfBusiness,
+                    description: type_of_service || "",
+                    iconUrl: brand_logo || "", 
+                    category: category || "General",
+                    userCount: 1,
+                    isPopular: false,
+                    rating: 0
+                });
+            }
+        }
 
             return { success: true, user: existingUser, business: [business] };
 
