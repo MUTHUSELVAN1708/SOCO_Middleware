@@ -8,11 +8,13 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken"
 import locationModel from "../model/locationModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
+import Playlist from "../model/playlistModel.js";
 import Comment from "../model/Comment.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import CommentModel from "../model/Comment.js";
+import ServiceModel from "../model/serviceModel.js";
 import UserInfo from "../model/UserInfo.js";
 // import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
@@ -38,6 +40,7 @@ import Friend from "../model/FriendModel.js";
 import Follow from "../model/FollowModel.js";
 import redisService from "./redisService.js";
 import Playlist from "../model/playlistModel.js";
+import { v4 as uuidv4 } from "uuid";
 
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
@@ -430,7 +433,10 @@ const adminService = {
                 institution,
                 year,
                 grade,
-                achievements
+                achievements,
+                businessLat,
+                businessLng,
+                businessDescription,
             } = data;
 
 
@@ -590,6 +596,9 @@ const adminService = {
                 businessType: businessType || "",
                 natureOfBusiness: natureOfBusiness || "",
                 businessName: businessName || "",
+                lat: businessLat || "",
+                lng: businessLng || "",
+                description: businessDescription || "",
                 important,
 
                 // Chat-related fields
@@ -599,6 +608,25 @@ const adminService = {
                 currentChatRoom,
                 unreadMessagesCount,
             });
+
+            if (natureOfBusiness) {
+            const service = await ServiceModel.findOne({ name: natureOfBusiness });
+            if (service) {
+                service.userCount += 1;
+                await service.save();
+            } else {
+                await ServiceModel.create({
+                    name: natureOfBusiness,
+                    description: type_of_service || "",
+                    iconUrl: brand_logo || "", 
+                    category: category || "General",
+                    userCount: 1,
+                    isPopular: false,
+                    rating: 0
+                });
+            }
+        }
+
 
 
             return { success: true, user: updatedUser, business: [business] };
@@ -804,6 +832,9 @@ const adminService = {
                 lastOnline = null,
                 currentChatRoom = null,
                 unreadMessagesCount = 0,
+                businessLat,
+                businessLng,
+                businessDescription,
                 accessAccountsIds = [] // New field for additional linked accounts
             } = data;
 
@@ -851,6 +882,9 @@ const adminService = {
                 pan_img: pan_img || "",
                 brand_logo: brand_logo || "",
                 cover_img: cover_img || "",
+                lat: businessLat || "",
+                lng: businessLng || "",
+                description: businessDescription || "",
                 businessAgree,
                 accountIsPublic,
                 postCount,
@@ -879,6 +913,24 @@ const adminService = {
                 unreadMessagesCount,
                 accessAccountsIds // Store linked account IDs
             });
+
+            if (natureOfBusiness) {
+            const service = await ServiceModel.findOne({ name: natureOfBusiness });
+            if (service) {
+                service.userCount += 1;
+                await service.save();
+            } else {
+                await ServiceModel.create({
+                    name: natureOfBusiness,
+                    description: type_of_service || "",
+                    iconUrl: brand_logo || "", 
+                    category: category || "General",
+                    userCount: 1,
+                    isPopular: false,
+                    rating: 0
+                });
+            }
+        }
 
             return { success: true, user: existingUser, business: [business] };
 
@@ -4875,36 +4927,54 @@ searchRecommendation: async (query, typeOfSearch = "Name", page = 1, limit = 25)
     },
 
     toggleFav: async (data) => {
-        const { user_id, post_id, isBusinessAccount, isProduct } = data;
-        try {
-            const existingLike = await FavoriteModel.findOne({ user_id, post_id });
+    const { user_id, post_id, isBusinessAccount, isProduct } = data;
 
-            if (existingLike) {
-                await FavoriteModel.findOneAndDelete({ user_id, post_id });
-                await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
+    try {
+        const existingLike = await FavoriteModel.findOne({ user_id, post_id });
 
-                await Playlist.findOneAndUpdate(
-                    { userId: user_id, name: "Favorites" },
-                    { $pull: { post_id: post_id } }
-                );
+        // Find or create the "LikedPosts" playlist
+        let likedPostsPlaylist = await Playlist.findOne({ userId: user_id, name: "LikedPosts" });
 
-                return { message: "Removed from favorites", liked: false };
-            }
-
-            const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
-            await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
-
-            const playlist = await Playlist.findOneAndUpdate(
-                { userId: user_id, name: "Favorites" },
-                { $addToSet: { videos: post_id } },
-                { upsert: true, new: true }
-            );
-
-            return { message: "Added to favorites", liked: true, data: newLike };
-        } catch (error) {
-            throw new Error(error.message || "Something went wrong while processing your request.");
+        if (!likedPostsPlaylist) {
+        likedPostsPlaylist = await Playlist.create({
+            playlistId: uuidv4(),
+            userId: new mongoose.Types.ObjectId(user_id),
+            name: "LikedPosts",
+            videos: [],
+            isPublic: false,
+        });
         }
+
+        if (existingLike) {
+        await FavoriteModel.findOneAndDelete({ user_id, post_id });
+        await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
+
+        // Remove post from LikedPosts playlist
+        await Playlist.updateOne(
+            { _id: likedPostsPlaylist._id },
+            { $pull: { videos: post_id } }
+        );
+
+        return { message: "Removed from favorites", liked: false };
+        }
+
+        const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
+        await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
+
+        // Add post to LikedPosts playlist (only if not already in)
+        if (!likedPostsPlaylist.videos.includes(post_id)) {
+        await Playlist.updateOne(
+            { _id: likedPostsPlaylist._id },
+            { $addToSet: { videos: post_id } }
+        );
+        }
+
+        return { message: "Added to favorites", liked: true, data: newLike };
+    } catch (error) {
+        throw new Error(error.message || "Something went wrong while processing your request.");
+    }
     },
+
 
 
     getUserFavorites: async (user_id, page = 1, limit = 15) => {
