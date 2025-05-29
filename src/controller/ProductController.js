@@ -182,7 +182,7 @@ export const getProductDetail = async (req, res) => {
         imageUrl: crossSell.imageUrl,
         currency: crossSell.currency === 'INR' ? '₹' : crossSell.currency,
       })),
-      review:review
+      // review:review
     };
 
     return res.status(200).json(
