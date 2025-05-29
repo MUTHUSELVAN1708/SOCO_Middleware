@@ -2,6 +2,7 @@ import Order from "../model/orderModel.js";
 import Product from "../model/Product.js";
 import registerModel from "../model/registerModel.js";
 import ReviewModel from "../model/reviewModel.js";
+import ReviewHelpfulModel from '../model/ReviewHelpfulModel.js';
 import mongoose from "mongoose";
 
 
@@ -80,14 +81,20 @@ export const createReview = async (req, res) => {
 
         try {
             if (typeof ReviewModel !== 'undefined' && ReviewModel) {
-                await ReviewModel.create({
-                    user_id,
-                    productId,
-                    rating,
-                    reviewText: reviewText,
-                    images: images || []
-                });
-            }
+            await ReviewModel.create({
+                _id: newReview.id,
+                user_id,
+                productId,
+                rating,
+                reviewText,
+                images: images || [],
+                replies: [],
+                isVerifiedPurchase: true,
+                isEdited: false,
+                datePosted: newReview.datePosted
+            });
+        }
+
         } catch (reviewModelError) {
             console.error("Error saving to ReviewModel:", reviewModelError);
         }
@@ -102,8 +109,117 @@ export const createReview = async (req, res) => {
     }
 };
 
+export const addReply = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { userName, userAvatar, reply, isSellerResponse, productId } = req.body;
+
+    const newReply = {
+      id: new mongoose.Types.ObjectId().toString(),
+      userName: userName || 'Anonymous',
+      userAvatar: userAvatar || '',
+      reply,
+      datePosted: new Date(),
+      isSellerResponse: isSellerResponse || false,
+      isEdited: false,
+    };
+
+    // Update in ReviewModel
+    const review = await ReviewModel.findByIdAndUpdate(
+      reviewId,
+      { $push: { replies: newReply } },
+      { new: true }
+    );
+
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found in ReviewModel' });
+    }
+
+    // Update in Product top 5 reviews
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const targetReview = product.ratings.reviews.find(r => r.id === reviewId);
+    if (targetReview) {
+      targetReview.replies.push(newReply);
+      await product.save();
+    }
+
+    res.status(200).json({
+      message: 'Reply added successfully',
+      reply: newReply
+    });
+  } catch (error) {
+    console.error('Error adding reply:', error);
+    res.status(500).json({ message: 'Failed to add reply', error: error.message });
+  }
+};
 
 
+
+export const addHelpfulCount = async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { userId, isBusinessAccount, productId } = req.body;
+
+    const existing = await ReviewHelpfulModel.findOne({
+      reviewId,
+      userId,
+      isBusinessAccount
+    });
+
+    if (existing) {
+      return res.status(409).json({ message: 'You have already marked this review as helpful.' });
+    }
+
+    // Add helpful record
+    await ReviewHelpfulModel.create({
+      reviewId,
+      userId,
+      isBusinessAccount
+    });
+
+    // Count actual helpful votes from ReviewHelpfulModel
+    const actualHelpfulCount = await ReviewHelpfulModel.countDocuments({ reviewId });
+
+    // Update ReviewModel with accurate count
+    const review = await ReviewModel.findByIdAndUpdate(
+      reviewId,
+      { helpfulCount: actualHelpfulCount },
+      { new: true }
+    );
+
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found' });
+    }
+
+    // Update the embedded review in Product model
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const targetReview = product.ratings?.reviews?.find(r => r.id === reviewId);
+    if (targetReview) {
+      targetReview.helpfulCount = actualHelpfulCount;
+      await product.save();
+    }
+
+    res.status(200).json({
+      message: 'Helpful count updated',
+      helpfulCount: actualHelpfulCount
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Duplicate helpful vote.' });
+    }
+
+    console.error('Error updating helpful count:', error);
+    res.status(500).json({ message: 'Failed to update helpful count', error: error.message });
+  }
+};
 
 
 export const getReviewDetails = async (req, res) => {
