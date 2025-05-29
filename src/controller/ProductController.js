@@ -51,6 +51,33 @@ const formatResponse = (success, message, data = null, errors = null) => {
 };
 
 
+export const getProductById = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({ success: false, message: 'Product ID is required' });
+    }
+
+    const product = await Product.findOne({
+      _id: productId,
+      status: { $ne: "Deactivate" }
+    }).populate('createdBy').exec();
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Product fetched successfully', data: product });
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+};
+
+
+
+
 export const getProductDetail = async (req, res) => {
   try {
     const { productId } = req.params;
