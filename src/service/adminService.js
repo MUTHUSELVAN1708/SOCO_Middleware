@@ -3920,16 +3920,17 @@ const adminService = {
                 }
             );
 
-            // console.log(" New message created:", newMessage);
+            console.log(" New message created:", newMessage);
+            const latestMessage = newMessage.messages.at(-1);
 
             const messageWithObjectId = {
-                _id: newMessage._id.toString(),
+                chat_id: newMessage._id.toString(),
+                _id: latestMessage._id,
                 from,
                 to,
-                message,
-                timestamp,
+                message: latestMessage.message,
+                timestamp: latestMessage.timestamp
             };
-
             // Store message in Redis
             await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
 
@@ -4132,45 +4133,45 @@ const adminService = {
     // ========================
 
 
-getAllChatUser: async (user_id) => {
-    try {
-        let getuser = await registerModel.findOne({ _id: user_id });
-        if (!getuser) getuser = await businessregisterModel.findOne({ _id: user_id });
-        if (!getuser) throw new Error("User not found");
+    getAllChatUser: async (user_id) => {
+        try {
+            let getuser = await registerModel.findOne({ _id: user_id });
+            if (!getuser) getuser = await businessregisterModel.findOne({ _id: user_id });
+            if (!getuser) throw new Error("User not found");
 
-        const chats = await MessageModel.find({ participants: user_id });
-        const result = [];
+            const chats = await MessageModel.find({ participants: user_id });
+            const result = [];
 
-        for (const chat of chats) {
-            const otherUserId = chat.participants.find(id => id !== user_id);
+            for (const chat of chats) {
+                const otherUserId = chat.participants.find(id => id !== user_id);
 
-            let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
-            if (!otherUser) {
-                otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
+                let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
+                if (!otherUser) {
+                    otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
+                }
+
+                const lastMessage = chat.messages[chat.messages.length - 1];
+
+                const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
+                const profileImage = otherUser?.profile_url || otherUser?.brand_logo || null;
+
+                result.push({
+                    userId: otherUserId,
+                    name,
+                    profileImage,
+                    lastMessage: lastMessage?.message || "",
+                    timestamp: lastMessage?.timestamp || null,
+                    isOnline: !!connectedUsers[otherUserId],
+                    chat_id: chat._id
+                });
             }
 
-            const lastMessage = chat.messages[chat.messages.length - 1];
-
-            const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
-            const profileImage = otherUser?.profile_url || otherUser?.brand_logo || null;
-
-            result.push({
-                userId: otherUserId,
-                name,
-                profileImage,
-                lastMessage: lastMessage?.message || "",
-                timestamp: lastMessage?.timestamp || null,
-                isOnline: !!connectedUsers[otherUserId],
-                chat_id:chat._id
-            });
+            return result;
+        } catch (error) {
+            console.error(" Error in getAllChatUser:", error.message);
+            throw error;
         }
-
-        return result;
-    } catch (error) {
-        console.error(" Error in getAllChatUser:", error.message);
-        throw error;
-    }
-},
+    },
 
     // =============================
     addDeliveryAddress: async (data) => {
