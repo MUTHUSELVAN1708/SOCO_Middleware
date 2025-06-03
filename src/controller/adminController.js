@@ -266,6 +266,40 @@ const adminController = {
 
     },
 
+
+    getMyAccounts: async (req, res, next) => {
+        try {
+            const userId = req.query.userId;
+
+            if (!userId) {
+                return res.status(400).json({
+                    status: 400,
+                    msg: "User ID is required",
+                    login: null,
+                });
+            }
+
+            const response = await adminService.getMyAccounts(userId);
+
+            if (response.status === 400 || response.status === 500) {
+                return res.status(response.status).json(response);
+            }
+
+            return res.status(200).json({
+                status: 200,
+                msg: "Accounts retrieved successfully",
+                data: response.login,
+            });
+        } catch (error) {
+            console.error("Controller error in getMyAccounts:", error);
+            next({
+                statuscode: 400,
+                error: error.message || "An unexpected error occurred",
+            });
+        }
+    },
+
+
     // ===================================
     otpValidation: async (req, res, next) => {
         try {
