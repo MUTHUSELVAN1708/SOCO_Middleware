@@ -1276,6 +1276,43 @@ const adminService = {
         }
     },
 
+    getMyAccounts: async (userId) => {
+        try {
+            const user = await registerModel.findById(userId);
+            if (!user) {
+                throw { msg: "User not found." };
+            }
+
+            const ownedBusinesses = await businessregisterModel.find({ user_id: user._id });
+
+            const accessibleBusinesses = await businessregisterModel.find({
+                accessAccountsIds: user._id.toString()
+            });
+
+            const allBusinesses = [...ownedBusinesses, ...accessibleBusinesses].filter(
+                (business, index, self) =>
+                    index === self.findIndex(b => b._id.toString() === business._id.toString())
+            );
+
+            return {
+                status: 200,
+                msg: "Accounts fetched successfully",
+                login: {
+                    token: null,
+                    user,
+                    business: allBusinesses,
+                },
+            };
+        } catch (error) {
+            console.error("Service error in getMyAccounts:", error);
+            return {
+                status: 500,
+                msg: error.msg || "Failed to retrieve accounts. Please try again.",
+                login: null,
+            };
+        }
+    },
+
 
 
     // ===================
