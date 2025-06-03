@@ -342,7 +342,7 @@ router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
 router.delete("/deleteFromRedis",adminController.deleteFromRedis);
 
 router.put("/updateMsg",adminController.updateMsg);
-
+router.get("/getAllChatUser/:user_id",adminController.getAllChatUser)
 
 router.get("/getFeed/:user_id/:address",adminController.getFeed)
 

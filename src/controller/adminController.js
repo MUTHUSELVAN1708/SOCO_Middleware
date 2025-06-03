@@ -1,5 +1,6 @@
 import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
+import redisService from "../service/redisService.js";
 // import redisService from "../service/redisService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
 
@@ -1080,6 +1081,24 @@ const adminController = {
             res.status(500).json({ error: 'Error updating message' });
         }
     },
+
+
+    // =================
+
+    getAllChatUser:async (req, res) => {
+        const { user_id } = req.params;
+
+        try {
+            const getAllChatUser = await adminService.getAllChatUser(user_id);
+            console.log(getAllChatUser,"llool")
+            res.status(200).json(getAllChatUser);
+
+        } catch (err) {
+            console.error('Error in getAllChatUser:', err);
+            res.status(500).json({ error: 'Error getAllChatUser' });
+        }
+    },
+
 
     //   =======================
     getFeed: async (req, res) => {
