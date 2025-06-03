@@ -3955,8 +3955,6 @@ const adminService = {
     },
 
 
-
-
     //   =============
     getChatHistory: async (from, to) => {
         const chatKey1 = `chat:${from}:${to}`;
@@ -4162,7 +4160,8 @@ getAllChatUser: async (user_id) => {
                 profileImage,
                 lastMessage: lastMessage?.message || "",
                 timestamp: lastMessage?.timestamp || null,
-                isOnline: !!connectedUsers[otherUserId]
+                isOnline: !!connectedUsers[otherUserId],
+                chat_id:chat._id
             });
         }
 
