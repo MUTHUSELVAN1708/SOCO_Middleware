@@ -1,5 +1,6 @@
 import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
+import redisService from "../service/redisService.js";
 // import redisService from "../service/redisService.js";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:2007';
 
@@ -688,7 +689,7 @@ const adminController = {
         const isBusinessAccount = req.body.isBusiness;
         const userId = req.body.userId;
         const accountBusinessType = req.body.accountBusinessType;
-        
+
         try {
             const getUserDetails = await adminService.getUserProfile(id, userId, accountBusinessType);
 
@@ -1115,6 +1116,24 @@ const adminController = {
         }
     },
 
+
+    // =================
+
+    getAllChatUser:async (req, res) => {
+        const { user_id } = req.params;
+
+        try {
+            const getAllChatUser = await adminService.getAllChatUser(user_id);
+            console.log(getAllChatUser,"llool")
+            res.status(200).json(getAllChatUser);
+
+        } catch (err) {
+            console.error('Error in getAllChatUser:', err);
+            res.status(500).json({ error: 'Error getAllChatUser' });
+        }
+    },
+
+
     //   =======================
     getFeed: async (req, res) => {
         const { user_id, address } = req.params;
@@ -1355,12 +1374,25 @@ const adminController = {
         const { user_id, interest } = req.body;
         try {
             const addInterest = await adminService.addInterest(req.body);
-            console.log(addInterest,"addInterest")
-            res.status(200).json({ success: true,msg: "successfull added",data:addInterest.interest })
-        } catch (error){
+            console.log(addInterest, "addInterest")
+            res.status(200).json({ success: true, msg: "successfull added", data: addInterest.interest })
+        } catch (error) {
             console.log(error)
             res.status(500).json({ success: false, msg: "faild to add" })
         }
+    },
+
+
+    getCollection: async (req, res) => {
+        const { userId } = req.params;
+        try {
+            const collection = await adminService.getCollection(userId)
+            res.status(200).json({ msg: "successfully fetched", collection })
+        } catch (error) {
+            console.log(error)
+            res.status(500).json({ success: false, msg: error.message })
+        }
+
     }
 
 };
