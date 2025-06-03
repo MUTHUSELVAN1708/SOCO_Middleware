@@ -89,6 +89,7 @@ router.post("/verifyOtp", adminController.verifyOtp);
 router.get("/verifyName", adminController.verifyNameUnique);
 router.get("/checkMobileNumber", adminController.checkMobileNumber);
 router.post("/login", adminController.login);
+router.get("/getMyAccounts", adminController.getMyAccounts);
 router.post("/otpValidation", adminController.otpValidation);
 router.put('/updateRegister', adminController.updateRegister);
 router.post("/forgotPassword", adminController.forgotPassword);
@@ -342,7 +343,7 @@ router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
 router.delete("/deleteFromRedis",adminController.deleteFromRedis);
 
 router.put("/updateMsg",adminController.updateMsg);
-
+router.get("/getAllChatUser/:user_id",adminController.getAllChatUser)
 
 router.get("/getFeed/:user_id/:address",adminController.getFeed)
 
@@ -360,5 +361,6 @@ router.post("/toggleBookmark",adminController.toggleBookmark);
 router.get("/getUserFavorites",adminController.getUserFavorites );
 router.get("/getUserBookmarks",adminController.getUserBookmarks );
 
-router.put("/addInterest",adminController.addInterest)
+router.put("/addInterest",adminController.addInterest);
+router.get("/getCollection/:userId",adminController.getCollection);
 export default router;

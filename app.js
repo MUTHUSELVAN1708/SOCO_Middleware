@@ -23,7 +23,9 @@ import errorHandling from "./errorHandling.js";
 // import  {initializeSocket} from "./socket.js";
 import chatSocket from "./src/service/chatSocket.js";
 // import redisService from "./src/service/redisService.js";
-
+import reviewRouter from "./src/router/reviewRouter.js"
+import serviceRouter from "./src/router/serviceRouter.js"
+import  {initializeSocket} from "./socket.js";
 const app = express();
 
 
@@ -49,7 +51,8 @@ app.use('/preferenceRouter', PreferenceRouter);
 app.use("/messages", chatMessageRoutes);
 app.use("/link", linkAccountRoutes);
 app.use("/notification", notificationRoutes);
-
+app.use("/review",reviewRouter);
+app.use("/services",serviceRouter);
 // Error Handling
 app.use(errorHandling);
 
@@ -59,14 +62,14 @@ const PORT = process.env.port || 3000;
 const server = http.createServer(app);
 
 
-// const io = initializeSocket(server);
-const chatIo = new Server(server, {
-  cors: {
-      origin: "*", // Adjust based on your frontend URL
-      methods: ["GET", "POST"],
-  }
-});
-chatSocket(chatIo);
+const io = initializeSocket(server);
+// const chatIo = new Server(server, {
+//   cors: {
+//       origin: "*", // Adjust based on your frontend URL
+//       methods: ["GET", "POST"],
+//   }
+// });
+// chatSocket(chatIo);
 // redisService.connect();
 
 // redisService.subscribeToNotifications(io);

@@ -6,6 +6,9 @@ import Order from "../model/orderModel.js"
 import businessregisterModel from '../model/BusinessModel.js';
 import viewsModel from '../model/VisitModel.js';
 import registerModel from '../model/registerModel.js';
+import createPostModel from '../model/createPostModel.js';
+import ReviewModel from '../model/reviewModel.js';
+import Follow from '../model/FollowModel.js';
 
 const ERROR_MESSAGES = {
   VALIDATION: {
@@ -49,6 +52,33 @@ const formatResponse = (success, message, data = null, errors = null) => {
 };
 
 
+export const getProductById = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({ success: false, message: 'Product ID is required' });
+    }
+
+    const product = await Product.findOne({
+      _id: productId,
+      status: { $ne: "Deactivate" }
+    }).populate('createdBy').exec();
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Product fetched successfully', data: product });
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+};
+
+
+
+
 export const getProductDetail = async (req, res) => {
   try {
     const { productId } = req.params;
@@ -60,9 +90,9 @@ export const getProductDetail = async (req, res) => {
     }
 
     const product = await Product.findOne({
-  _id: productId,
-  status: { $ne: "Deactivate" }
-})
+      _id: productId,
+      status: { $ne: "Deactivate" }
+    })
       .populate('createdBy') // populates business details
       .exec();
 
@@ -74,6 +104,8 @@ export const getProductDetail = async (req, res) => {
       );
     }
 
+    const review = await ReviewModel.find({ productId: productId }).sort({ rating: -1 }).limit(3);
+    console.log(review, "review")
     const business = product.createdBy;
 
     const transformedReviews = product.ratings.reviews.map(review => ({
@@ -178,6 +210,7 @@ export const getProductDetail = async (req, res) => {
         imageUrl: crossSell.imageUrl,
         currency: crossSell.currency === 'INR' ? '₹' : crossSell.currency,
       })),
+      review: review
     };
 
     return res.status(200).json(
@@ -389,7 +422,11 @@ export const getProductCategories = async (req, res) => {
   const { createdBy } = req.query;
 
   try {
-    const products = await Product.find({ createdBy, status: "Activate" }).select("basicInfo.categories images");
+    const products = await Product.find({
+        createdBy,
+        status: { $ne: "Deactivate" }
+    }).select("basicInfo.categories images");
+
 
     const categoryMap = {};
 
@@ -431,102 +468,209 @@ export const getProductCategories = async (req, res) => {
     });
   }
 };
-
 export const getProduct = async (req, res) => {
   try {
     const {
-      category,
-      sortBy,
-      color,
-      discount,
-      priceRange,
+      in_stock,
+      price_min,
+      price_max,
+      discount_min,
+      discount_max,
+      categories,
+      brands,
+      tags,
+      sizes,
+      materials,
+      units,
+      sort_by,
       createdBy,
       page = 1,
       limit = 10
-    } = req.query;
-
+    } = req.body;
+    console.log(req.body, "kkjhhh")
     if (!createdBy) {
       return res.status(400).json({ message: "createdBy is required." });
     }
 
-    const createdByObjectId = new mongoose.Types.ObjectId(createdBy);
-    const baseMatch = {
-      createdBy: createdByObjectId,
-      status: "Activate" // 👈 Add this line
+    const matchStage = {
+      $match: {
+        "createdBy": new mongoose.Types.ObjectId(createdBy),
+        status: { $ne: "Deactivate" }
+      }
     };
 
-
-    // Optional filters
-    if (discount) {
-      baseMatch["pricing.discount"] = { $gte: Number(discount) };
+    if (in_stock === true) {
+      matchStage.$match["availability.inStock"] = true;
     }
 
-    if (category && category !== "All") {
-      baseMatch[`basicInfo.categories.${category}`] = { $exists: true };
+    const pipeline = [matchStage];
+
+    // Unwind variant array to filter sizes
+    if (sizes?.length) {
+      pipeline.push({
+        $match: {
+          "variants": {
+            $elemMatch: {
+              size: { $in: sizes }
+            }
+          }
+        }
+      });
     }
 
-    if (color) {
-      baseMatch["variants.color"] = color;
+    // Add stage to convert price and discount to numbers
+    pipeline.push({
+      $addFields: {
+        salePriceNum: { $toDouble: "$pricing.salePrice" },
+        discountNum: { $toDouble: "$pricing.discount" }
+      }
+    });
+
+    // Price range
+    if (price_min !== undefined || price_max !== undefined) {
+      const priceFilter = {};
+      if (price_min !== undefined) {
+        priceFilter.$gte = price_min;
+      }
+      if (price_max !== undefined) {
+        priceFilter.$lte = price_max;
+      }
+      pipeline.push({
+        $match: {
+          salePriceNum: priceFilter
+        }
+      });
     }
 
-    // Price range filter
-    if (priceRange) {
-      const [minPrice, maxPrice] = priceRange.split(',').map(Number);
-      baseMatch["pricing.salePrice"] = {
-        $gte: minPrice,
-        $lte: maxPrice
-      };
+
+    // Discount range
+    if (discount_min !== undefined || discount_max !== undefined) {
+      const discountFilter = {};
+      if (discount_min !== undefined) {
+        discountFilter.$gte = discount_min;
+      }
+      if (discount_max !== undefined) {
+        discountFilter.$lte = discount_max;
+      }
+
+      pipeline.push({
+        $match: {
+          discountNum: discountFilter
+        }
+      });
     }
 
-    // Total results before pagination
-    const totalResults = await Product.countDocuments(baseMatch);
+    // Brands
+    if (brands?.length) {
+      pipeline.push({
+        $match: {
+          "basicInfo.brand": { $in: brands.map(b => b.trim()) }
+        }
+      });
+    }
+
+    // Units
+    if (units?.length) {
+      pipeline.push({
+        $match: {
+          "unit": { $in: units.map(u => u.trim()) }
+        }
+      });
+    }
+
+    // Tags
+    if (tags?.length) {
+      pipeline.push({
+        $match: {
+          "basicInfo.tags": { $in: tags.map(t => t.trim()) }
+        }
+      });
+    }
+
+    // Materials
+    if (materials?.length) {
+      pipeline.push({
+        $match: {
+          "materials": { $in: materials.map(m => m.trim()) }
+        }
+      });
+    }
+
+    const isAllCategories = categories?.length === 1 && categories[0].toLowerCase() === 'all';
+
+    if (categories?.length && !isAllCategories) {
+      pipeline.push({
+        $addFields: {
+          categoryValues: {
+            $reduce: {
+              input: { $objectToArray: "$basicInfo.categories" },
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this.v"] }
+            }
+          }
+        }
+      });
+
+      pipeline.push({
+        $match: {
+          categoryValues: {
+            $elemMatch: {
+              $regex: new RegExp(`^(${categories.join('|')})$`, 'i')  // case-insensitive match
+            }
+          }
+        }
+      });
+    }
+
+
+    const totalPipeline = [...pipeline, { $count: "total" }];
+    const totalResult = await Product.aggregate(totalPipeline);
+    const totalResults = totalResult[0]?.total || 0;
     const totalPages = Math.ceil(totalResults / limit);
     const skip = (page - 1) * limit;
 
-    // Aggregation Pipeline
-    const pipeline = [
-      { $match: baseMatch },
-      {
-        $project: {
-          image: { $arrayElemAt: ["$images", 0] },
-          stock: "$availability.inStock",
-          stockQuantity: "$availability.stockQuantity",
-          amount: { $toDouble: "$pricing.salePrice" },
-          brand: "$basicInfo.brand",
-          productTitle: "$basicInfo.productTitle",
-          createdAt: 1,
-          discount: "$pricing.discount",
-          postCommentsCount: 1,
-          "ratings.averageRating": 1
-        }
-      }
-    ];
-
     // Sorting
     let sort = {};
-    switch (sortBy) {
-      case 'lowToHigh':
-        sort = { amount: 1 };
-        break;
-      case 'highToLow':
-        sort = { amount: -1 };
-        break;
-      case 'whatsNew':
+    switch (sort_by) {
+      case 'newest':
         sort = { createdAt: -1 };
         break;
-      case 'discount':
-        sort = { discount: -1 };
+      case 'nameAsc':
+        sort = { name: 1 };
         break;
-      case 'popularity':
-        sort = { postCommentsCount: -1, 'ratings.averageRating': -1 };
+      case 'nameDesc':
+        sort = { name: -1 };
+        break;
+      case 'priceAsc':
+        sort = { salePriceNum: 1 };
+        break;
+      case 'priceDesc':
+        sort = { salePriceNum: -1 };
         break;
       default:
         sort = { createdAt: -1 };
     }
 
+
     pipeline.push({ $sort: sort });
     pipeline.push({ $skip: skip });
     pipeline.push({ $limit: Number(limit) });
+
+    // Project final fields
+    pipeline.push({
+      $project: {
+        image: { $arrayElemAt: ["$images", 0] },
+        stock: "$availability.inStock",
+        stockQuantity: "$availability.stockQuantity",
+        amount: "$salePriceNum",
+        brand: "$basicInfo.brand",
+        productTitle: "$basicInfo.productTitle",
+        createdAt: 1,
+        discount: "$discountNum",
+        postCommentsCount: 1,
+        "ratings.averageRating": 1
+      }
+    });
 
     const products = await Product.aggregate(pipeline);
 
@@ -547,6 +691,7 @@ export const getProduct = async (req, res) => {
     res.status(500).json({ message: 'Something went wrong', error });
   }
 };
+
 
 
 
@@ -697,9 +842,290 @@ export const getProductFilters = async (req, res) => {
 };
 
 
+// export const getBusinessAnalytics = async (req, res, next) => {
+//   try {
+//     const { id, type } = req.query;
+
+
+//     let target;
+//     if (type === 'Business') {
+//       target = await businessregisterModel.findById(id);
+//     } else if (type === 'User') {
+//       target = await registerModel.findById(id);
+//     } else {
+//       return res.status(400).json({ success: false, message: "Invalid type" });
+//     }
+
+//     if (!target) {
+//       return res.status(404).json({ success: false, message: `${type} not found` });
+//     }
+
+//     const views = await viewsModel.find({ viewed_page_id: id });
+//     const totalVisitors = views.length;
+//     console.log(views, "views");
+//     const repeatVisitorsMap = {};
+
+//     views.forEach(view => {
+//       const viewerId = view.viewer_id.toString();
+//       const viewCount = view.viewedAt.length;
+
+//       repeatVisitorsMap[viewerId] = (repeatVisitorsMap[viewerId] || 0) + viewCount;
+//     });
+
+//     const repeatVisitorsCount = Object.values(repeatVisitorsMap).filter(count => count > 1).length;
+
+//     console.log('Repeat Visitors:', repeatVisitorsCount);
+//     const cityStats = await viewsModel.aggregate([
+//       {
+//         $match: { viewed_page_id: target._id }
+//       },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "viewer_id",
+//           foreignField: "_id",
+//           as: "user"
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "businessregisters",
+//           localField: "viewer_id",
+//           foreignField: "_id",
+//           as: "business"
+//         }
+//       },
+//       {
+//         $addFields: {
+//           // Handle case if location_id is an array, and take the first element
+//           userLocationId: {
+//             $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
+//           }
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "locations",
+//           localField: "userLocationId",
+//           foreignField: "_id",
+//           as: "location"
+//         }
+//       },
+//       {
+//         $addFields: {
+//           city: {
+//             $cond: [
+//               { $gt: [{ $size: "$user" }, 0] },
+//               {
+//                 $toLower: {
+//                   $trim: {
+//                     input: {
+//                       $ifNull: [
+//                         { $arrayElemAt: ["$location.address.city", 0] },
+//                         "" // Default to empty string if city is null
+//                       ]
+//                     }
+//                   }
+//                 }
+//               },
+//               {
+//                 $toLower: {
+//                   $trim: {
+//                     input: {
+//                       $ifNull: [
+//                         { $arrayElemAt: ["$business.address.city", 0] },
+//                         ""
+//                       ]
+//                     }
+//                   }
+//                 }
+//               }
+//             ]
+//           }
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: "$city",
+//           count: { $sum: 1 }
+//         }
+//       },
+//       { $sort: { count: -1 } },
+//       { $limit: 7 },
+//       {
+//         $project: {
+//           _id: 0,
+//           city: "$_id",
+//           count: 1
+//         }
+//       }
+//     ]);
+
+//     console.log(cityStats, "cityStats")
+
+//     const genderStats = await viewsModel.aggregate([
+//       {
+//         $match: {
+//           viewed_page_id: target._id,
+//           viewer_type: "User"
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "viewer_id",
+//           foreignField: "_id",
+//           as: "user"
+//         }
+//       },
+//       { $unwind: "$user" },
+//       {
+//         $group: {
+//           _id: "$user.gender",
+//           count: { $sum: 1 }
+//         }
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           gender: "$_id",
+//           count: 1
+//         }
+//       }
+//     ]);
+
+//     const ageCategory = await viewsModel.aggregate([
+//       {
+//         $match: {
+//           viewed_page_id: target._id,
+//           viewer_type: "User"
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "viewer_id",
+//           foreignField: "_id",
+//           as: "user"
+//         }
+//       },
+//       { $unwind: "$user" },
+//       {
+//         $addFields: {
+//           age: {
+//             $floor: {
+//               $divide: [
+//                 {
+//                   $subtract: [
+//                     "$$NOW",
+//                     {
+//                       $dateFromString: {
+//                         dateString: "$user.DOB",
+//                         format: "%d-%m-%Y"
+//                       }
+//                     }
+//                   ]
+//                 },
+//                 1000 * 60 * 60 * 24 * 365
+//               ]
+//             }
+//           }
+//         }
+//       },
+//       {
+//         $addFields: {
+//           ageRange: {
+//             $switch: {
+//               branches: [
+//                 { case: { $lt: ["$age", 18] }, then: "Under 18" },
+//                 { case: { $and: [{ $gte: ["$age", 18] }, { $lte: ["$age", 24] }] }, then: "18-24" },
+//                 { case: { $and: [{ $gte: ["$age", 25] }, { $lte: ["$age", 34] }] }, then: "25-34" },
+//                 { case: { $and: [{ $gte: ["$age", 35] }, { $lte: ["$age", 44] }] }, then: "35-44" },
+//                 { case: { $and: [{ $gte: ["$age", 45] }, { $lte: ["$age", 54] }] }, then: "45-54" },
+//                 { case: { $and: [{ $gte: ["$age", 55] }, { $lte: ["$age", 64] }] }, then: "55-64" }
+//               ],
+//               default: "65+"
+//             }
+//           }
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: "$ageRange",
+//           count: { $sum: 1 }
+//         }
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           ageRange: "$_id",
+//           count: 1
+//         }
+//       }
+//     ]);
+
+
+//     const interestCategory = await viewsModel.aggregate([
+//       {
+//         $match: {
+//           viewed_page_id: target._id,
+//           viewer_type: "User"
+//         }
+//       },
+//       {
+//         $lookup: {
+//           from: "users",
+//           localField: "viewer_id",
+//           foreignField: "_id",
+//           as: "user"
+//         }
+//       },
+//       { $unwind: "$user" },
+//       { $unwind: "$user.interest" },
+//       {
+//         $group: {
+//           _id: "$user.interest",
+//           count: { $sum: 1 }
+//         }
+//       },
+//       { $sort: { count: -1 } },
+//       { $limit: 7 },
+//       {
+//         $project: {
+//           _id: 0,
+//           interest: "$_id",
+//           count: 1
+//         }
+//       }
+//     ]);
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Analytics fetched successfully",
+//       data: {
+//         totalVisitors,
+//         repeatVisitors: repeatVisitorsCount,
+//         topCities: cityStats,
+//         genderStats,
+//         ageCategory,
+//         interestCategory
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("Error fetching analytics:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Error fetching analytics",
+//       error: error.message
+//     });
+//   }
+// };
+
+
 export const getBusinessAnalytics = async (req, res, next) => {
   try {
-    const { id, type } = req.query;
+    const { id, type,range, startDate, endDate} = req.query;
 
 
     let target;
@@ -715,107 +1141,213 @@ export const getBusinessAnalytics = async (req, res, next) => {
       return res.status(404).json({ success: false, message: `${type} not found` });
     }
 
-    const views = await viewsModel.find({ viewed_page_id: id });
-    const totalVisitors = views.length;
-    console.log(views, "views");
-    const repeatVisitorsMap = {};
+const now = new Date();
+let fromDate, toDate;
 
-    views.forEach(view => {
-      const viewerId = view.viewer_id.toString();
-      const viewCount = view.viewedAt.length;
+switch (range) {
+  case 'this_week': {
+    const day = now.getDay(); // 0 (Sun) - 6 (Sat)
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
+    fromDate = new Date(now.setDate(diff));
+    fromDate.setHours(0, 0, 0, 0);
+    toDate = new Date();
+    break;
+  }
+  case 'this_month': {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    toDate = new Date();
+    break;
+  }
+  case 'last_3_months': {
+    fromDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    toDate = new Date();
+    break;
+  }
+  case 'last_6_months': {
+    fromDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+    toDate = new Date();
+    break;
+  }
+  case 'previous_year': {
+    fromDate = new Date(now.getFullYear() - 1, 0, 1);
+    toDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+    break;
+  }
+  case 'custom': {
+    if (startDate) fromDate = new Date(startDate);
+    if (endDate) toDate = new Date(endDate);
+    break;
+  }
+  default:
+    break;
+}
 
-      repeatVisitorsMap[viewerId] = (repeatVisitorsMap[viewerId] || 0) + viewCount;
-    });
+// Date filter
+const dateFilter = {};
+if (fromDate || toDate) {
+  dateFilter.viewedAt = {};
+  if (fromDate) dateFilter.viewedAt.$gte = fromDate;
+  if (toDate) dateFilter.viewedAt.$lte = toDate;
+}
 
-    const repeatVisitorsCount = Object.values(repeatVisitorsMap).filter(count => count > 1).length;
 
-    console.log('Repeat Visitors:', repeatVisitorsCount);
-    const cityStats = await viewsModel.aggregate([
-      {
-        $match: { viewed_page_id: target._id }
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "viewer_id",
-          foreignField: "_id",
-          as: "user"
-        }
-      },
-      {
-        $lookup: {
-          from: "businessregisters",
-          localField: "viewer_id",
-          foreignField: "_id",
-          as: "business"
-        }
-      },
-      {
-        $addFields: {
-          // Handle case if location_id is an array, and take the first element
-          userLocationId: {
-            $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
+    // Get all views for the given page with optional date filter
+    const baseFilter = {
+      viewed_page_id: id,
+      ...dateFilter
+    };
+
+    const allViews = await viewsModel.find(baseFilter);
+
+    // Get followers of this profile
+    const followers = await Follow.find({ followingId: id }).select('userId');
+    const followerIds = followers.map(f => f.userId.toString());
+
+    const followerViews = allViews.filter(view => followerIds.includes(view.viewer_id.toString()));
+
+    // Utility to calculate repeat visitors
+    const calculateRepeatVisitors = (views) => {
+      const map = {};
+      views.forEach(view => {
+        const viewerId = view.viewer_id.toString();
+        map[viewerId] = (map[viewerId] || 0) + 1;
+      });
+      return Object.values(map).filter(count => count > 1).length;
+    };
+
+    // Total visitors
+    const allVisitorCount = allViews.length;
+    const followerVisitorCount = followerViews.length;
+
+    const repeatAll = calculateRepeatVisitors(allViews);
+    const repeatFollowers = calculateRepeatVisitors(followerViews);
+
+    // Shared aggregation filters
+    const sharedMatch = { viewed_page_id: target._id };
+
+    // Helper: Add $match filter for followers
+    const followerMatch = {
+      ...sharedMatch,
+      viewer_id: { $in: followerIds.map(id => new mongoose.Types.ObjectId(id))
+ }
+    };
+
+    // ========== Aggregations ==========
+    // For cityStats, genderStats, etc., you’ll do the same aggregation twice:
+    // one for allViews, another for followerViews
+
+    const getCityStats = async (match) => {
+      return await viewsModel.aggregate([
+        { $match: match },
+        {
+          $lookup: {
+            from: "users",
+            localField: "viewer_id",
+            foreignField: "_id",
+            as: "user"
           }
-        }
-      },
-      {
-        $lookup: {
-          from: "locations",
-          localField: "userLocationId",
-          foreignField: "_id",
-          as: "location"
-        }
-      },
-      {
-        $addFields: {
-          city: {
-            $cond: [
-              { $gt: [{ $size: "$user" }, 0] },
-              {
-                $toLower: {
-                  $trim: {
-                    input: {
-                      $ifNull: [
-                        { $arrayElemAt: ["$location.address.city", 0] },
-                        "" // Default to empty string if city is null
-                      ]
+        },
+        {
+          $lookup: {
+            from: "businessregisters",
+            localField: "viewer_id",
+            foreignField: "_id",
+            as: "business"
+          }
+        },
+        {
+          $addFields: {
+            userLocationId: {
+              $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: "locations",
+            localField: "userLocationId",
+            foreignField: "_id",
+            as: "location"
+          }
+        },
+        {
+          $addFields: {
+            city: {
+              $cond: [
+                { $gt: [{ $size: "$user" }, 0] },
+                {
+                  $toLower: {
+                    $trim: {
+                      input: {
+                        $ifNull: [
+                          { $arrayElemAt: ["$location.address.city", 0] },
+                          ""
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  $toLower: {
+                    $trim: {
+                      input: {
+                        $ifNull: [
+                          { $arrayElemAt: ["$business.address.city", 0] },
+                          ""
+                        ]
+                      }
                     }
                   }
                 }
-              },
-              {
-                $toLower: {
-                  $trim: {
-                    input: {
-                      $ifNull: [
-                        { $arrayElemAt: ["$business.address.city", 0] },
-                        ""
-                      ]
-                    }
-                  }
-                }
-              }
-            ]
+              ]
+            }
+          }
+        },
+        {
+          $group: {
+            _id: "$city",
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 7 },
+        {
+          $project: {
+            _id: 0,
+            city: "$_id",
+            count: 1
           }
         }
-      },
-      {
-        $group: {
-          _id: "$city",
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { count: -1 } },
-      { $limit: 7 },
-      {
-        $project: {
-          _id: 0,
-          city: "$_id",
-          count: 1
-        }
-      }
-    ]);
+      ]);
+    };
 
+    const getGenderStats = async (match) => {
+      return await viewsModel.aggregate([
+        { $match: { ...match, viewer_type: "User" } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "viewer_id",
+            foreignField: "_id",
+            as: "user"
+          }
+        },
+        { $unwind: "$user" },
+        {
+          $group: {
+            _id: "$user.gender",
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            gender: "$_id",
+            count: 1
+          }
+        }
+      ]);
+    };
     console.log(cityStats, "cityStats")
 
     const genderStats = await viewsModel.aggregate([
@@ -849,6 +1381,72 @@ export const getBusinessAnalytics = async (req, res, next) => {
       }
     ]);
 
+    const getAgeStats = async (match) => {
+      return await viewsModel.aggregate([
+        { $match: { ...match, viewer_type: "User" } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "viewer_id",
+            foreignField: "_id",
+            as: "user"
+          }
+        },
+        { $unwind: "$user" },
+        {
+          $addFields: {
+            age: {
+              $floor: {
+                $divide: [
+                  {
+                    $subtract: [
+                      "$$NOW",
+                      {
+                        $dateFromString: {
+                          dateString: "$user.DOB",
+                          format: "%d-%m-%Y"
+                        }
+                      }
+                    ]
+                  },
+                  1000 * 60 * 60 * 24 * 365
+                ]
+              }
+            }
+          }
+        },
+        {
+          $addFields: {
+            ageRange: {
+              $switch: {
+                branches: [
+                  { case: { $lt: ["$age", 18] }, then: "Under 18" },
+                  { case: { $and: [{ $gte: ["$age", 18] }, { $lte: ["$age", 24] }] }, then: "18-24" },
+                  { case: { $and: [{ $gte: ["$age", 25] }, { $lte: ["$age", 34] }] }, then: "25-34" },
+                  { case: { $and: [{ $gte: ["$age", 35] }, { $lte: ["$age", 44] }] }, then: "35-44" },
+                  { case: { $and: [{ $gte: ["$age", 45] }, { $lte: ["$age", 54] }] }, then: "45-54" },
+                  { case: { $and: [{ $gte: ["$age", 55] }, { $lte: ["$age", 64] }] }, then: "55-64" }
+                ],
+                default: "65+"
+              }
+            }
+          }
+        },
+        {
+          $group: {
+            _id: "$ageRange",
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            ageRange: "$_id",
+            count: 1
+          }
+        }
+      ]);
+    };
     const ageCategory = await viewsModel.aggregate([
       {
         $match: {
@@ -919,6 +1517,36 @@ export const getBusinessAnalytics = async (req, res, next) => {
       }
     ]);
 
+    const getInterestStats = async (match) => {
+      return await viewsModel.aggregate([
+        { $match: { ...match, viewer_type: "User" } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "viewer_id",
+            foreignField: "_id",
+            as: "user"
+          }
+        },
+        { $unwind: "$user" },
+        { $unwind: "$user.interest" },
+        {
+          $group: {
+            _id: "$user.interest",
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 7 },
+        {
+          $project: {
+            _id: 0,
+            interest: "$_id",
+            count: 1
+          }
+        }
+      ]);
+    };
 
     const interestCategory = await viewsModel.aggregate([
       {
@@ -954,18 +1582,48 @@ export const getBusinessAnalytics = async (req, res, next) => {
       }
     ]);
 
+    
+    const [allCityStats, followerCityStats] = await Promise.all([
+      getCityStats(sharedMatch),
+      getCityStats(followerMatch)
+    ]);
+    const [allGenderStats, followerGenderStats] = await Promise.all([
+      getGenderStats(sharedMatch),
+      getGenderStats(followerMatch)
+    ]);
+    const [allAgeStats, followerAgeStats] = await Promise.all([
+      getAgeStats(sharedMatch),
+      getAgeStats(followerMatch)
+    ]);
+    const [allInterestStats, followerInterestStats] = await Promise.all([
+      getInterestStats(sharedMatch),
+      getInterestStats(followerMatch)
+    ]);
+
+    // Final Response
     res.status(200).json({
       success: true,
       message: "Analytics fetched successfully",
       data: {
-        totalVisitors,
-        repeatVisitors: repeatVisitorsCount,
-        topCities: cityStats,
-        genderStats,
-        ageCategory,
-        interestCategory
+        allVisitors: {
+          totalVisitors: allVisitorCount,
+          repeatVisitors: repeatAll,
+          topCities: allCityStats,
+          genderStats: allGenderStats,
+          ageCategory: allAgeStats,
+          interestCategory: allInterestStats
+        },
+        followerVisitors: {
+          totalVisitors: followerVisitorCount,
+          repeatVisitors: repeatFollowers,
+          topCities: followerCityStats,
+          genderStats: followerGenderStats,
+          ageCategory: followerAgeStats,
+          interestCategory: followerInterestStats
+        }
       }
     });
+
 
   } catch (error) {
     console.error("Error fetching analytics:", error);
@@ -1029,9 +1687,10 @@ export const deactivateProduct = async (req, res) => {
   console.log(req.query, "Received query params");
 
   try {
+    // Step 1: Update product status in the Product collection
     const updatedProduct = await Product.findByIdAndUpdate(
       product_id,
-      { status: status },
+      { status },
       { new: true }
     );
 
@@ -1039,13 +1698,25 @@ export const deactivateProduct = async (req, res) => {
       return res.status(404).json({ status: false, message: "Product not found" });
     }
 
+    // Step 2: Update all posts where mediaItems contain this productId
+    const updatedPosts = await createPostModel.updateMany(
+      { 'mediaItems.productId': product_id },
+      { $set: { Product_status: status } }
+    );
+
+    console.log(updatedPosts, 'Posts updated with new product status');
+
     res.status(200).json({
       status: true,
       message: "Deactivated successfully",
-      data: updatedProduct
+      data: {
+        updatedProduct,
+        updatedPostsCount: updatedPosts.modifiedCount
+      }
     });
   } catch (error) {
     console.error(error, "Error deactivating product");
     res.status(500).json({ status: false, message: "Something went wrong", error });
   }
 };
+

@@ -32,7 +32,7 @@
 //         const tracking = await trackingModel.findOne({ 
 //             user_id: new mongoose.Types.ObjectId(user_id) 
 //         });
-        
+
 //         const trackedPostIds = tracking?.sentPosts?.map(post => 
 //             new mongoose.Types.ObjectId(post.post_id)
 //         ) || [];
@@ -89,7 +89,7 @@
 //             .sort({ timestamp: -1, viewsCount: -1 })
 //             .limit(Math.ceil((limit - posts.length) * 0.35))
 //             .select(baseSelect);
-            
+
 //             posts = [...posts, ...locationPosts];
 //         }
 
@@ -108,7 +108,7 @@
 //             .sort({ viewsCount: -1, likesCount: -1 })
 //             .limit(limit - posts.length)
 //             .select(baseSelect);
-            
+
 //             posts = [...posts, ...trendingPosts];
 //         }
 
@@ -209,6 +209,7 @@ import BookmarkModel from "../model/BookmarkModel.js";
 import CommentModel from "../model/Comment.js";
 import UserInfo from "../model/UserInfo.js";
 import Follow from "../model/FollowModel.js";
+import trackingModel from "../model/TrackingModel.js";
 
 export const getDashboardFeed = async (req, res) => {
   try {
@@ -230,7 +231,7 @@ export const getDashboardFeed = async (req, res) => {
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit);
-      
+
     const totalResults = await createPostModel.countDocuments({});
     const totalPages = Math.ceil(totalResults / limit);
     const hasNextPage = page < totalPages;
@@ -244,6 +245,10 @@ export const getDashboardFeed = async (req, res) => {
 
     const formattedPosts = await Promise.all(
       posts.map(async (post) => {
+        await createPostModel.updateOne(
+          { _id: post._id },
+          { $inc: { viewsCount: 1 } }
+        );
         const isFavorite = favoriteSet.has(post._id.toString());
         const isBookmarked = bookmarkSet.has(post._id.toString());
 
@@ -260,79 +265,79 @@ export const getDashboardFeed = async (req, res) => {
         }
 
         const formattedComments = await Promise.all(
-            topComments.map(async (comment) => {
-              const user = await UserInfo.findOne({ id: comment.userId }); // userId should exist on comment
-          
-              return {
-                commentId: comment._id.toString(),
-                id: comment._id.toString(),
-                content: comment.content,
-                createdAt: comment.createdAt,
-                userInfo: {
-                  name: user?.name || "",
-                  avatar: user?.avatarUrl || "",
-                },
-              };
-            })
-          );
+          topComments.map(async (comment) => {
+            const user = await UserInfo.findOne({ id: comment.userId }); // userId should exist on comment
 
-          return {
-            id: post._id.toString(),
-            username: post.userName,
-            userId: post.userId,
-            productId: post.productId,
-            isBusinessAccount: post.isBusinessAccount,
-            userAvatar: post.userAvatar,
-            caption: post.caption,
-            thumbnailUrl: post.thumbnailUrl,
-            likesCount: post.likesCount,
-            commentsCount: post.commentsCount,
-            viewsCount: post.viewsCount,
-            sharesCount: post.sharesCount,
-            rePostCount: post.rePostCount,
-            isRepost: post.isRepost,
-            isOwnPost: post.isOwnPost,
-            isProductPost: post.isProductPost,
-            mediaItems: post.mediaItems.map((media) => ({
-              url: media.url,
-              type: media.type,
-              thumbnailUrl: media.thumbnailUrl,
-              productName: media.productName,
-              price: media.price,
-              originalPrice: media.originalPrice,
-              hasDiscount: media.hasDiscount,
-            })),
-            repostDetails: post.repostDetails
-  ? {
-      originalPostId: post.repostDetails.originalPostId?.toString() || "",
-      originalUserId: post.repostDetails.originalUserId || "",
-      originalUserName: post.repostDetails.originalUserName || "",
-      originalUserAvatar: post.repostDetails.originalUserAvatar || "",
-      originalCaption: post.repostDetails.originalCaption || "",
-      originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
-        url: media.url,
-        type: media.type,
-        thumbnailUrl: media.thumbnailUrl,
-        productName: media.productName,
-        price: media.price,
-        originalPrice: media.originalPrice,
-        hasDiscount: media.hasDiscount,
-      })),
-      isBusinessAccount: await (async () => {
-        const originalUser = await registerModel.findOne({ _id: post.repostDetails.originalUserId });
-        if (originalUser) return false;
-        const originalBusinessUser = await businessRegisterModel.findOne({ _id: post.repostDetails.originalUserId });
-        return !!originalBusinessUser;
-      })(),
-    }
-  : null,
-            likes: post.likesCount,
-            comments: formattedComments,
-            timestamp: post.timestamp,
-            isFavorite,
-            isBookmarked,
-          };
-          
+            return {
+              commentId: comment._id.toString(),
+              id: comment._id.toString(),
+              content: comment.content,
+              createdAt: comment.createdAt,
+              userInfo: {
+                name: user?.name || "",
+                avatar: user?.avatarUrl || "",
+              },
+            };
+          })
+        );
+
+        return {
+          id: post._id.toString(),
+          username: post.userName,
+          userId: post.userId,
+          productId: post.productId,
+          isBusinessAccount: post.isBusinessAccount,
+          userAvatar: post.userAvatar,
+          caption: post.caption,
+          thumbnailUrl: post.thumbnailUrl,
+          likesCount: post.likesCount,
+          commentsCount: post.commentsCount,
+          viewsCount: post.viewsCount,
+          sharesCount: post.sharesCount,
+          rePostCount: post.rePostCount,
+          isRepost: post.isRepost,
+          isOwnPost: post.isOwnPost,
+          isProductPost: post.isProductPost,
+          mediaItems: post.mediaItems.map((media) => ({
+            url: media.url,
+            type: media.type,
+            thumbnailUrl: media.thumbnailUrl,
+            productName: media.productName,
+            price: media.price,
+            originalPrice: media.originalPrice,
+            hasDiscount: media.hasDiscount,
+          })),
+          repostDetails: post.repostDetails
+            ? {
+              originalPostId: post.repostDetails.originalPostId?.toString() || "",
+              originalUserId: post.repostDetails.originalUserId || "",
+              originalUserName: post.repostDetails.originalUserName || "",
+              originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+              originalCaption: post.repostDetails.originalCaption || "",
+              originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
+                url: media.url,
+                type: media.type,
+                thumbnailUrl: media.thumbnailUrl,
+                productName: media.productName,
+                price: media.price,
+                originalPrice: media.originalPrice,
+                hasDiscount: media.hasDiscount,
+              })),
+              isBusinessAccount: await (async () => {
+                const originalUser = await registerModel.findOne({ _id: post.repostDetails.originalUserId });
+                if (originalUser) return false;
+                const originalBusinessUser = await businessRegisterModel.findOne({ _id: post.repostDetails.originalUserId });
+                return !!originalBusinessUser;
+              })(),
+            }
+            : null,
+          likes: post.likesCount,
+          comments: formattedComments,
+          timestamp: post.timestamp,
+          isFavorite,
+          isBookmarked,
+        };
+
       })
     );
 
@@ -352,6 +357,51 @@ export const getDashboardFeed = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
+
+
+
+
+export const trackViewedPost = async (req, res) => {
+  try {
+    const { user_id, post_id } = req.body;
+
+    if (!user_id || !post_id) {
+      return res.status(400).json({ message: "user_id and post_id are required" });
+    }
+
+    const existingTracking = await trackingModel.findOne({ user_id });
+
+    const alreadyTracked = existingTracking?.sentPosts?.some(
+      (entry) => entry.post_id.toString() === post_id
+    );
+
+    if (!alreadyTracked) {
+      await trackingModel.updateOne(
+        { user_id },
+        {
+          $push: {
+            sentPosts: {
+              post_id,
+              viewedAt: new Date(),
+              isWatched: true
+            }
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    return res.status(200).json({ message: "Post tracked" });
+  } catch (error) {
+    console.error("Error in trackViewedPost:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+
 
 export const suggestion = async (req, res) => {
   try {

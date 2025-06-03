@@ -8,11 +8,13 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken"
 import locationModel from "../model/locationModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
+import Playlist from "../model/playlistModel.js";
 import Comment from "../model/Comment.js";
 import otpModel from "../model/regOtpModel.js";
 import { constants } from "buffer";
 import followerModel from "../model/followerModel.js";
 import CommentModel from "../model/Comment.js";
+import ServiceModel from "../model/serviceModel.js";
 import UserInfo from "../model/UserInfo.js";
 // import postModel from "../model/postModel.js";
 import createPostModel from "../model/createPostModel.js";
@@ -37,6 +39,8 @@ import BookmarkModel from "../model/BookmarkModel.js";
 import Friend from "../model/FriendModel.js";
 import Follow from "../model/FollowModel.js";
 import redisService from "./redisService.js";
+// import Playlist from "../model/playlistModel.js";
+import { v4 as uuidv4 } from "uuid";
 
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
@@ -429,7 +433,10 @@ const adminService = {
                 institution,
                 year,
                 grade,
-                achievements
+                achievements,
+                businessLat,
+                businessLng,
+                businessDescription,
             } = data;
 
 
@@ -589,6 +596,9 @@ const adminService = {
                 businessType: businessType || "",
                 natureOfBusiness: natureOfBusiness || "",
                 businessName: businessName || "",
+                lat: businessLat || "",
+                lng: businessLng || "",
+                description: businessDescription || "",
                 important,
 
                 // Chat-related fields
@@ -598,6 +608,25 @@ const adminService = {
                 currentChatRoom,
                 unreadMessagesCount,
             });
+
+            if (natureOfBusiness) {
+                const service = await ServiceModel.findOne({ name: natureOfBusiness });
+                if (service) {
+                    service.userCount += 1;
+                    await service.save();
+                } else {
+                    await ServiceModel.create({
+                        name: natureOfBusiness,
+                        description: type_of_service || "",
+                        iconUrl: brand_logo || "",
+                        category: category || "General",
+                        userCount: 1,
+                        isPopular: false,
+                        rating: 0
+                    });
+                }
+            }
+
 
 
             return { success: true, user: updatedUser, business: [business] };
@@ -803,6 +832,9 @@ const adminService = {
                 lastOnline = null,
                 currentChatRoom = null,
                 unreadMessagesCount = 0,
+                businessLat,
+                businessLng,
+                businessDescription,
                 accessAccountsIds = [] // New field for additional linked accounts
             } = data;
 
@@ -850,6 +882,9 @@ const adminService = {
                 pan_img: pan_img || "",
                 brand_logo: brand_logo || "",
                 cover_img: cover_img || "",
+                lat: businessLat || "",
+                lng: businessLng || "",
+                description: businessDescription || "",
                 businessAgree,
                 accountIsPublic,
                 postCount,
@@ -878,6 +913,24 @@ const adminService = {
                 unreadMessagesCount,
                 accessAccountsIds // Store linked account IDs
             });
+
+            if (natureOfBusiness) {
+                const service = await ServiceModel.findOne({ name: natureOfBusiness });
+                if (service) {
+                    service.userCount += 1;
+                    await service.save();
+                } else {
+                    await ServiceModel.create({
+                        name: natureOfBusiness,
+                        description: type_of_service || "",
+                        iconUrl: brand_logo || "",
+                        category: category || "General",
+                        userCount: 1,
+                        isPopular: false,
+                        rating: 0
+                    });
+                }
+            }
 
             return { success: true, user: existingUser, business: [business] };
 
@@ -1218,6 +1271,43 @@ const adminService = {
             return {
                 status: 500,
                 msg: error.msg || "An error occurred during login. Please try again.",
+                login: null,
+            };
+        }
+    },
+
+    getMyAccounts: async (userId) => {
+        try {
+            const user = await registerModel.findById(userId);
+            if (!user) {
+                throw { msg: "User not found." };
+            }
+
+            const ownedBusinesses = await businessregisterModel.find({ user_id: user._id });
+
+            const accessibleBusinesses = await businessregisterModel.find({
+                accessAccountsIds: user._id.toString()
+            });
+
+            const allBusinesses = [...ownedBusinesses, ...accessibleBusinesses].filter(
+                (business, index, self) =>
+                    index === self.findIndex(b => b._id.toString() === business._id.toString())
+            );
+
+            return {
+                status: 200,
+                msg: "Accounts fetched successfully",
+                login: {
+                    token: null,
+                    user,
+                    business: allBusinesses,
+                },
+            };
+        } catch (error) {
+            console.error("Service error in getMyAccounts:", error);
+            return {
+                status: 500,
+                msg: error.msg || "Failed to retrieve accounts. Please try again.",
                 login: null,
             };
         }
@@ -1655,91 +1745,383 @@ const adminService = {
                 return { success: false, message: "Invalid or missing query parameter" };
             }
 
-            const normalizedQuery = query.toLowerCase();
-            let results;
+            const normalizedQuery = query.toLowerCase().trim();
+            let results = [];
+
+            // Function to calculate relevance score based on match quality
+            const calculateScore = (fieldValue, query) => {
+                if (!fieldValue) return 0;
+                const value = fieldValue.toString().toLowerCase();
+
+                // Exact match gets highest score
+                if (value === query) return 20;
+                // Starts with query gets high score
+                if (value.startsWith(query)) return 15;
+                // Contains query as a whole word gets medium score
+                if (new RegExp(`\\b${query}\\b`).test(value)) return 12;
+                // Contains query gets lower score
+                if (value.includes(query)) return 10;
+                // Partial match gets lowest score
+                return 5;
+            };
 
             if (typeOfSearch === "Location") {
-                const conditions = [
-                    { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
-                    { 'address.city': { $regex: normalizedQuery, $options: 'i' } },
-                    { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
-                    { 'address.country': { $regex: normalizedQuery, $options: 'i' } }
-                ];
+                // Location search for users
+                const locationQuery = {
+                    $or: [
+                        { 'address.street': { $regex: normalizedQuery, $options: 'i' } },
+                        { 'address.city': { $regex: normalizedQuery, $options: 'i' } },
+                        { 'address.district': { $regex: normalizedQuery, $options: 'i' } },
+                        { 'address.country': { $regex: normalizedQuery, $options: 'i' } }
+                    ]
+                };
 
                 // If the query is a number, add a condition for Pincode
                 if (!isNaN(query)) {
-                    conditions.push({ 'address.Pincode': Number(query) });
+                    locationQuery.$or.push({ 'address.Pincode': Number(query) });
                 }
 
-                const locationResults = await locationModel.find({
-                    $or: conditions
-                }).select('_id address');
+                // Get all matching locations
+                const locationResults = await locationModel.find(locationQuery)
+                    .select('_id address lat lng');
 
+                // Extract user data based on location IDs
+                if (locationResults.length > 0) {
+                    const locationIds = locationResults.map(location => location._id);
+                    const locationMap = new Map(locationResults.map(loc => [loc._id.toString(), loc]));
 
-                const locationIds = locationResults.map(location => location._id);
+                    const userResults = await registerModel.find({
+                        location_id: { $in: locationIds }
+                    }).select('_id full_Name profile_url location_id');
 
-                const userResults = await registerModel.find({
-                    location_id: { $in: locationIds }
-                }).select('_id full_Name profile_url');
+                    // Format user results with location data
+                    const formattedUserResults = userResults.map(user => {
+                        const locationData = locationMap.get(user.location_id.toString()) || {};
+                        const addressText = locationData.address ?
+                            [
+                                locationData.address.street,
+                                locationData.address.city,
+                                locationData.address.district,
+                                locationData.address.country,
+                                locationData.address.Pincode
+                            ].filter(Boolean).join(', ') : '';
 
+                        // Calculate score based on how well the location matches the query
+                        let score = 0;
+                        if (locationData.address) {
+                            score += calculateScore(locationData.address.street, normalizedQuery);
+                            score += calculateScore(locationData.address.city, normalizedQuery);
+                            score += calculateScore(locationData.address.district, normalizedQuery);
+                            score += calculateScore(locationData.address.country, normalizedQuery);
+                            if (locationData.address.Pincode) {
+                                score += calculateScore(locationData.address.Pincode.toString(), normalizedQuery);
+                            }
+                        }
+
+                        return {
+                            _id: user._id,
+                            full_Name: user.full_Name,
+                            type: "User",
+                            profile_url: user.profile_url || "",
+                            address: addressText,
+                            lat: locationData.lat || "",
+                            lng: locationData.lng || "",
+                            score: score
+                        };
+                    });
+
+                    results = [...results, ...formattedUserResults];
+                }
+
+                // Business location search
+                const businessQuery = {
+                    $or: [
+                        { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessCity: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessState: { $regex: normalizedQuery, $options: 'i' } },
+                        { businessCountry: { $regex: normalizedQuery, $options: 'i' } }
+                    ]
+                };
+
+                if (!isNaN(query)) {
+                    businessQuery.$or.push({ businessPinCode: Number(query) });
+                }
+
+                const businessResults = await businessregisterModel.find(businessQuery)
+                    .select('_id businessName brand_logo businessAddress businessCity businessState businessCountry businessPinCode lat lng');
+
+                // Format business results
+                const formattedBusinessResults = businessResults.map(business => {
+                    const addressText = [
+                        business.businessAddress,
+                        business.businessCity,
+                        business.businessState,
+                        business.businessCountry,
+                        business.businessPinCode
+                    ].filter(Boolean).join(', ');
+
+                    // Calculate score based on how well the location matches the query
+                    let score = 0;
+                    score += calculateScore(business.businessAddress, normalizedQuery);
+                    score += calculateScore(business.businessCity, normalizedQuery);
+                    score += calculateScore(business.businessState, normalizedQuery);
+                    score += calculateScore(business.businessCountry, normalizedQuery);
+                    if (business.businessPinCode) {
+                        score += calculateScore(business.businessPinCode.toString(), normalizedQuery);
+                    }
+
+                    return {
+                        _id: business._id,
+                        businessName: business.businessName,
+                        type: "Business",
+                        profile_url: business.brand_logo || "",
+                        address: addressText,
+                        lat: business.lat || "",
+                        lng: business.lng || "",
+                        score: score
+                    };
+                });
+
+                results = [...results, ...formattedBusinessResults];
+            }
+            else if (typeOfSearch === "Name") {
+                // User name search - improved to include fuzzy matching
+                const userResults = await registerModel.aggregate([
+                    {
+                        $match: { full_Name: { $regex: normalizedQuery, $options: 'i' } }
+                    },
+                    {
+                        $lookup: {
+                            from: 'locations',
+                            localField: 'location_id',
+                            foreignField: '_id',
+                            as: 'locationData'
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            full_Name: 1,
+                            profile_url: 1,
+                            lat: { $arrayElemAt: ['$locationData.lat', 0] },
+                            lng: { $arrayElemAt: ['$locationData.lng', 0] },
+                            address: {
+                                $concat: [
+                                    { $arrayElemAt: ['$locationData.address.street', 0] }, ', ',
+                                    { $arrayElemAt: ['$locationData.address.city', 0] }, ', ',
+                                    { $arrayElemAt: ['$locationData.address.district', 0] }, ', ',
+                                    { $arrayElemAt: ['$locationData.address.country', 0] }
+                                ]
+                            }
+                        }
+                    }
+                ]);
+
+                // Calculate score based on name match quality
                 const formattedUserResults = userResults.map(user => ({
                     _id: user._id,
                     full_Name: user.full_Name,
                     type: "User",
                     profile_url: user.profile_url || "",
-                    score: 1 // Assign a base score
-                }));
-                const businessConditions = [
-                    { businessAddress: { $regex: normalizedQuery, $options: 'i' } },
-                    { businessCity: { $regex: normalizedQuery, $options: 'i' } },
-                    { businessState: { $regex: normalizedQuery, $options: 'i' } }
-                ];
-
-                if (!isNaN(query)) {
-                    businessConditions.push({ businessPinCode: Number(query) });
-                }
-
-                const businessResults = await businessregisterModel.find({
-                    $or: businessConditions
-                }).select('_id businessName brand_logo');
-
-
-                const formattedBusinessResults = businessResults.map(business => ({
-                    _id: business._id,
-                    name: business.businessName,
-                    type: "Business",
-                    profile_url: business.brand_logo || "",
-                    score: 1 // Assign a base score
+                    address: user.address || "",
+                    lat: user.lat || "",
+                    lng: user.lng || "",
+                    score: calculateScore(user.full_Name, normalizedQuery)
                 }));
 
-                results = [...formattedUserResults, ...formattedBusinessResults];
-            } else if (typeOfSearch === "Name") {
-                const userResults = await registerModel.find({
-                    full_Name: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id full_Name profile_url');
-
+                // Business name search
                 const businessResults = await businessregisterModel.find({
                     businessName: { $regex: normalizedQuery, $options: 'i' }
-                }).select('_id businessName brand_logo');
+                }).select('_id businessName brand_logo businessAddress businessCity businessState businessCountry businessPinCode lat lng');
 
-                results = [
-                    ...userResults.map(user => ({
-                        _id: user._id,
-                        full_Name: user.full_Name,
-                        type: "User",
-                        profile_url: user.profile_url || "",
-                        score: user.full_Name.toLowerCase().includes(normalizedQuery) ? 10 : 5 // Higher score for exact matches
-                    })),
-                    ...businessResults.map(business => ({
+                const formattedBusinessResults = businessResults.map(business => {
+                    const addressText = [
+                        business.businessAddress,
+                        business.businessCity,
+                        business.businessState,
+                        business.businessCountry,
+                        business.businessPinCode
+                    ].filter(Boolean).join(', ');
+
+                    return {
                         _id: business._id,
                         businessName: business.businessName,
                         type: "Business",
                         profile_url: business.brand_logo || "",
-                        score: business.businessName.toLowerCase().includes(normalizedQuery) ? 10 : 5 // Higher score for exact matches
-                    }))
-                ];
-            } else {
-                return { success: false, message: "Invalid TypeOfSearch parameter" };
+                        address: addressText,
+                        lat: business.lat || "",
+                        lng: business.lng || "",
+                        score: calculateScore(business.businessName, normalizedQuery)
+                    };
+                });
+
+                results = [...formattedUserResults, ...formattedBusinessResults];
+            }
+            // Add a new search type for proximity search (if lat/lng provided)
+            else if (typeOfSearch === "Proximity") {
+                // Extract user's lat and lng from the query string (format: "lat,lng,radius")
+                const [userLat, userLng, radiusKm = 10] = normalizedQuery.split(',').map(Number);
+
+                if (isNaN(userLat) || isNaN(userLng)) {
+                    return { success: false, message: "Invalid coordinates format. Use 'latitude,longitude' or 'latitude,longitude,radiusKm'" };
+                }
+
+                // Convert radius from km to radians (for MongoDB's $geoNear)
+                const radiusInRadians = radiusKm / 6371; // Earth radius in km
+
+                // Find users within the radius
+                const nearbyLocations = await locationModel.find({
+                    lat: { $exists: true },
+                    lng: { $exists: true },
+                    $where: function () {
+                        if (!this.lat || !this.lng) return false;
+
+                        const lat1 = parseFloat(this.lat);
+                        const lng1 = parseFloat(this.lng);
+                        const lat2 = userLat;
+                        const lng2 = userLng;
+
+                        if (isNaN(lat1) || isNaN(lng1)) return false;
+
+                        // Haversine formula
+                        const dLat = (lat2 - lat1) * Math.PI / 180;
+                        const dLon = (lng2 - lng1) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        const distance = 6371 * c; // Distance in km
+
+                        return distance <= radiusKm;
+                    }
+                }).select('_id address lat lng');
+
+                // Process user results
+                if (nearbyLocations.length > 0) {
+                    const locationIds = nearbyLocations.map(loc => loc._id);
+                    const locationMap = new Map(nearbyLocations.map(loc => [loc._id.toString(), loc]));
+
+                    const nearbyUsers = await registerModel.find({
+                        location_id: { $in: locationIds }
+                    }).select('_id full_Name profile_url location_id');
+
+                    const formattedUserResults = nearbyUsers.map(user => {
+                        const locationData = locationMap.get(user.location_id.toString()) || {};
+
+                        // Calculate distance
+                        let distance = 0;
+                        if (locationData.lat && locationData.lng) {
+                            const lat1 = parseFloat(locationData.lat);
+                            const lng1 = parseFloat(locationData.lng);
+                            const lat2 = userLat;
+                            const lng2 = userLng;
+
+                            // Haversine formula
+                            const dLat = (lat2 - lat1) * Math.PI / 180;
+                            const dLon = (lng2 - lng1) * Math.PI / 180;
+                            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                            distance = 6371 * c; // Distance in km
+                        }
+
+                        const addressText = locationData.address ?
+                            [
+                                locationData.address.street,
+                                locationData.address.city,
+                                locationData.address.district,
+                                locationData.address.country,
+                                locationData.address.Pincode
+                            ].filter(Boolean).join(', ') : '';
+
+                        return {
+                            _id: user._id,
+                            full_Name: user.full_Name,
+                            type: "User",
+                            profile_url: user.profile_url || "",
+                            address: addressText,
+                            lat: locationData.lat || "",
+                            lng: locationData.lng || "",
+                            distance: distance.toFixed(2), // Distance in km
+                            score: 20 - distance // Score based on proximity (closer = higher score)
+                        };
+                    });
+
+                    results = [...results, ...formattedUserResults];
+                }
+
+                // Find nearby businesses
+                const nearbyBusinesses = await businessregisterModel.find({
+                    lat: { $exists: true },
+                    lng: { $exists: true },
+                    $where: function () {
+                        if (!this.lat || !this.lng) return false;
+
+                        const lat1 = parseFloat(this.lat);
+                        const lng1 = parseFloat(this.lng);
+                        const lat2 = userLat;
+                        const lng2 = userLng;
+
+                        if (isNaN(lat1) || isNaN(lng1)) return false;
+
+                        // Haversine formula
+                        const dLat = (lat2 - lat1) * Math.PI / 180;
+                        const dLon = (lng2 - lng1) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        const distance = 6371 * c; // Distance in km
+
+                        return distance <= radiusKm;
+                    }
+                }).select('_id businessName brand_logo businessAddress businessCity businessState businessCountry businessPinCode lat lng');
+
+                const formattedBusinessResults = nearbyBusinesses.map(business => {
+                    // Calculate distance
+                    let distance = 0;
+                    if (business.lat && business.lng) {
+                        const lat1 = parseFloat(business.lat);
+                        const lng1 = parseFloat(business.lng);
+                        const lat2 = userLat;
+                        const lng2 = userLng;
+
+                        // Haversine formula
+                        const dLat = (lat2 - lat1) * Math.PI / 180;
+                        const dLon = (lng2 - lng1) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        distance = 6371 * c; // Distance in km
+                    }
+
+                    const addressText = [
+                        business.businessAddress,
+                        business.businessCity,
+                        business.businessState,
+                        business.businessCountry,
+                        business.businessPinCode
+                    ].filter(Boolean).join(', ');
+
+                    return {
+                        _id: business._id,
+                        businessName: business.businessName,
+                        type: "Business",
+                        profile_url: business.brand_logo || "",
+                        address: addressText,
+                        lat: business.lat || "",
+                        lng: business.lng || "",
+                        distance: distance.toFixed(2), // Distance in km
+                        score: 20 - distance // Score based on proximity (closer = higher score)
+                    };
+                });
+
+                results = [...results, ...formattedBusinessResults];
+            }
+            else {
+                return { success: false, message: "Invalid typeOfSearch parameter. Use 'Name', 'Location', or 'Proximity'." };
             }
 
             if (results.length === 0) {
@@ -1769,6 +2151,7 @@ const adminService = {
                 }
             };
         } catch (error) {
+            console.error("Search recommendation error:", error);
             return { success: false, message: error.message };
         }
     },
@@ -2324,10 +2707,11 @@ const adminService = {
         try {
             const skip = (page - 1) * limit;
 
-            const totalResults = await createPostModel.countDocuments({ userId: user_id });
+            const totalResults = await createPostModel.countDocuments({ userId: user_id, Product_status: { $ne: "Deactivate" } });
+            console.log(totalResults, "totalResults")
             const totalPages = Math.ceil(totalResults / limit);
 
-            const posts = await createPostModel.find({ userId: user_id })
+            const posts = await createPostModel.find({ userId: user_id, Product_status: { $ne: "Deactivate" } })
                 .sort({ likesCount: -1 })
                 .skip(skip)
                 .limit(limit);
@@ -3542,9 +3926,6 @@ const adminService = {
 
     // ================================
 
-
-    // ===================
-
    sendMessage: async (io, socket, from, to, message) => {
         // console.log("Input data:", { from, to, message });
 
@@ -3789,6 +4170,48 @@ const adminService = {
         }
     },
 
+    // ========================
+
+
+getAllChatUser: async (user_id) => {
+    try {
+        let getuser = await registerModel.findOne({ _id: user_id });
+        if (!getuser) getuser = await businessregisterModel.findOne({ _id: user_id });
+        if (!getuser) throw new Error("User not found");
+
+        const chats = await MessageModel.find({ participants: user_id });
+        const result = [];
+
+        for (const chat of chats) {
+            const otherUserId = chat.participants.find(id => id !== user_id);
+
+            let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
+            if (!otherUser) {
+                otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
+            }
+
+            const lastMessage = chat.messages[chat.messages.length - 1];
+
+            const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
+            const profileImage = otherUser?.profile_url || otherUser?.brand_logo || null;
+
+            result.push({
+                userId: otherUserId,
+                name,
+                profileImage,
+                lastMessage: lastMessage?.message || "",
+                timestamp: lastMessage?.timestamp || null,
+                isOnline: !!connectedUsers[otherUserId],
+                chat_id:chat._id
+            });
+        }
+
+        return result;
+    } catch (error) {
+        console.error(" Error in getAllChatUser:", error.message);
+        throw error;
+    }
+},
 
     // =============================
     addDeliveryAddress: async (data) => {
@@ -4048,30 +4471,47 @@ const adminService = {
             };
         }
     },
+
+
     fetchUserPosts: async (userId, page = 1, limit = 12) => {
         try {
             const skip = (page - 1) * limit;
             const objectId = new mongoose.Types.ObjectId(userId);
 
-            const totalPostsCount = await createPostModel.countDocuments({ userId });
+            const totalPostsCount = await createPostModel.countDocuments({ userId, Product_status: { $ne: "Deactivate" } });
 
             const posts = await createPostModel
-                .find({ userId })
+                .find({ userId, Product_status: { $ne: "Deactivate" } })
                 .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
                 .skip(skip)
                 .limit(limit);
-
+            console.log(posts, "posts")
             const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
             const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
 
-            const favoriteSet = new Set(favoritePosts.map((f) => f.post_id.toString()));
-            const bookmarkSet = new Set(bookmarkedPosts.map((b) => b.post_id.toString()));
+            // Filter only active favorite posts
+            const favoritePostIds = favoritePosts.map((f) => f.post_id);
+            const activeFavoritePosts = await createPostModel.find({
+                _id: { $in: favoritePostIds },
+                Product_status: { $ne: "Deactivate" }
+            }).select("_id");
+            const activeFavoriteSet = new Set(activeFavoritePosts.map((p) => p._id.toString()));
 
+            // Filter only active bookmarked posts
+            const bookmarkedPostIds = bookmarkedPosts.map((b) => b.post_id);
+            const activeBookmarkedPosts = await createPostModel.find({
+                _id: { $in: bookmarkedPostIds },
+                Product_status: { $ne: "Deactivate" }
+            }).select("_id");
+            const activeBookmarkSet = new Set(activeBookmarkedPosts.map((p) => p._id.toString()));
+
+            // Format posts
             const formattedPosts = await Promise.all(
                 posts.map(async (post) => {
-                    const isFavorite = favoriteSet.has(post._id.toString());
-                    const isBookmarked = bookmarkSet.has(post._id.toString());
+                    const isFavorite = activeFavoriteSet.has(post._id.toString());
+                    const isBookmarked = activeBookmarkSet.has(post._id.toString());
 
+                    // Get top comments
                     let topComments = await CommentModel.find({ postId: post._id })
                         .sort({ likesCount: -1, createdAt: -1 })
                         .limit(2)
@@ -4587,18 +5027,46 @@ const adminService = {
 
     toggleFav: async (data) => {
         const { user_id, post_id, isBusinessAccount, isProduct } = data;
+
         try {
             const existingLike = await FavoriteModel.findOne({ user_id, post_id });
+
+            // Find or create the "LikedPosts" playlist
+            let likedPostsPlaylist = await Playlist.findOne({ userId: user_id, name: "LikedPosts" });
+
+            if (!likedPostsPlaylist) {
+                likedPostsPlaylist = await Playlist.create({
+                    playlistId: uuidv4(),
+                    userId: new mongoose.Types.ObjectId(user_id),
+                    name: "LikedPosts",
+                    videos: [],
+                    isPublic: false,
+                });
+            }
 
             if (existingLike) {
                 await FavoriteModel.findOneAndDelete({ user_id, post_id });
                 await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: -1 } });
+
+                // Remove post from LikedPosts playlist
+                await Playlist.updateOne(
+                    { _id: likedPostsPlaylist._id },
+                    { $pull: { videos: post_id } }
+                );
 
                 return { message: "Removed from favorites", liked: false };
             }
 
             const newLike = await FavoriteModel.create({ user_id, post_id, isBusinessAccount, isProduct });
             await createPostModel.findByIdAndUpdate(post_id, { $inc: { likesCount: 1 } });
+
+            // Add post to LikedPosts playlist (only if not already in)
+            if (!likedPostsPlaylist.videos.includes(post_id)) {
+                await Playlist.updateOne(
+                    { _id: likedPostsPlaylist._id },
+                    { $addToSet: { videos: post_id } }
+                );
+            }
 
             return { message: "Added to favorites", liked: true, data: newLike };
         } catch (error) {
@@ -4607,25 +5075,28 @@ const adminService = {
     },
 
 
+
     getUserFavorites: async (user_id, page = 1, limit = 15) => {
         try {
             if (!user_id) return { success: false, message: "Invalid user ID" };
 
             const skip = (page - 1) * limit;
-
-            const totalFavorites = await FavoriteModel.countDocuments({ user_id });
-            const totalPages = Math.ceil(totalFavorites / limit);
-
-            const favoritePostDocs = await FavoriteModel.find({ user_id })
-                .select("post_id")
-                .skip(skip)
-                .limit(limit);
-
+            const favoritePostDocs = await FavoriteModel.find({ user_id }).select("post_id");
             const postIds = favoritePostDocs.map(fav => fav.post_id);
-
-            const posts = await createPostModel.find({ _id: { $in: postIds } })
+            console.log(postIds, "postIds")
+            const activePostCount = await createPostModel.countDocuments({
+                _id: { $in: postIds },
+                Product_status: { $ne: "Deactivate" }
+            });
+            console.log(activePostCount, "activePostCount")
+            const totalFavorites = activePostCount;
+            const totalPages = Math.ceil(totalFavorites / limit);
+            const posts = await createPostModel.find({ _id: { $in: postIds }, Product_status: { $ne: "Deactivate" } })
                 .sort({ likesCount: -1 })
+                .skip(skip)
+                .limit(limit)
                 .lean();
+
 
             let objectId;
             if (mongoose.Types.ObjectId.isValid(user_id)) {
@@ -4849,7 +5320,49 @@ const adminService = {
             console.log(error)
             throw error
         }
+    },
+
+
+
+
+
+    getCollection: async (userId) => {
+        console.log(userId, "userId");
+        try {
+            const collection = await Playlist.find({ userId });
+
+            if (!collection || collection.length === 0) {
+                throw new Error("No collections found for this user");
+            }
+
+            // Sort so "Favorites" is first
+            collection.sort((a, b) => {
+                if (a.name === "Favorites") return -1;
+                if (b.name === "Favorites") return 1;
+                return 0;
+            });
+
+            const groupedCollections = await Promise.all(
+                collection.map(async (playlist) => {
+                    const posts = await createPostModel.find({ _id: { $in: playlist.post_id } });
+                    return {
+                        _id: playlist._id,
+                        name: playlist.name,
+                        userId: playlist.userId,
+                        posts: posts,
+                    };
+                })
+            );
+
+            return groupedCollections;
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
     }
+
+
+
 
 
 }

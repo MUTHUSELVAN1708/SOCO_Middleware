@@ -869,33 +869,43 @@ export const deleteOrder = async (req, res) => {
 export const shippedOrderBySeller = async (req, res) => {
     try {
         const { orderId } = req.body;
+        console.log("Received request to ship order:", orderId);
 
         if (!orderId) {
+            console.log("Missing orderId in request body");
             return handleError(res, 400, "Missing required field: orderId");
         }
 
         const order = await Order.findById(orderId);
         if (!order) {
+            console.log("Order not found for orderId:", orderId);
             return handleError(res, 404, "Order not found");
         }
+        console.log("Order found:", order);
 
         const product = await Product.findById(order.product_id);
         if (!product) {
+            console.log("Product not found for product_id:", order.product_id);
             return handleError(res, 404, "Product not found");
         }
+        console.log("Product found:", product.basicInfo.productTitle);
 
         if (order.order_status !== "Confirmed") {
+            console.log(`Order status is '${order.order_status}'. Only 'Confirmed' orders can be shipped.`);
             return handleError(res, 400, "Only confirmed orders can be marked as Shipped");
         }
 
         if (order.order_status === "Shipped") {
+            console.log("Order is already marked as Shipped:", orderId);
             return handleError(res, 400, "Order is already marked as Shipped");
         }
 
         if (product.availability.stockQuantity <= 0) {
+            console.log("Insufficient stock to ship the order. Current stock:", product.availability.stockQuantity);
             return handleError(res, 400, "Insufficient stock to ship this order");
         }
 
+        console.log("Updating order status to Shipped...");
         order.order_status = "Shipped";
         order.seller_review_status = "Shipped";
         order.is_Shipped = "true";
@@ -906,22 +916,33 @@ export const shippedOrderBySeller = async (req, res) => {
 
         product.availability.stockQuantity -= 1;
         product.availability.inStock = product.availability.stockQuantity > 0;
+        console.log("Updated product stock. Remaining:", product.availability.stockQuantity);
 
         await Promise.all([order.save(), product.save()]);
+        console.log("Order and product saved successfully");
 
         let user = await registerModel.findById(order.user_id);
         if (!user) {
             user = await BusinessModel.findById(order.user_id);
         }
 
-        const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
-        if (validPlayerIds.length > 0) {
-            sendPushNotification({
-                playerIds: validPlayerIds,
-                title: "Order Shipped",
-                message: `The seller has shipped your order for ${product.basicInfo.productTitle.trim()}.`,
-                productImageUrl: product.images?.length > 0 ? product.images[0] : null,
-            });
+        if (!user) {
+            console.log("User not found for user_id:", order.user_id);
+        } else {
+            const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
+            console.log("Valid player IDs for push notification:", validPlayerIds);
+
+            if (validPlayerIds.length > 0) {
+                sendPushNotification({
+                    playerIds: validPlayerIds,
+                    title: "Order Shipped",
+                    message: `The seller has shipped your order for ${product.basicInfo.productTitle.trim()}.`,
+                    productImageUrl: product.images?.length > 0 ? product.images[0] : null,
+                });
+                console.log("Push notification sent successfully");
+            } else {
+                console.log("No valid player IDs found for push notification");
+            }
         }
 
         return handleSuccessV1(res, 200, "Order shipped successfully", {
@@ -929,9 +950,11 @@ export const shippedOrderBySeller = async (req, res) => {
             status: order.order_status,
         });
     } catch (error) {
+        console.error("Error shipping order:", error);
         return handleError(res, 500, `Error shipping order: ${error.message}`);
     }
 };
+
 
 export const changePaymentBySeller = async (req, res) => {
     try {
@@ -1012,7 +1035,7 @@ export const getConfirmedOrders = async (req, res) => {
         console.log(`Fetching confirmed orders for ID: ${id}, Page: ${pageNumber}, Limit: ${pageSize}, Skip: ${skip}`);
 
         const queryFilter = {
-            order_status: isBusiness === "true" ? { $nin: ["Pending", "Cancelled", "Rejected"] } : "Confirmed",
+            order_status: isBusiness === "true" ? { $nin: ["Pending", "Cancelled", "Rejected"] } : { $in: ["Confirmed", "Shipped","Delivered"] },
             [isBusiness === "true" ? "seller_id" : "user_id"]: id,
         };
 
