@@ -3545,8 +3545,8 @@ const adminService = {
 
     // ===================
 
-    sendMessage: async (io, socket, from, to, message) => {
-        console.log("📩 Input data:", { from, to, message });
+   sendMessage: async (io, socket, from, to, message) => {
+        // console.log("Input data:", { from, to, message });
 
         if (!from || !to || !message) {
             socket.emit("sendedMsg", { success: false, message: "Missing required fields: from, to, or message" });
@@ -3557,28 +3557,47 @@ const adminService = {
         const chatKey = `chat:${from}:${to}`;
 
         try {
-            const newMessage = await MessageModel.create({ from, to, message, timestamp });
-            console.log("✅ New message created:", newMessage);
+            const participants = [from, to].sort();
+
+            const newMessage = await MessageModel.findOneAndUpdate(
+                { participants },
+                {
+                    $push: {
+                        messages: { message, timestamp, sender: from }
+                    },
+                    $setOnInsert: {
+                        participants
+                    }
+                },
+                {
+                    new: true,
+                    upsert: true,
+                    setDefaultsOnInsert: true
+                }
+            );
+
+            console.log(" New message created:", newMessage);
+            const latestMessage = newMessage.messages.at(-1);
 
             const messageWithObjectId = {
-                _id: newMessage._id.toString(),
+                chat_id: newMessage._id.toString(),
+                _id: latestMessage._id,
                 from,
                 to,
-                message,
-                timestamp,
+                message: latestMessage.message,
+                timestamp: latestMessage.timestamp
             };
-
             // Store message in Redis
             await redisService.getRedisClient().lPush(chatKey, JSON.stringify(messageWithObjectId));
 
-            console.log("🟢 Checking connected users:", JSON.stringify(connectedUsers, null, 2));
+            // console.log("Checking connected users:", JSON.stringify(connectedUsers, null, 2));
             const receiverSocketId = connectedUsers[to];
 
             if (receiverSocketId) {
-                console.log(`✅ Receiver (${to}) is online. Sending message...`);
+                // console.log(`✅ Receiver (${to}) is online. Sending message...`);
                 io.to(receiverSocketId).emit("receiveMsg", messageWithObjectId);
             } else {
-                console.log(`❌ Receiver (${to}) is offline.`);
+                // console.log(`❌ Receiver (${to}) is offline.`);
                 await redisService.getRedisClient().lPush(`offlineMessages:${to}`, JSON.stringify(messageWithObjectId));
             }
 
@@ -3586,11 +3605,12 @@ const adminService = {
 
             return { success: true, message: "Message sent" };
         } catch (err) {
-            console.error("❌ Error in sendMessage:", err);
+            // console.error("❌ Error in sendMessage:", err);
             socket.emit("sendedMsg", { success: false, message: "Error sending message" });
             throw new Error("Error sending message");
         }
     },
+
 
 
 
