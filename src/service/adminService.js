@@ -3984,7 +3984,7 @@ const adminService = {
 
             socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
 
-            return { success: true, message: "Message sent" };
+            return { success: true, message: "Message sent",messageWithObjectId };
         } catch (err) {
             // console.error("❌ Error in sendMessage:", err);
             socket.emit("sendedMsg", { success: false, message: "Error sending message" });
