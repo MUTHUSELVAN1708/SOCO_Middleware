@@ -9,7 +9,10 @@ const messageSchema = new mongoose.Schema(
     },
     messages: [
       {
-        message: { type: String, required: true },
+        post_id:{type:mongoose.Schema.Types.ObjectId},
+        msgType:{type:String},
+        post_url:{type:String},
+        message: { type: String, required: false },
         timestamp: { type: Date, default: Date.now },
         sender: { type: String, required: true }
       }
