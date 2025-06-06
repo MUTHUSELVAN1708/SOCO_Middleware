@@ -4031,7 +4031,7 @@ getSinglePost: async (post_id) => {
         return {
             id: post._id.toString() ?? '',
             userId: post.userId ?? '',
-            username: post.username ?? '',
+            username: post.userName ?? '',
             userAvatar: post.userAvatar ?? '',
             mediaItems: Array.isArray(post.mediaItems)
                 ? post.mediaItems.map(item => ({
