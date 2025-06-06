@@ -1073,6 +1073,19 @@ const adminController = {
             res.status(500).json({ error: 'Error fetching chat history' });
         }
     },
+
+    // ====================
+    getSinglePost:async (req, res) => {
+        const { post_id} = req.params;
+
+        try {
+            const post = await adminService.getSinglePost(post_id);
+            res.status(200).json({ post });
+        } catch (err) {
+            console.error('Error in getpost:', err);
+            res.status(500).json({ error: 'Error fetching post' });
+        }
+    },
     //   ======================================
     deleteFromRedis: async (req, res) => {
         const { chatKey, messagesToDelete } = req.body;
