@@ -338,6 +338,7 @@ router.get("/getCart/:id",adminController.getCart);
 
 router.post("/sendMessage/:from/:to",adminController.sendMessage);
 
+router.get("/getSinglePost/:post_id",adminController.getSinglePost)
 router.get("/getChatHistory/:from/:to",adminController.getChatHistory);
 
 router.delete("/deleteFromRedis",adminController.deleteFromRedis);

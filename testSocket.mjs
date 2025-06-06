@@ -35,10 +35,10 @@ setTimeout(() => {
         socket.emit("sendMsg", {
             from: "68062193600f323429cb2779",
             to: "68072a0986c2ff11021f13d0",
-            message: "Hello from!",
-            // post_id: "680764af74a64affd7a36c93",
-            // msgType: "img",
-            // post_url: "http://122.165.18.7:2007/uploads/1745314991220-scaled_1000001972.jpg"
+            message: " ",
+            post_id: "680764af74a64affd7a36c93",
+            msgType: "img",
+            post_url: "http://122.165.18.7:2007/uploads/1745314991220-scaled_1000001972.jpg"
         });
     }
 }, 2000);

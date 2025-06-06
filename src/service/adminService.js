@@ -1,5 +1,5 @@
 import registerModel from "../model/registerModel.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import otpGenerator from "otp-generator";
 import twilio from "twilio";
@@ -3926,7 +3926,7 @@ const adminService = {
 
     // ================================
 
-   sendMessage: async (io, socket, from, to, message) => {
+    sendMessage: async (io, socket, from, to, message) => {
         // console.log("Input data:", { from, to, message });
 
         if (!from || !to || !message) {
@@ -3984,7 +3984,7 @@ const adminService = {
 
             socket.emit("sendedMsg", { success: true, data: messageWithObjectId });
 
-            return { success: true, message: "Message sent",messageWithObjectId };
+            return { success: true, message: "Message sent", messageWithObjectId };
         } catch (err) {
             // console.error("❌ Error in sendMessage:", err);
             socket.emit("sendedMsg", { success: false, message: "Error sending message" });
@@ -4000,7 +4000,7 @@ const adminService = {
     getChatHistory: async (from, to) => {
         const chatKey1 = `chat:${from}:${to}`;
         const chatKey2 = `chat:${to}:${from}`;
-console.log(chatKey1,chatKey2,"chatKey1")
+        console.log(chatKey1, chatKey2, "chatKey1")
         try {
             // Fetch messages from Redis (both directions)
             const messages1 = await redisService.getRedisClient().lRange(chatKey1, 0, -1);
@@ -4018,7 +4018,66 @@ console.log(chatKey1,chatKey2,"chatKey1")
         }
     },
 
+    // =========================post
+   
 
+getSinglePost: async (post_id) => {
+    try {
+        const post = await createPostModel.findById(post_id).lean();
+        if (!post) {
+            throw new Error('Post not found');
+        }
+
+        return {
+            id: post._id.toString() ?? '',
+            userId: post.userId ?? '',
+            username: post.username ?? '',
+            userAvatar: post.userAvatar ?? '',
+            mediaItems: Array.isArray(post.mediaItems)
+                ? post.mediaItems.map(item => ({
+                    // Assuming each mediaItem has these fields
+                    url: item.url ?? '',
+                    type: item.type ?? '',
+                  }))
+                : [],
+            likes: post.likes ?? 0,
+            caption: post.caption ?? '',
+            comments: Array.isArray(post.comments)
+                ? post.comments.map(comment => ({
+                    // Assuming each comment has these fields
+                    id: comment._id?.toString() ?? '',
+                    userId: comment.userId ?? '',
+                    username: comment.username ?? '',
+                    text: comment.text ?? '',
+                    timestamp: comment.timestamp ?? '',
+                  }))
+                : [],
+            timestamp: post.timestamp ?? new Date(),
+            isLiked: post.isFavorite ?? false,
+            isBookmarked: post.isBookmarked ?? false,
+            likesCount: post.likesCount ?? 0,
+            commentsCount: post.commentsCount ?? 0,
+            viewsCount: post.viewsCount ?? 0,
+            sharesCount: post.sharesCount ?? 0,
+            rePostCount: post.rePostCount ?? 0,
+            isRepost: post.isRepost ?? false,
+            isOwnPost: post.isOwnPost ?? true,
+            isProductPost: post.isProductPost ?? false,
+            isBusinessAccount: post.isBusinessAccount ?? false,
+            productId: post.productId ?? '',
+            repostDetails: post.repostDetails
+                ? {
+                    originalUserId: post.repostDetails.originalUserId ?? '',
+                    originalPostId: post.repostDetails.originalPostId ?? '',
+                    repostedAt: post.repostDetails.repostedAt ?? '',
+                }
+                : null,
+        };
+    } catch (error) {
+        console.error('Error fetching post:', error);
+        throw new Error('Error fetching post');
+    }
+},
 
     //   =====================
 
@@ -4173,45 +4232,45 @@ console.log(chatKey1,chatKey2,"chatKey1")
     // ========================
 
 
-getAllChatUser: async (user_id) => {
-    try {
-        let getuser = await registerModel.findOne({ _id: user_id });
-        if (!getuser) getuser = await businessregisterModel.findOne({ _id: user_id });
-        if (!getuser) throw new Error("User not found");
+    getAllChatUser: async (user_id) => {
+        try {
+            let getuser = await registerModel.findOne({ _id: user_id });
+            if (!getuser) getuser = await businessregisterModel.findOne({ _id: user_id });
+            if (!getuser) throw new Error("User not found");
 
-        const chats = await MessageModel.find({ participants: user_id });
-        const result = [];
+            const chats = await MessageModel.find({ participants: user_id });
+            const result = [];
 
-        for (const chat of chats) {
-            const otherUserId = chat.participants.find(id => id !== user_id);
+            for (const chat of chats) {
+                const otherUserId = chat.participants.find(id => id !== user_id);
 
-            let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
-            if (!otherUser) {
-                otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
+                let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
+                if (!otherUser) {
+                    otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
+                }
+
+                const lastMessage = chat.messages[chat.messages.length - 1];
+
+                const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
+                const profileImage = otherUser?.profile_url || otherUser?.brand_logo || null;
+
+                result.push({
+                    userId: otherUserId,
+                    name,
+                    profileImage,
+                    lastMessage: lastMessage?.message || "",
+                    timestamp: lastMessage?.timestamp || null,
+                    isOnline: !!connectedUsers[otherUserId],
+                    chat_id: chat._id
+                });
             }
 
-            const lastMessage = chat.messages[chat.messages.length - 1];
-
-            const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
-            const profileImage = otherUser?.profile_url || otherUser?.brand_logo || null;
-
-            result.push({
-                userId: otherUserId,
-                name,
-                profileImage,
-                lastMessage: lastMessage?.message || "",
-                timestamp: lastMessage?.timestamp || null,
-                isOnline: !!connectedUsers[otherUserId],
-                chat_id:chat._id
-            });
+            return result;
+        } catch (error) {
+            console.error(" Error in getAllChatUser:", error.message);
+            throw error;
         }
-
-        return result;
-    } catch (error) {
-        console.error(" Error in getAllChatUser:", error.message);
-        throw error;
-    }
-},
+    },
 
     // =============================
     addDeliveryAddress: async (data) => {
