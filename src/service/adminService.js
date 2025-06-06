@@ -4000,7 +4000,7 @@ const adminService = {
     getChatHistory: async (from, to) => {
         const chatKey1 = `chat:${from}:${to}`;
         const chatKey2 = `chat:${to}:${from}`;
-
+console.log(chatKey1,chatKey2,"chatKey1")
         try {
             // Fetch messages from Redis (both directions)
             const messages1 = await redisService.getRedisClient().lRange(chatKey1, 0, -1);
