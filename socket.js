@@ -28,7 +28,6 @@ const initializeSocket = (server) => {
         connectedUsers.set(userId, socket.id);
         console.log(`✅ ${userId} connected with socket ${socket.id}`);
 
-        // 🔁 Send offline messages (if any)
         const offlineKey = `offlineMessages:${userId}`;
         try {
             const messages = await redisClient.lRange(offlineKey, 0, -1);
