@@ -56,6 +56,7 @@ const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree, deviceToken } = data;
+        console.log(data,"data")
         try {
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
@@ -95,12 +96,13 @@ const adminService = {
 
     // ==================
     verifyEmail: async (email) => {
+        console.log(email)
         try {
             const existingEmail = await registerModel.findOne({ email });
             if (existingEmail) {
                 throw new Error("Email already exists");
             }
-
+console.log(existingEmail)
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
                 throw new Error("Invalid email format");
@@ -439,7 +441,7 @@ const adminService = {
                 businessDescription,
             } = data;
 
-
+console.log(data)
 
             // Validate required fields
             let errors = [];

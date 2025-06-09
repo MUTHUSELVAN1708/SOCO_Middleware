@@ -66,6 +66,9 @@ const upload = multer({
   }),
 });
 
+
+
+
 // General File Upload Configuration
 const allowedMimeTypes = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
@@ -102,7 +105,23 @@ router.post("/registerBusinessAccount", adminController.registerBusinessAccount)
 router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 
 
-                                                                                                               
+        
+
+
+router.post('/sendMessage', uploadFiles.single('filename'), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+  const { filename, originalname, size } = req.file;
+
+  res.status(200).json({
+    success: true,
+    fileName: originalname,
+    post_url: `/uploads/${filename}`, // This is what gets stored in DB
+    fileSize: size,
+  });
+});
+
+
 // Image Upload Route
 router.post(
     "/imgUpload",
@@ -336,7 +355,8 @@ router.delete("/removeFromCart",adminController.removeFromCart);
 router.get("/getCart/:id",adminController.getCart);
 
 
-router.post("/sendMessage/:from/:to",adminController.sendMessage);
+// router.post("/sendMessage/:from/:to",adminController.sendMessage);
+
 
 router.get("/getSinglePost/:post_id",adminController.getSinglePost)
 router.get("/getChatHistory/:from/:to",adminController.getChatHistory);

@@ -9,6 +9,7 @@ const adminController = {
     register: async (req, res, next) => {
         try {
             const register = await adminService.register(req.body);
+            console.log(register,"te")
             res.status(200).json({
                 status: 200,
                 msg: "successfully created",

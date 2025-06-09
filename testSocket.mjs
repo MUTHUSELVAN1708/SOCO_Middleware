@@ -32,14 +32,16 @@ socket.on("disconnect", () => {
 // If this is a sender, emit a message after 2 seconds
 setTimeout(() => {
     if (userId === "68062193600f323429cb2779") {
-        socket.emit("sendMsg", {
-            from: "68062193600f323429cb2779",
-            to: "68072a0986c2ff11021f13d0",
-            message: " ",
-            post_id: "680764af74a64affd7a36c93",
-            msgType: "img",
-            post_url: "http://122.165.18.7:2007/uploads/1745314991220-scaled_1000001972.jpg"
-        });
+       socket.emit("sendMsg", {
+    from: "68062193600f323429cb2779",
+    to: "68072a0986c2ff11021f13d0",
+    message: " ", // Required if msgType is "text"
+    msgType: "document",
+    post_url: "http://122.165.18.7:2007/uploads/myfile.pdf",
+    fileName: "myfile.pdf",
+    fileSize: 120345  // <-- Add the correct file size in bytes
+});
+
     }
 }, 2000);
 
