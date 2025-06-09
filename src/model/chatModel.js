@@ -14,7 +14,9 @@ const messageSchema = new mongoose.Schema(
         post_url:{type:String},
         message: { type: String, required: false },
         timestamp: { type: Date, default: Date.now },
-        sender: { type: String, required: true }
+        sender: { type: String, required: true },
+        fileName:{type:String},
+        fileSize:{type:String},
       }
     ]
   },

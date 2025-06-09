@@ -46,17 +46,31 @@ const initializeSocket = (server) => {
                 if (typeof data === "string") data = JSON.parse(data);
                 if (!data || typeof data !== "object") throw new Error("Invalid message format");
 
-                const { from, to, message, post_id, msgType, post_url } = data;
-                if (!from || !to || !message) throw new Error("Missing fields");
+                const { from, to, message, post_id, msgType, post_url, fileName ,fileSize} = data;
+
+                if (!from || !to) throw new Error("Missing 'from' or 'to' fields");
+                if (msgType === "text" && !message) throw new Error("Message content required for text type");
+                if ((msgType === "image" || msgType === "document") && !post_url)
+                    throw new Error("Media URL required for image/document");
 
                 const participants = [from, to].sort();
                 const timestamp = new Date();
 
-                // Save to MongoDB
+                const messageData = {
+                    message,
+                    timestamp,
+                    sender: from,
+                    post_id,
+                    msgType,
+                    post_url,
+                    fileName, 
+                     fileSize
+                };
+
                 const chatDoc = await MessageModel.findOneAndUpdate(
                     { participants },
                     {
-                        $push: { messages: { message, timestamp, sender: from, post_id, msgType, post_url } },
+                        $push: { messages: messageData },
                         $setOnInsert: { participants },
                     },
                     { new: true, upsert: true, setDefaultsOnInsert: true }
@@ -70,7 +84,11 @@ const initializeSocket = (server) => {
                     to,
                     message,
                     timestamp,
-                    post_id, msgType, post_url
+                    post_id,
+                    msgType,
+                    post_url,
+                    fileName,
+                    fileSize
                 };
 
                 const chatKey = `chat:${from}:${to}`;
@@ -89,6 +107,7 @@ const initializeSocket = (server) => {
                 socket.emit("sendedMsg", { success: false, message: err.message });
             }
         });
+
 
         // ✍️ Typing event
         socket.on("typing", (data) => {
