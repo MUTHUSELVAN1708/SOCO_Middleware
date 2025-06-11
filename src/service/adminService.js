@@ -56,7 +56,7 @@ const SECRET_KEY = crypto.randomBytes(32).toString('hex');
 const adminService = {
     register: async (data) => {
         const { full_Name, phn_number, email, DOB, reg_otp_id, password, status, address, isSameNumberBusiness, agree, deviceToken } = data;
-        console.log(data,"data")
+        // console.log(data, "data")
         try {
             const phnNumber = await registerModel.findOne({ phn_number });
             if (phnNumber) {
@@ -96,13 +96,13 @@ const adminService = {
 
     // ==================
     verifyEmail: async (email) => {
-        console.log(email)
+        // console.log(email)
         try {
             const existingEmail = await registerModel.findOne({ email });
             if (existingEmail) {
                 throw new Error("Email already exists");
             }
-console.log(existingEmail)
+            // console.log(existingEmail)
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
                 throw new Error("Invalid email format");
@@ -114,7 +114,7 @@ console.log(existingEmail)
                 lowerCaseAlphabets: false,
                 upperCaseAlphabets: false,
             });
-            console.log(otp, "otp")
+            // console.log(otp, "otp")
             const emailSent = await adminService.SendOTPEmail(email, otp);
             const existingOtpRecord = await otpModel.findOne({ email });
             if (existingOtpRecord) {
@@ -133,7 +133,7 @@ console.log(existingEmail)
             }
 
         } catch (error) {
-            console.error("Error in verifyEmail service:", error);
+            // console.error("Error in verifyEmail service:", error);
             throw new Error(error.message || "Failed to verify email");
         }
     },
@@ -162,7 +162,7 @@ console.log(existingEmail)
             }
             return updatedUser
         } catch (error) {
-            console.error('Error in storeOtp:', error);
+            // console.error('Error in storeOtp:', error);
             throw new Error("Error storing OTP.");
         }
     },
@@ -441,7 +441,7 @@ console.log(existingEmail)
                 businessDescription,
             } = data;
 
-console.log(data)
+            // console.log(data)
 
             // Validate required fields
             let errors = [];
@@ -456,8 +456,8 @@ console.log(data)
             if (errors.length > 0) {
                 throw { status: 400, message: errors.join(" ") };
             }
-            console.log('businessName');
-            console.log(businessregisterModel.findOne({ businessName }));
+            // console.log('businessName');
+            // console.log(businessregisterModel.findOne({ businessName }));
             // Check for existing users and business name
             const queries = [];
 
@@ -4021,71 +4021,73 @@ console.log(data)
     },
 
     // =========================post
-   
 
-getSinglePost: async (post_id) => {
-    try {
-        const post = await createPostModel.findById(post_id).lean();
-        if (!post) {
-            throw new Error('Post not found');
+
+    getSinglePost: async (post_id) => {
+        try {
+            const post = await createPostModel.findById(post_id).lean();
+            if (!post) throw new Error('Post not found');
+
+            const comments = await CommentModel.find({ postId: post_id }).lean();
+
+            const liked = await FavoriteModel.findOne({ post_id: post_id }).lean();
+           
+            return {
+                id: post._id.toString() ?? '',
+                userId: post.userId ?? '',
+                username: post.userName ?? '',
+                userAvatar: post.userAvatar ?? '',
+                mediaItems: Array.isArray(post.mediaItems)
+                    ? post.mediaItems.map(item => ({
+                        url: item.url ?? '',
+                        type: item.type ?? '',
+                        productId: item.productId ?? '',
+                    }))
+                    : [],
+                likes: post.likes ?? 0,
+                caption: post.caption ?? '',
+                comments: Array.isArray(comments)
+                    ? comments.map(comment => ({
+                        id: comment._id?.toString() ?? '',
+                        userId: comment.userId ?? '',
+                        likesCount: comment.likesCount ?? '',
+                        replyCount:comment.replyCount ?? "",
+                        text: comment.content ?? '',
+                        timestamp: comment.createdAt ?? '',
+                    }))
+                    : [],
+                timestamp: post.timestamp ?? new Date(),
+                isLiked: liked ? true : false,
+                likesCount: post.likesCount ?? 0,
+                commentsCount: post.commentsCount ?? 0,
+                viewsCount: post.viewsCount ?? 0,
+                sharesCount: post.sharesCount ?? 0,
+                rePostCount: post.rePostCount ?? 0,
+                isRepost: post.isRepost ?? false,
+                isOwnPost: viewerId === post.userId,
+                isProductPost: post.isProductPost ?? false,
+                isBusinessAccount: post.isBusinessAccount ?? false,
+                
+                repostDetails: post.repostDetails
+                    ? {
+                        originalUserId: post.repostDetails.originalUserId ?? '',
+                        originalPostId: post.repostDetails.originalPostId ?? '',
+                        repostedAt: post.repostDetails.repostedAt ?? '',
+                    }
+                    : null,
+            };
+        } catch (error) {
+            // console.error('Error fetching post:', error);
+            throw new Error('Error fetching post');
         }
+    },
 
-        return {
-            id: post._id.toString() ?? '',
-            userId: post.userId ?? '',
-            username: post.userName ?? '',
-            userAvatar: post.userAvatar ?? '',
-            mediaItems: Array.isArray(post.mediaItems)
-                ? post.mediaItems.map(item => ({
-                    // Assuming each mediaItem has these fields
-                    url: item.url ?? '',
-                    type: item.type ?? '',
-                  }))
-                : [],
-            likes: post.likes ?? 0,
-            caption: post.caption ?? '',
-            comments: Array.isArray(post.comments)
-                ? post.comments.map(comment => ({
-                    // Assuming each comment has these fields
-                    id: comment._id?.toString() ?? '',
-                    userId: comment.userId ?? '',
-                    username: comment.username ?? '',
-                    text: comment.text ?? '',
-                    timestamp: comment.timestamp ?? '',
-                  }))
-                : [],
-            timestamp: post.timestamp ?? new Date(),
-            isLiked: post.isFavorite ?? false,
-            isBookmarked: post.isBookmarked ?? false,
-            likesCount: post.likesCount ?? 0,
-            commentsCount: post.commentsCount ?? 0,
-            viewsCount: post.viewsCount ?? 0,
-            sharesCount: post.sharesCount ?? 0,
-            rePostCount: post.rePostCount ?? 0,
-            isRepost: post.isRepost ?? false,
-            isOwnPost: post.isOwnPost ?? true,
-            isProductPost: post.isProductPost ?? false,
-            isBusinessAccount: post.isBusinessAccount ?? false,
-            productId: post.productId ?? '',
-            repostDetails: post.repostDetails
-                ? {
-                    originalUserId: post.repostDetails.originalUserId ?? '',
-                    originalPostId: post.repostDetails.originalPostId ?? '',
-                    repostedAt: post.repostDetails.repostedAt ?? '',
-                }
-                : null,
-        };
-    } catch (error) {
-        console.error('Error fetching post:', error);
-        throw new Error('Error fetching post');
-    }
-},
 
     //   =====================
 
     getFeed: async (data) => {
         let { user_id, address } = data;
-        console.log(data, "Input Data");
+        // console.log(data, "Input Data");
         try {
             if (typeof address === "string") {
                 try {
@@ -4104,19 +4106,19 @@ getSinglePost: async (post_id) => {
             const following = await followerModel
                 .find({ follower_id: user_id, status: 'accepted' })
                 .select('user_id');
-            console.log(following, "Following Users");
+            // console.log(following, "Following Users");
             const followingIds = following.map(follow => follow.user_id);
-            console.log(followingIds, "Following IDs");
+            // console.log(followingIds, "Following IDs");
 
             const delta = 0.10; // 
             const nearbyLocations = await locationModel.find({
                 "address.lat": { $gte: targetLat - delta, $lte: targetLat + delta },
                 "address.lng": { $gte: targetLng - delta, $lte: targetLng + delta }
             });
-            console.log(nearbyLocations, "Nearby Location Documents");
+            // console.log(nearbyLocations, "Nearby Location Documents");
 
             const localUserIds = nearbyLocations.map(loc => loc.user_id);
-            console.log(localUserIds, "Local User IDs");
+            // console.log(localUserIds, "Local User IDs");
 
             const localPosts = await createPostModel.find({
                 user_id: { $in: localUserIds }
@@ -4124,36 +4126,36 @@ getSinglePost: async (post_id) => {
                 .populate('user_id', 'full_Name profile_url')
                 .sort({ timestamp: -1 })
                 .limit(5);
-            console.log(localPosts, "Local Posts");
+            // console.log(localPosts, "Local Posts");
 
             const selfPosts = await createPostModel.find({ user_id: user_id })
                 .populate('user_id', 'full_Name profile_url')
                 .sort({ timestamp: -1 })
                 .limit(5);
-            console.log(selfPosts, "Self Posts");
+            // console.log(selfPosts, "Self Posts");
 
             const followedPosts = await createPostModel.find({ user_id: { $in: followingIds } })
                 .populate('user_id', 'full_Name profile_url')
                 .sort({ timestamp: -1 })
                 .limit(5);
-            console.log(followedPosts, "Followed Posts");
+            // console.log(followedPosts, "Followed Posts");
 
             const businessPosts = await businessregisterModel.find({ user_id: { $in: followingIds } })
                 .sort({ timestamp: -1 })
                 .limit(5);
-            console.log(businessPosts, "Business Posts");
+            // console.log(businessPosts, "Business Posts");
 
             const userPosts = await registerModel.find({ _id: user_id })
                 .sort({ timestamp: -1 })
                 .limit(5);
-            console.log(userPosts, "User Interest Posts");
+            // console.log(userPosts, "User Interest Posts");
 
             // 8. Fetch products
             const products = await Product.find()
                 .select('basicInfo.productTitle images pricing.regularPrice pricing.salePrice ratings.averageRating')
                 .sort({ 'ratings.averageRating': -1 })
                 .limit(5);
-            console.log(products, "Products");
+            // console.log(products, "Products");
             const feed = [
                 ...selfPosts.map(post => ({ type: 'post', data: post })),
                 ...followedPosts.map(post => ({ type: 'post', data: post })),
@@ -4162,12 +4164,12 @@ getSinglePost: async (post_id) => {
                 ...products.map(product => ({ type: 'product', data: product })),
                 ...localPosts.map(post => ({ type: 'local', data: post }))
             ];
-            console.log(feed, "Combined Feed");
+            // console.log(feed, "Combined Feed");
 
             const sortedFeed = feed.sort((a, b) => new Date(b.data.timestamp || 0) - new Date(a.data.timestamp || 0));
 
             const shuffledFeed = sortedFeed.sort(() => Math.random() - 0.5);
-            console.log(shuffledFeed, "Shuffled Feed");
+            // console.log(shuffledFeed, "Shuffled Feed");
 
             const transformedFeed = shuffledFeed.map(item => {
                 const { data: post, type } = item;
@@ -4226,7 +4228,7 @@ getSinglePost: async (post_id) => {
 
             return transformedFeed;
         } catch (error) {
-            console.error("Error fetching feed:", error);
+            // console.error("Error fetching feed:", error);
             throw error;
         }
     },
@@ -4269,7 +4271,7 @@ getSinglePost: async (post_id) => {
 
             return result;
         } catch (error) {
-            console.error(" Error in getAllChatUser:", error.message);
+            // console.error(" Error in getAllChatUser:", error.message);
             throw error;
         }
     },
@@ -4334,7 +4336,7 @@ getSinglePost: async (post_id) => {
 
             return createAddress;
         } catch (error) {
-            console.error("Error in createAddress:", error);
+            // console.error("Error in createAddress:", error);
             throw error;
         }
     },
@@ -4361,20 +4363,20 @@ getSinglePost: async (post_id) => {
             const deliveryAddresses = await DeliveryAddressModel.find(user_id);
             return deliveryAddresses;
         } catch (error) {
-            console.error("Error in getDeliveryAddress:", error);
+            // console.error("Error in getDeliveryAddress:", error);
             throw error;
         }
     },
 
     // =================
     deleteAddress: async (deliveryAddress_id) => {
-        console.log("deliveryAddress_id")
+        // console.log("deliveryAddress_id")
         try {
             const { id } = deliveryAddress_id; // Extract ID from object
             const deleteAddress = await DeliveryAddressModel.findOneAndDelete({ _id: id.toString() });
             return deleteAddress
         } catch (error) {
-            console.error("Error  in delete delivery Address:", error);
+            // console.error("Error  in delete delivery Address:", error);
             throw error
         }
     },
@@ -4382,12 +4384,11 @@ getSinglePost: async (post_id) => {
 
     getUserProfile: async (id, userId, accountBusinessType) => {
         try {
-            console.log(`Fetching user profile for ID: ${id}`);
+            // console.log(`Fetching user profile for ID: ${id}`);
 
-            // First, try to find the user in registerModel
+           
             let user = await registerModel.findById(id);
 
-            // If not found, try businessregisterModel
             const isBusinessAccount = !user;
             if (!user) {
                 user = await businessregisterModel.findById(id);
@@ -4398,11 +4399,11 @@ getSinglePost: async (post_id) => {
                 return null;
             }
 
-            console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.businessName : user.full_Name}`);
+            // console.log(`User found: ${user._id}, Name: ${isBusinessAccount ? user.businessName : user.full_Name}`);
 
             const fullName = isBusinessAccount ? user.businessName || "Business Owner" : user.full_Name || "";
 
-            console.log(`Checking friendship status for userId: ${userId} and profileId: ${id}`);
+            // console.log(`Checking friendship status for userId: ${userId} and profileId: ${id}`);
 
             // Fetch friendship details
             const friendRecord = await Friend.findOne({
@@ -4427,8 +4428,8 @@ getSinglePost: async (post_id) => {
                 }
             ]);
 
-            console.log('------ friendRecordV1 ------');
-            console.log(friendRecordV1);
+            // console.log('------ friendRecordV1 ------');
+            // console.log(friendRecordV1);
 
 
             let friendStatus = "Not Friends";
@@ -4446,9 +4447,9 @@ getSinglePost: async (post_id) => {
                 }
             }
 
-            console.log(`Friendship status: ${friendStatus}`);
+            // console.log(`Friendship status: ${friendStatus}`);
 
-            console.log(`Checking follow status for userId: ${userId} and profileId: ${id}`);
+            // console.log(`Checking follow status for userId: ${userId} and profileId: ${id}`);
 
             // Check if userId is already following
             const isAlreadyFollow = await Follow.exists({
@@ -4458,7 +4459,7 @@ getSinglePost: async (post_id) => {
                 followingReference: isBusinessAccount ? "businessRegister" : "User",
             });
 
-            console.log(`Follow status: ${isAlreadyFollow ? "Already following" : "Not following"}`);
+            // console.log(`Follow status: ${isAlreadyFollow ? "Already following" : "Not following"}`);
 
             const profileData = {
                 id: user._id.toString(),
@@ -4479,11 +4480,11 @@ getSinglePost: async (post_id) => {
                 friendStatus, // ✅ Added friend status
             };
 
-            console.log(`Returning profile data:`, profileData);
+            // console.log(`Returning profile data:`, profileData);
 
             return profileData;
         } catch (error) {
-            console.error("Error fetching user profile:", error);
+            // console.error("Error fetching user profile:", error);
             return null;
         }
     },
@@ -4524,7 +4525,7 @@ getSinglePost: async (post_id) => {
                 totalFriendsCount,
             };
         } catch (error) {
-            console.error("Error fetching user friends:", error);
+            // console.error("Error fetching user friends:", error);
             return {
                 friends: [],
                 hasMoreFriends: false,
@@ -4546,7 +4547,7 @@ getSinglePost: async (post_id) => {
                 .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
                 .skip(skip)
                 .limit(limit);
-            console.log(posts, "posts")
+            // console.log(posts, "posts")
             const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
             const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
 
@@ -4675,7 +4676,7 @@ getSinglePost: async (post_id) => {
 
     // =======
     payment: async ({ amount, name, email }) => {
-        console.log("Payment details:", amount, name, email);
+        // console.log("Payment details:", amount, name, email);
         try {
             if (!amount || !name || !email) {
                 return {
@@ -4705,7 +4706,7 @@ getSinglePost: async (post_id) => {
                 email: email,
             };
         } catch (error) {
-            console.error("Error in payment processing:", error.message);
+            // console.error("Error in payment processing:", error.message);
             return {
                 success: false,
                 msg: "Internal Server Error",
@@ -4853,8 +4854,8 @@ getSinglePost: async (post_id) => {
                 }
 
                 totalPrice = itemTotalPrice + taxAmount;
-                console.log(`Total Tax Amount: ${taxAmount}`);
-                console.log(`Final Total Price (including taxes): ${totalPrice}`);
+                // console.log(`Total Tax Amount: ${taxAmount}`);
+                // console.log(`Final Total Price (including taxes): ${totalPrice}`);
 
 
 
@@ -4906,11 +4907,11 @@ getSinglePost: async (post_id) => {
                     const product = await Product.findById(cartItem.product_id);
                     if (!product) throw { error: `Product not found` };
 
-                    console.log(`Processing Product: ${product._id}, Name: ${product.name}`);
+                    // console.log(`Processing Product: ${product._id}, Name: ${product.name}`);
 
                     // Base price calculation
                     const basePrice = parseFloat(product.pricing?.salePrice || 0) * cartItem.quantity;
-                    console.log(`Base Price: ${product.pricing?.salePrice}, Quantity: ${cartItem.quantity}, Item Total Price: ${basePrice}`);
+                    // console.log(`Base Price: ${product.pricing?.salePrice}, Quantity: ${cartItem.quantity}, Item Total Price: ${basePrice}`);
 
                     let taxAmount = 0;
 
@@ -4919,7 +4920,7 @@ getSinglePost: async (post_id) => {
                         const gstPercentage = parseFloat(product.pricing?.gstDetails?.gstPercentage || 0);
                         const gstAmount = (basePrice * gstPercentage) / 100;
                         taxAmount += gstAmount;
-                        console.log(`GST Applied (${gstPercentage}%): ${gstAmount}`);
+                        // console.log(`GST Applied (${gstPercentage}%): ${gstAmount}`);
                     }
 
                     // Add additional taxes if any
@@ -4935,8 +4936,8 @@ getSinglePost: async (post_id) => {
 
                     // Final total price after adding taxes
                     const totalPrice = basePrice + taxAmount;
-                    console.log(`Total Tax Amount: ${taxAmount}`);
-                    console.log(`Final Total Price (including taxes): ${totalPrice}`);
+                    // console.log(`Total Tax Amount: ${taxAmount}`);
+                    // console.log(`Final Total Price (including taxes): ${totalPrice}`);
 
                     // Generate tracking details
                     const trackingNumber = `TRACK-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`; // Unique tracking per product
@@ -4962,11 +4963,11 @@ getSinglePost: async (post_id) => {
 
                     checkoutRecords.push(checkoutRecord);
 
-                    console.log(`Checkout Record Created: ${checkoutRecord._id}`);
+                    // console.log(`Checkout Record Created: ${checkoutRecord._id}`);
 
                     // Remove item from cart
                     await cartModel.deleteOne({ user_id, product_id: cartItem.product_id });
-                    console.log(`Removed item from cart: ${cartItem.product_id}`);
+                    // console.log(`Removed item from cart: ${cartItem.product_id}`);
                 }
 
             }
@@ -4985,7 +4986,7 @@ getSinglePost: async (post_id) => {
     // ========================
     Invoice: async (data) => {
         try {
-            console.log("datass", data.checkoutRecords);
+            // console.log("datass", data.checkoutRecords);
             const validData = data.checkoutRecords;
             const invoices = [];
 
@@ -5149,7 +5150,7 @@ getSinglePost: async (post_id) => {
                 _id: { $in: postIds },
                 Product_status: { $ne: "Deactivate" }
             });
-            console.log(activePostCount, "activePostCount")
+            // console.log(activePostCount, "activePostCount")
             const totalFavorites = activePostCount;
             const totalPages = Math.ceil(totalFavorites / limit);
             const posts = await createPostModel.find({ _id: { $in: postIds }, Product_status: { $ne: "Deactivate" } })
@@ -5292,7 +5293,7 @@ getSinglePost: async (post_id) => {
 
         try {
             const userId = user_id?.id ? user_id.id.toString() : user_id;
-            console.log(userId, "Processed userId");
+            // console.log(userId, "Processed userId");
 
             if (!userId) {
                 throw new Error("Invalid user_id provided");
@@ -5300,7 +5301,7 @@ getSinglePost: async (post_id) => {
 
             // Fetch wishlist items only for the given user_id
             const getWishList = await FavoriteModel.find({ user_id: userId }).lean();
-            console.log(getWishList, "Fetched wishlist items");
+            // console.log(getWishList, "Fetched wishlist items");
 
             if (getWishList.length === 0) {
                 return [];
@@ -5311,7 +5312,7 @@ getSinglePost: async (post_id) => {
 
             // Fetch products that match the wishlist items
             const products = await Product.find({ _id: { $in: productIds } }).lean();
-            console.log(products, "Fetched products");
+            // console.log(products, "Fetched products");
 
             // Format the response
             const result = products.map(product => ({
@@ -5330,7 +5331,7 @@ getSinglePost: async (post_id) => {
                 unit: product?.unit || "N/A"
             }));
 
-            console.log(result, "Formatted wishlist response");
+            // console.log(result, "Formatted wishlist response");
             return result;
 
         } catch (error) {
@@ -5341,7 +5342,7 @@ getSinglePost: async (post_id) => {
 
     // =====================
     getOrderHistory: async (user_id) => {
-        console.log(user_id)
+        // console.log(user_id)
         try {
             const orders = await checkoutModel.find({ user_id })
             console.log(orders)
@@ -5356,7 +5357,7 @@ getSinglePost: async (post_id) => {
     },
     // ==========================
     updateOrderStatus: async (checkout_id, newStatus) => {
-        console.log(checkout_id, newStatus)
+        // console.log(checkout_id, newStatus)
         try {
             const order = await checkoutModel.findById(checkout_id);
             if (!order) throw new Error("Order not found");
@@ -5388,7 +5389,7 @@ getSinglePost: async (post_id) => {
 
 
     getCollection: async (userId) => {
-        console.log(userId, "userId");
+        // console.log(userId, "userId");
         try {
             const collection = await Playlist.find({ userId });
 
