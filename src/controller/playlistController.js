@@ -292,7 +292,7 @@ const getAllPlaylists = async (req, res) => {
                     thumbnailUrl: firstMedia?.thumbnailUrl || firstMedia?.url || "",
                     channelName: videos[0]?.userName || "Unknown",
                     videoCount: playlist.videos.length,
-                    playlistId: playlist.playlistId,
+                    playlistId: playlist._id,
                     videoLength: formatTotalDuration(videos),
                 };
             })

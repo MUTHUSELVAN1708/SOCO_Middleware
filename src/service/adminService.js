@@ -5092,7 +5092,6 @@ getSinglePost: async (post_id) => {
         try {
             const existingLike = await FavoriteModel.findOne({ user_id, post_id });
 
-            // Find or create the "LikedPosts" playlist
             let likedPostsPlaylist = await Playlist.findOne({ userId: user_id, name: "LikedPosts" });
 
             if (!likedPostsPlaylist) {
