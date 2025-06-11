@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const PlaylistSchema = new mongoose.Schema({
-  // playlistId: { type: String, unique: true, required: true },c
+  playlistId: { type: String, unique: true, required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   name: { type: String, required: true },
  videos: [{
