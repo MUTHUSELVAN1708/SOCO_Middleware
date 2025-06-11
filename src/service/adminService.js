@@ -4031,7 +4031,7 @@ const adminService = {
             const comments = await CommentModel.find({ postId: post_id }).lean();
 
             const liked = await FavoriteModel.findOne({ post_id: post_id }).lean();
-           
+            const book = await BookmarkModel.findOne({ post_id: post_id }).lean();
             return {
                 id: post._id.toString() ?? '',
                 userId: post.userId ?? '',
@@ -4047,27 +4047,39 @@ const adminService = {
                 likes: post.likes ?? 0,
                 caption: post.caption ?? '',
                 comments: Array.isArray(comments)
-                    ? comments.map(comment => ({
-                        id: comment._id?.toString() ?? '',
-                        userId: comment.userId ?? '',
-                        likesCount: comment.likesCount ?? '',
-                        replyCount:comment.replyCount ?? "",
-                        text: comment.content ?? '',
-                        timestamp: comment.createdAt ?? '',
-                    }))
+                    ? await Promise.all(
+                        comments.map(async (comment) => {
+                            const user = await UserInfo.findOne({ id: comment.userId });
+                            return {
+                                id: comment._id?.toString() ?? '',
+                                commentId:comment._id?.toString( )?? '',
+                                userId: comment.userId ?? '',
+                                likesCount: comment.likesCount ?? '',
+                                replyCount: comment.replyCount ?? '',
+                                content: comment.content ?? '',
+                                createdAt: comment.createdAt ?? '',
+                                userInfo: {
+                                    name: user?.name || '',
+                                    avatar: user?.avatarUrl || '',
+                                }
+                            };
+                        })
+                    )
                     : [],
+
                 timestamp: post.timestamp ?? new Date(),
-                isLiked: liked ? true : false,
+                isFavorite: liked ? true : false,
+                isBookmarked: book ? true : false,
                 likesCount: post.likesCount ?? 0,
                 commentsCount: post.commentsCount ?? 0,
                 viewsCount: post.viewsCount ?? 0,
                 sharesCount: post.sharesCount ?? 0,
                 rePostCount: post.rePostCount ?? 0,
                 isRepost: post.isRepost ?? false,
-                isOwnPost: viewerId === post.userId,
+                isOwnPost: post.isOwnPost,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-                
+
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -4077,7 +4089,7 @@ const adminService = {
                     : null,
             };
         } catch (error) {
-            // console.error('Error fetching post:', error);
+            console.error('Error fetching post:', error);
             throw new Error('Error fetching post');
         }
     },
@@ -4386,7 +4398,7 @@ const adminService = {
         try {
             // console.log(`Fetching user profile for ID: ${id}`);
 
-           
+
             let user = await registerModel.findById(id);
 
             const isBusinessAccount = !user;
