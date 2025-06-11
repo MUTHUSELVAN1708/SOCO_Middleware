@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import adminService from "./src/service/adminService.js";
 import redisService from "./src/service/redisService.js";
 import MessageModel from "./src/model/chatModel.js";
+import Playlist from "./src/model/playlistModel.js";
 
 const connectedUsers = new Map(); // userId => socketId
 
@@ -46,7 +47,7 @@ const initializeSocket = (server) => {
                 if (typeof data === "string") data = JSON.parse(data);
                 if (!data || typeof data !== "object") throw new Error("Invalid message format");
 
-                const { from, to, message, post_id, msgType, post_url, fileName ,fileSize} = data;
+                const { from, to, message, post_id, msgType, post_url, fileName, fileSize } = data;
 
                 if (!from || !to) throw new Error("Missing 'from' or 'to' fields");
                 if (msgType === "text" && !message) throw new Error("Message content required for text type");
@@ -63,8 +64,8 @@ const initializeSocket = (server) => {
                     post_id,
                     msgType,
                     post_url,
-                    fileName, 
-                     fileSize
+                    fileName,
+                    fileSize
                 };
 
                 const chatDoc = await MessageModel.findOneAndUpdate(
@@ -75,6 +76,30 @@ const initializeSocket = (server) => {
                     },
                     { new: true, upsert: true, setDefaultsOnInsert: true }
                 );
+
+
+                if (msgType === "post" && post_id) {
+                    const postIdStr = String(post_id); // ensure it's a string to match your schema
+
+                    let sharedPostsPlaylist = await Playlist.findOne({ userId: from, name: "SharedPosts" });
+
+                    if (!sharedPostsPlaylist) {
+                        sharedPostsPlaylist = await Playlist.create({
+                            userId: new mongoose.Types.ObjectId(from),
+                            name: "SharedPosts",
+                            videos: [],
+                            isPublic: false,
+                        });
+                    }
+
+                    if (!sharedPostsPlaylist.videos.includes(postIdStr)) {
+                        await Playlist.updateOne(
+                            { _id: sharedPostsPlaylist._id },
+                            { $addToSet: { videos: postIdStr } }
+                        );
+                    }
+                }
+
 
                 const latestMessage = chatDoc.messages.at(-1);
                 const messageObj = {

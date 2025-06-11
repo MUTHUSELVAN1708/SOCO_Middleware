@@ -5,12 +5,13 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid"; 
 import registerModel from '../model/registerModel.js';
 import businessRegisterModel from '../model/BusinessModel.js';
+import "dotenv/config";
 
 const router = express.Router();
 
 // Multer Storage Configuration
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+ destination: (req, file, cb) => cb(null,  process.env.UPLOAD_FOLDER),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname),
   
 });
@@ -20,7 +21,7 @@ const mediaStorage = multer.diskStorage({
     // Determine destination folder based on file type
     const folder = file.mimetype.startsWith('image') ? 'images' : 'videos';
     console.log(folder);
-    cb(null, `uploads/${folder}`);
+    cb(null, `${process.env.UPLOAD_FOLDER}/${folder}`);
   },
   filename: (req, file, cb) => {
     // Generate a unique file name using UUID
@@ -58,7 +59,7 @@ const uploadImages = multer({
 const upload = multer({
   storage: multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, 'uploads/');
+      cb(null, process.env.UPLOAD_FOLDER);
     },
     filename: function (req, file, cb) {
       cb(null, Date.now() + '-' + file.originalname);
@@ -116,7 +117,7 @@ router.post('/sendMessage', uploadFiles.single('filename'), (req, res) => {
   res.status(200).json({
     success: true,
     fileName: originalname,
-    post_url: `/uploads/${filename}`, // This is what gets stored in DB
+    post_url: `/socouploads/${filename}`, // This is what gets stored in DB
     fileSize: size,
   });
 });
@@ -188,7 +189,7 @@ router.post(
     (req, res) => {
         try {
             if (!req.file) return res.status(400).json({ message: 'No file uploaded!' });
-            const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            const fileUrl = `${req.protocol}://${req.get('host')}/${process.env.UPLOAD_FOLDER}/${req.file.filename}`;
             res.status(200).json({ message: 'File uploaded successfully!', fileUrl });
         } catch (error) {
             res.status(500).json({ message: error.message });
@@ -237,7 +238,7 @@ router.post(
       uploadedFiles.add(fileKey);
       console.log(`File added: ${fileKey}`);
 
-      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+      const fileUrl = `${req.protocol}://${req.get('host')}/${process.env.UPLOAD_FOLDER}/${file.filename}`;
       fileUrls.push(fileUrl);
       console.log(`File URL generated: ${fileUrl}`);
     });
@@ -284,7 +285,7 @@ router.post(
           console.log(`Image Uploaded - Original Name: ${file.originalname}, Saved Name: ${file.filename}`);
           return {
             fileName: file.originalname,
-            filePath: `${req.protocol}://${req.get('host')}/uploads/images/${encodeURIComponent(file.filename)}`,
+            filePath: `${req.protocol}://${req.get('host')}/${process.env.UPLOAD_FOLDER}/images/${encodeURIComponent(file.filename)}`,
           };
         });
       }
@@ -296,7 +297,7 @@ router.post(
           return {
             originalFileName: file.originalname,
             uniqueId: file.filename,
-            filePath: `${req.protocol}://${req.get('host')}/uploads/videos/${encodeURIComponent(file.filename)}`,
+            filePath: `${req.protocol}://${req.get('host')}/${process.env.UPLOAD_FOLDER}/videos/${encodeURIComponent(file.filename)}`,
           };
         });
       }
