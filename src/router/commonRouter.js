@@ -154,7 +154,8 @@ router.post(
             if (!accountType || !id || !fieldName) return res.status(400).json({ message: 'Missing required parameters!' });
             if (!allowedAccountTypes.includes(accountType)) return res.status(400).json({ message: 'Invalid account type!' });
             // if (!allowedFields.includes(fieldName)) return res.status(400).json({ message: `Invalid field name: ${fieldName}` });
-            const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+          const fileUrl = `${req.protocol}://${req.get('host')}/socouploads/${req.file.filename}`;
+
              console.log(id);      
             if (accountType === 'user') {
                 const user = await registerModel.findById(id);
@@ -189,7 +190,8 @@ router.post(
     (req, res) => {
         try {
             if (!req.file) return res.status(400).json({ message: 'No file uploaded!' });
-            const fileUrl = `${req.protocol}://${req.get('host')}/${process.env.UPLOAD_FOLDER}/${req.file.filename}`;
+           const fileUrl = `${req.protocol}://${req.get('host')}/socouploads/${req.file.filename}`;
+
             res.status(200).json({ message: 'File uploaded successfully!', fileUrl });
         } catch (error) {
             res.status(500).json({ message: error.message });
@@ -197,7 +199,7 @@ router.post(
     }
 );
 
-//for multiple files
+//for multiple files    used
 router.post(
   '/filesUpload',
   upload.any(),
@@ -238,7 +240,9 @@ router.post(
       uploadedFiles.add(fileKey);
       console.log(`File added: ${fileKey}`);
 
-      const fileUrl = `${req.protocol}://${req.get('host')}/${process.env.UPLOAD_FOLDER}/${file.filename}`;
+    const fileUrl = `${req.protocol}://${req.get('host')}/socouploads/${file.filename}`;
+
+
       fileUrls.push(fileUrl);
       console.log(`File URL generated: ${fileUrl}`);
     });
