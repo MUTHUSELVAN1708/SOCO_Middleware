@@ -208,23 +208,27 @@ const redisService = {
     return subscriber;
   },
 
-  async deleteFromRedis(chatKey, messagesToDelete) {
+async deleteFromRedis(chatKey, messageToDelete) {
     try {
-      const messagesArray = Array.isArray(messagesToDelete) ? messagesToDelete : [messagesToDelete];
+        const list = await redisClient.lRange(chatKey, 0, -1);
 
-      let removedCount = 0;
-      for (const message of messagesArray) {
-        const count = await redisClient.lRem(chatKey, 1, JSON.stringify(message));
-        removedCount += count;
-      }
+        let removed = 0;
 
-      console.log(`Deleted ${removedCount} message(s) from Redis`);
-      return removedCount > 0 ? "Message(s) deleted successfully" : "No messages found";
+        for (const item of list) {
+            const parsed = JSON.parse(item);
+            if (parsed._id === messageToDelete._id) {
+                removed += await redisClient.lRem(chatKey, 1, item); // match exact item
+                break;
+            }
+        }
+
+        return removed > 0 ? "Deleted from Redis" : "Not found in Redis";
     } catch (err) {
-      console.error("Error deleting messages:", err);
-      throw err;
+        console.error("Error deleting from Redis:", err);
+        throw err;
     }
-  },
+},
+
 
   async updateMessage(chatKey, oldMessage, newMessage) {
     try {

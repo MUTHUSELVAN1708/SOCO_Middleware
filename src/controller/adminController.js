@@ -1,3 +1,4 @@
+import MessageModel from "../model/chatModel.js";
 import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
 import redisService from "../service/redisService.js";
@@ -729,12 +730,11 @@ const adminController = {
     },
 
     fetchUserPosts: async (req, res, next) => {
-        const id = req.body.id;
-        const limit = req.body.limit;
-        const page = req.body.page;
+       
+        const {userId,otherUserId,limit,page}=req.body;
 
         try {
-            const getUserDetails = await adminService.fetchUserPosts(id, page, limit);
+            const getUserDetails = await adminService.fetchUserPosts(userId, otherUserId,page, limit);
 
             res.status(200).json({
                 status: 200,
@@ -1088,29 +1088,41 @@ const adminController = {
         }
     },
     //   ======================================
-    deleteFromRedis: async (req, res) => {
-        const { chatKey, messagesToDelete } = req.body;
-        console.log(req.body, "ki")
+  deleteFromRedis: async (req, res) => {
+    const { chatKey, messagesToDelete, chatId } = req.body;
+    console.log(req.body, "→ delete request");
 
-        if (!chatKey || !messagesToDelete || !Array.isArray(messagesToDelete)) {
-            return res.status(400).json({ error: 'chatKey must be provided and messagesToDelete must be an array' });
+    if (!chatKey || !chatId || !Array.isArray(messagesToDelete)) {
+        return res.status(400).json({ error: 'chatKey, chatId, and messagesToDelete array are required' });
+    }
+
+    try {
+        const deleteResults = [];
+
+        for (const messages of messagesToDelete) {
+            // Redis deletion
+            const redisResult = await redisService.deleteFromRedis(chatKey, messages);
+console.log(redisResult,"kkkkk")
+            // MongoDB deletion
+            const mongoResult = await MessageModel.updateOne(
+                { _id: chatId },
+                { $pull: { messages: { _id: messages._id } } }
+            );
+
+            deleteResults.push({
+                messageId: messages._id,
+                redis: redisResult,
+                mongo: mongoResult.modifiedCount > 0 ? "Deleted from DB" : "Not found in DB"
+            });
         }
 
-        try {
+        res.status(200).json({ success: true, results: deleteResults });
+    } catch (err) {
+        console.error('Error deleting from Redis/DB:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+},
 
-            const deleteResults = [];
-
-            for (const messageToDelete of messagesToDelete) {
-                const result = await redisService.deleteFromRedis(chatKey, messageToDelete);
-                deleteResults.push(result);
-            }
-
-            res.status(200).json({ success: true, deletedMessages: deleteResults });
-        } catch (err) {
-            console.error('Error in deleteFromRedis:', err);
-            res.status(500).json({ error: 'Error deleting messages' });
-        }
-    },
 
     //  =================================
     updateMsg: async (req, res) => {

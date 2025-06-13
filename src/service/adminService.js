@@ -4052,7 +4052,7 @@ const adminService = {
                             const user = await UserInfo.findOne({ id: comment.userId });
                             return {
                                 id: comment._id?.toString() ?? '',
-                                commentId:comment._id?.toString( )?? '',
+                                commentId: comment._id?.toString() ?? '',
                                 userId: comment.userId ?? '',
                                 likesCount: comment.likesCount ?? '',
                                 replyCount: comment.replyCount ?? '',
@@ -4546,92 +4546,102 @@ const adminService = {
         }
     },
 
-
-    fetchUserPosts: async (userId, page = 1, limit = 12) => {
+    fetchUserPosts: async (viewerId, profileOwnerId, page = 1, limit = 12) => {
         try {
             const skip = (page - 1) * limit;
-            const objectId = new mongoose.Types.ObjectId(userId);
 
-            const totalPostsCount = await createPostModel.countDocuments({ userId, Product_status: { $ne: "Deactivate" } });
+            const totalPostsCount = await createPostModel.countDocuments({
+                userId: profileOwnerId,
+                Product_status: { $ne: "Deactivate" },
+            });
 
             const posts = await createPostModel
-                .find({ userId, Product_status: { $ne: "Deactivate" } })
+                .find({ userId: profileOwnerId, Product_status: { $ne: "Deactivate" } })
                 .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
                 .skip(skip)
-                .limit(limit);
-            // console.log(posts, "posts")
-            const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
-            const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
+                .limit(limit)
+                .lean();
+            const viewerObjectId = new mongoose.Types.ObjectId(viewerId);
 
-            // Filter only active favorite posts
-            const favoritePostIds = favoritePosts.map((f) => f.post_id);
-            const activeFavoritePosts = await createPostModel.find({
-                _id: { $in: favoritePostIds },
-                Product_status: { $ne: "Deactivate" }
-            }).select("_id");
-            const activeFavoriteSet = new Set(activeFavoritePosts.map((p) => p._id.toString()));
+            const [favoritePosts, bookmarkedPosts] = await Promise.all([
+                FavoriteModel.find({ user_id: viewerObjectId }).select("post_id").lean(),
+                BookmarkModel.find({ user_id: viewerObjectId }).select("post_id").lean(),
+            ]);
 
-            // Filter only active bookmarked posts
-            const bookmarkedPostIds = bookmarkedPosts.map((b) => b.post_id);
-            const activeBookmarkedPosts = await createPostModel.find({
-                _id: { $in: bookmarkedPostIds },
-                Product_status: { $ne: "Deactivate" }
-            }).select("_id");
-            const activeBookmarkSet = new Set(activeBookmarkedPosts.map((p) => p._id.toString()));
+            const favoritePostIds = new Set(favoritePosts.map(f => f.post_id.toString()));
+            const bookmarkedPostIds = new Set(bookmarkedPosts.map(b => b.post_id.toString()));
 
-            // Format posts
-            const formattedPosts = await Promise.all(
-                posts.map(async (post) => {
-                    const isFavorite = activeFavoriteSet.has(post._id.toString());
-                    const isBookmarked = activeBookmarkSet.has(post._id.toString());
+            console.log(favoritePostIds, bookmarkedPostIds, "bookmarkedPostIds")
+            // Format each post
+            const formattedPosts = await Promise.all(posts.map(async (post) => {
+                const postIdStr = post._id.toString();
 
-                    // Get top comments
-                    let topComments = await CommentModel.find({ postId: post._id })
-                        .sort({ likesCount: -1, createdAt: -1 })
+                // Get top 2 liked or recent comments
+                let topComments = await CommentModel.find({ postId: post._id })
+                    .sort({ likesCount: -1, createdAt: -1 })
+                    .limit(2)
+                    .lean();
+
+                if (!topComments.length) {
+                    topComments = await CommentModel.find({ postId: post._id })
+                        .sort({ createdAt: -1 })
                         .limit(2)
                         .lean();
+                }
 
-                    if (!topComments.length) {
-                        topComments = await CommentModel.find({ postId: post._id })
-                            .sort({ createdAt: -1 })
-                            .limit(2)
-                            .lean();
-                    }
+                // Get users who made the comments
+                const commentUserIds = [...new Set(topComments.map(c => c.userId))];
+                const users = await UserInfo.find({ id: { $in: commentUserIds } }).lean();
+                const userMap = new Map(users.map(u => [u.id, u]));
+                console.log("Checking post:", postIdStr, {
+                    isFavorite: favoritePostIds.has(postIdStr),
+                    isBookmarked: bookmarkedPostIds.has(postIdStr),
+                });
+                // Format comments
+                const formattedComments = topComments.map(comment => ({
+                    commentId: comment._id.toString(),
+                    id: comment._id.toString(),
+                    content: comment.content,
+                    createdAt: comment.createdAt,
+                    userInfo: {
+                        name: userMap.get(comment.userId)?.name || "",
+                        avatar: userMap.get(comment.userId)?.avatarUrl || "",
+                    },
+                }));
 
-                    const formattedComments = await Promise.all(
-                        topComments.map(async (comment) => {
-                            const user = await UserInfo.findOne({ id: comment.userId });
-                            return {
-                                commentId: comment._id.toString(),
-                                id: comment._id.toString(),
-                                content: comment.content,
-                                createdAt: comment.createdAt,
-                                userInfo: {
-                                    name: user?.name || "",
-                                    avatar: user?.avatarUrl || "",
-                                },
-                            };
-                        })
-                    );
-
-                    return {
-                        id: post._id.toString(),
-                        username: post.userName,
-                        userAvatar: post.userAvatar,
-                        caption: post.caption,
-                        thumbnailUrl: post.thumbnailUrl,
-                        likesCount: post.likesCount,
-                        commentsCount: post.commentsCount,
-                        viewsCount: post.viewsCount,
-                        sharesCount: post.sharesCount,
-                        rePostCount: post.rePostCount,
-                        userId: post.userId,
-                        productId: post.productId,
-                        isBusinessAccount: post.isBusinessAccount,
-                        isRepost: post.isRepost,
-                        isOwnPost: post.isOwnPost,
-                        isProductPost: post.isProductPost,
-                        mediaItems: post.mediaItems.map((media) => ({
+                return {
+                    id: postIdStr,
+                    username: post.userName,
+                    userAvatar: post.userAvatar,
+                    caption: post.caption,
+                    thumbnailUrl: post.thumbnailUrl,
+                    likesCount: post.likesCount,
+                    commentsCount: post.commentsCount,
+                    viewsCount: post.viewsCount,
+                    sharesCount: post.sharesCount,
+                    rePostCount: post.rePostCount,
+                    userId: post.userId,
+                    productId: post.productId,
+                    isBusinessAccount: post.isBusinessAccount,
+                    isRepost: post.isRepost,
+                    isOwnPost: post.isOwnPost,
+                    isProductPost: post.isProductPost,
+                    mediaItems: (post.mediaItems || []).map(media => ({
+                        url: media.url,
+                        type: media.type,
+                        thumbnailUrl: media.thumbnailUrl,
+                        productName: media.productName,
+                        price: media.price,
+                        originalPrice: media.originalPrice,
+                        hasDiscount: media.hasDiscount,
+                    })),
+                    repostDetails: post.repostDetails ? {
+                        originalPostId: post.repostDetails.originalPostId?.toString() || "",
+                        originalUserId: post.repostDetails.originalUserId || "",
+                        originalUserName: post.repostDetails.originalUserName || "",
+                        originalUserAvatar: post.repostDetails.originalUserAvatar || "",
+                        originalCaption: post.repostDetails.originalCaption || "",
+                        originalMediaItems: (post.repostDetails.originalMediaItems || []).map(media => ({
                             url: media.url,
                             type: media.type,
                             thumbnailUrl: media.thumbnailUrl,
@@ -4640,32 +4650,15 @@ const adminService = {
                             originalPrice: media.originalPrice,
                             hasDiscount: media.hasDiscount,
                         })),
-                        repostDetails: post.repostDetails
-                            ? {
-                                originalPostId: post.repostDetails.originalPostId?.toString() || "",
-                                originalUserId: post.repostDetails.originalUserId || "",
-                                originalUserName: post.repostDetails.originalUserName || "",
-                                originalUserAvatar: post.repostDetails.originalUserAvatar || "",
-                                originalCaption: post.repostDetails.originalCaption || "",
-                                originalMediaItems: (post.repostDetails.originalMediaItems || []).map((media) => ({
-                                    url: media.url,
-                                    type: media.type,
-                                    thumbnailUrl: media.thumbnailUrl,
-                                    productName: media.productName,
-                                    price: media.price,
-                                    originalPrice: media.originalPrice,
-                                    hasDiscount: media.hasDiscount,
-                                })),
-                            }
-                            : null,
-                        likes: post.likesCount,
-                        comments: formattedComments,
-                        timestamp: post.timestamp,
-                        isFavorite,
-                        isBookmarked,
-                    };
-                })
-            );
+                    } : null,
+                    likes: post.likesCount,
+                    comments: formattedComments,
+                    timestamp: post.timestamp,
+                    isFavorite: favoritePostIds.has(post._id.toString()),
+                    isBookmarked: bookmarkedPostIds.has(post._id.toString()),
+
+                };
+            }));
 
             return {
                 posts: formattedPosts,
@@ -4681,6 +4674,7 @@ const adminService = {
             };
         }
     },
+
 
 
 

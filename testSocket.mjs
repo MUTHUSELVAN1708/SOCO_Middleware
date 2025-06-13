@@ -88,7 +88,7 @@ setTimeout(() => {
     if (userId === "68062193600f323429cb2779") {
         socket.emit("sendMsg", {
             from: "68062193600f323429cb2779",
-            to: "68072a0986c2ff11021f13d0",
+            to: "6847f749aa841e31578c7132",
             message: "", // Not needed for post type
             post_id: "684819b5aa841e31578c78c2", // Example post_id
             msgType: "post",
