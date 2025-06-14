@@ -339,8 +339,9 @@ const getPlaylistItems = async (req, res) => {
           isFavorite,
           isBookmarked,
 
-        };
-      });
+        }
+        
+      }));
   
       return handleSuccessV1(res, 200, "Playlist items fetched successfully", {
         posts: formattedPosts,
