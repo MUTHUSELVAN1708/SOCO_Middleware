@@ -1233,19 +1233,21 @@ const adminController = {
         }
     },
     // =========================\
-    wishlist: async (req, res, next) => {
-        try {
-            const wishlist = await adminService.wishlist(req.body);
-            console.log(wishlist, "wishlist");
+   handleWishlist: async (req, res, next) => {
+    const { user_id, post_id, isBusinessAccount } = req.body;
 
-            res.status(200).json(wishlist);
-        } catch (error) {
-            error.message = error.error;
-            console.log(error);
-            error.statuscode = 500;
-            next(error);
-        }
-    },
+    try {
+        const result = await adminService.toggleWishlist(req.body);
+        console.log(result, "wishlist result");
+
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Wishlist error:", error);
+        error.statuscode = 500;
+        next(error);
+    }
+}
+,
 
 
     toggleBookmark: async (req, res, next) => {
