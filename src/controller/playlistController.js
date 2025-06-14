@@ -4,6 +4,9 @@ import createPostModel from "../model/createPostModel.js";
 import { v4 as uuidv4 } from "uuid";
 import { handleSuccess, handleError, handleSuccessV1 } from "../utils/responseHandler.js";
 import Comment from "../model/Comment.js";
+import FavoriteModel from "../model/favoriteModel.js";
+import BookmarkModel from "../model/BookmarkModel.js";
+import UserInfo from "../model/UserInfo.js";
 
 const addToWatchLater = async (req, res) => {
   const { userId, videoId } = req.body;
