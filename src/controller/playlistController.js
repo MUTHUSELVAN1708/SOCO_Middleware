@@ -3,6 +3,7 @@ import Playlist from "../model/playlistModel.js";
 import createPostModel from "../model/createPostModel.js";
 import { v4 as uuidv4 } from "uuid";
 import { handleSuccess, handleError, handleSuccessV1 } from "../utils/responseHandler.js";
+import Comment from "../model/Comment.js";
 
 const addToWatchLater = async (req, res) => {
   const { userId, videoId } = req.body;
@@ -196,10 +197,9 @@ const getAllPlaylistsPaginated = async (req, res) => {
 
 
 const getPlaylistItems = async (req, res) => {
-
   try {
     const { playlistId, page = 1, limit = 15, userId } = req.query;
-    console.log(req.params, "kkkkkkkk")
+
     if (!playlistId) {
       return handleError(res, 400, "Playlist ID is required");
     }
@@ -208,7 +208,7 @@ const getPlaylistItems = async (req, res) => {
     const pageSize = parseInt(limit);
 
     const playlist = await Playlist.findOne({ playlistId });
-    console.log(playlist, "playlist")
+
     if (!playlist || !Array.isArray(playlist.videos) || playlist.videos.length === 0) {
       return handleSuccessV1(res, 200, "No posts found in this playlist", {
         posts: [],
@@ -231,43 +231,39 @@ const getPlaylistItems = async (req, res) => {
 
     const posts = await createPostModel.find({ _id: { $in: paginatedVideoIds } });
 
-    let activeFavoriteSet = new Set();
-    let activeBookmarkSet = new Set();
+    let favoritePostIds = new Set();
+    let bookmarkedPostIds = new Set();
 
     if (userId) {
-      const objectId = new mongoose.Types.ObjectId(userId);
+      const viewerObjectId = new mongoose.Types.ObjectId(userId);
 
-      const favoritePosts = await FavoriteModel.find({ user_id: objectId }).select("post_id");
-      const bookmarkedPosts = await BookmarkModel.find({ user_id: objectId }).select("post_id");
+      const [favoritePosts, bookmarkedPosts] = await Promise.all([
+        FavoriteModel.find({ user_id: viewerObjectId }).select("post_id").lean(),
+        BookmarkModel.find({ user_id: viewerObjectId }).select("post_id").lean(),
+      ]);
 
-      const favoritePostIds = favoritePosts.map(f => f.post_id);
-      const bookmarkedPostIds = bookmarkedPosts.map(b => b.post_id);
-      console.log(favoritePostIds, bookmarkedPostIds, "bookmarkedPostIds")
-      const activeFavoritePosts = await createPostModel.find({
-        _id: { $in: favoritePostIds },
-        Product_status: { $ne: "Deactivate" },
-      }).select("_id");
-      activeFavoriteSet = new Set(activeFavoritePosts.map(p => p._id.toString()));
-
-      const activeBookmarkedPosts = await createPostModel.find({
-        _id: { $in: bookmarkedPostIds },
-        Product_status: { $ne: "Deactivate" },
-      }).select("_id");
-      activeBookmarkSet = new Set(activeBookmarkedPosts.map(p => p._id.toString()));
+      favoritePostIds = new Set(favoritePosts.map(f => f.post_id.toString()));
+      bookmarkedPostIds = new Set(bookmarkedPosts.map(b => b.post_id.toString()));
     }
-    console.log(activeFavoritePosts, activeBookmarkedPosts, "activeBookmarkedPosts")
+
     const formattedPosts = await Promise.all(
       posts.map(async (post) => {
-        const isFavorite = activeFavoriteSet.has(post._id.toString());
-        const isBookmarked = activeBookmarkSet.has(post._id.toString());
-        console.log(isFavorite, isBookmarked, "isBookmarked")
-        let topComments = await CommentModel.find({ postId: post._id })
+        const postIdStr = post._id.toString();
+        console.log("Checking post:", postIdStr, {
+          isFavorite: favoritePostIds.has(postIdStr),
+          isBookmarked: bookmarkedPostIds.has(postIdStr),
+        });
+
+        const isFavorite = favoritePostIds.has(postIdStr);
+        const isBookmarked = bookmarkedPostIds.has(postIdStr);
+
+        let topComments = await Comment.find({ postId: post._id })
           .sort({ likesCount: -1, createdAt: -1 })
           .limit(2)
           .lean();
 
         if (!topComments.length) {
-          topComments = await CommentModel.find({ postId: post._id })
+          topComments = await Comment.find({ postId: post._id })
             .sort({ createdAt: -1 })
             .limit(2)
             .lean();
@@ -290,7 +286,7 @@ const getPlaylistItems = async (req, res) => {
         );
 
         return {
-          id: post._id.toString(),
+          id: postIdStr,
           username: post.userName,
           userAvatar: post.userAvatar,
           caption: post.caption,
@@ -338,25 +334,24 @@ const getPlaylistItems = async (req, res) => {
           timestamp: post.timestamp,
           isFavorite,
           isBookmarked,
+        };
+      })
+    );
 
-        }
-        
-      }));
-  
-      return handleSuccessV1(res, 200, "Playlist items fetched successfully", {
-        posts: formattedPosts,
-        pagination: {
-          totalResults,
-          totalPages,
-          currentPage: pageNumber,
-          limit: pageSize,
-          hasNextPage: pageNumber < totalPages,
-          hasPreviousPage: pageNumber > 1,
-        }
-      });
-    } catch (error) {
-      return handleError(res, 500, error.message);
-    }
+    return handleSuccessV1(res, 200, "Playlist items fetched successfully", {
+      posts: formattedPosts,
+      pagination: {
+        totalResults,
+        totalPages,
+        currentPage: pageNumber,
+        limit: pageSize,
+        hasNextPage: pageNumber < totalPages,
+        hasPreviousPage: pageNumber > 1,
+      },
+    });
+  } catch (error) {
+    return handleError(res, 500, error.message);
+  }
 };
 
 
