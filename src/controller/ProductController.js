@@ -1125,7 +1125,7 @@ export const getProductFilters = async (req, res) => {
 
 export const getBusinessAnalytics = async (req, res, next) => {
   try {
-    const { id, type,range, startDate, endDate} = req.query;
+    const { id, type } = req.query;
 
 
     let target;
@@ -1141,213 +1141,107 @@ export const getBusinessAnalytics = async (req, res, next) => {
       return res.status(404).json({ success: false, message: `${type} not found` });
     }
 
-const now = new Date();
-let fromDate, toDate;
+    const views = await viewsModel.find({ viewed_page_id: id });
+    const totalVisitors = views.length;
+    console.log(views, "views");
+    const repeatVisitorsMap = {};
 
-switch (range) {
-  case 'this_week': {
-    const day = now.getDay(); // 0 (Sun) - 6 (Sat)
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
-    fromDate = new Date(now.setDate(diff));
-    fromDate.setHours(0, 0, 0, 0);
-    toDate = new Date();
-    break;
-  }
-  case 'this_month': {
-    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    toDate = new Date();
-    break;
-  }
-  case 'last_3_months': {
-    fromDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-    toDate = new Date();
-    break;
-  }
-  case 'last_6_months': {
-    fromDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-    toDate = new Date();
-    break;
-  }
-  case 'previous_year': {
-    fromDate = new Date(now.getFullYear() - 1, 0, 1);
-    toDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
-    break;
-  }
-  case 'custom': {
-    if (startDate) fromDate = new Date(startDate);
-    if (endDate) toDate = new Date(endDate);
-    break;
-  }
-  default:
-    break;
-}
+    views.forEach(view => {
+      const viewerId = view.viewer_id.toString();
+      const viewCount = view.viewedAt.length;
 
-// Date filter
-const dateFilter = {};
-if (fromDate || toDate) {
-  dateFilter.viewedAt = {};
-  if (fromDate) dateFilter.viewedAt.$gte = fromDate;
-  if (toDate) dateFilter.viewedAt.$lte = toDate;
-}
+      repeatVisitorsMap[viewerId] = (repeatVisitorsMap[viewerId] || 0) + viewCount;
+    });
 
+    const repeatVisitorsCount = Object.values(repeatVisitorsMap).filter(count => count > 1).length;
 
-    // Get all views for the given page with optional date filter
-    const baseFilter = {
-      viewed_page_id: id,
-      ...dateFilter
-    };
-
-    const allViews = await viewsModel.find(baseFilter);
-
-    // Get followers of this profile
-    const followers = await Follow.find({ followingId: id }).select('userId');
-    const followerIds = followers.map(f => f.userId.toString());
-
-    const followerViews = allViews.filter(view => followerIds.includes(view.viewer_id.toString()));
-
-    // Utility to calculate repeat visitors
-    const calculateRepeatVisitors = (views) => {
-      const map = {};
-      views.forEach(view => {
-        const viewerId = view.viewer_id.toString();
-        map[viewerId] = (map[viewerId] || 0) + 1;
-      });
-      return Object.values(map).filter(count => count > 1).length;
-    };
-
-    // Total visitors
-    const allVisitorCount = allViews.length;
-    const followerVisitorCount = followerViews.length;
-
-    const repeatAll = calculateRepeatVisitors(allViews);
-    const repeatFollowers = calculateRepeatVisitors(followerViews);
-
-    // Shared aggregation filters
-    const sharedMatch = { viewed_page_id: target._id };
-
-    // Helper: Add $match filter for followers
-    const followerMatch = {
-      ...sharedMatch,
-      viewer_id: { $in: followerIds.map(id => new mongoose.Types.ObjectId(id))
- }
-    };
-
-    // ========== Aggregations ==========
-    // For cityStats, genderStats, etc., you’ll do the same aggregation twice:
-    // one for allViews, another for followerViews
-
-    const getCityStats = async (match) => {
-      return await viewsModel.aggregate([
-        { $match: match },
-        {
-          $lookup: {
-            from: "users",
-            localField: "viewer_id",
-            foreignField: "_id",
-            as: "user"
+    console.log('Repeat Visitors:', repeatVisitorsCount);
+    const cityStats = await viewsModel.aggregate([
+      {
+        $match: { viewed_page_id: target._id }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "viewer_id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      {
+        $lookup: {
+          from: "businessregisters",
+          localField: "viewer_id",
+          foreignField: "_id",
+          as: "business"
+        }
+      },
+      {
+        $addFields: {
+          // Handle case if location_id is an array, and take the first element
+          userLocationId: {
+            $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
           }
-        },
-        {
-          $lookup: {
-            from: "businessregisters",
-            localField: "viewer_id",
-            foreignField: "_id",
-            as: "business"
-          }
-        },
-        {
-          $addFields: {
-            userLocationId: {
-              $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
-            }
-          }
-        },
-        {
-          $lookup: {
-            from: "locations",
-            localField: "userLocationId",
-            foreignField: "_id",
-            as: "location"
-          }
-        },
-        {
-          $addFields: {
-            city: {
-              $cond: [
-                { $gt: [{ $size: "$user" }, 0] },
-                {
-                  $toLower: {
-                    $trim: {
-                      input: {
-                        $ifNull: [
-                          { $arrayElemAt: ["$location.address.city", 0] },
-                          ""
-                        ]
-                      }
-                    }
-                  }
-                },
-                {
-                  $toLower: {
-                    $trim: {
-                      input: {
-                        $ifNull: [
-                          { $arrayElemAt: ["$business.address.city", 0] },
-                          ""
-                        ]
-                      }
+        }
+      },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "userLocationId",
+          foreignField: "_id",
+          as: "location"
+        }
+      },
+      {
+        $addFields: {
+          city: {
+            $cond: [
+              { $gt: [{ $size: "$user" }, 0] },
+              {
+                $toLower: {
+                  $trim: {
+                    input: {
+                      $ifNull: [
+                        { $arrayElemAt: ["$location.address.city", 0] },
+                        "" // Default to empty string if city is null
+                      ]
                     }
                   }
                 }
-              ]
-            }
-          }
-        },
-        {
-          $group: {
-            _id: "$city",
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { count: -1 } },
-        { $limit: 7 },
-        {
-          $project: {
-            _id: 0,
-            city: "$_id",
-            count: 1
+              },
+              {
+                $toLower: {
+                  $trim: {
+                    input: {
+                      $ifNull: [
+                        { $arrayElemAt: ["$business.address.city", 0] },
+                        ""
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
-      ]);
-    };
+      },
+      {
+        $group: {
+          _id: "$city",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 7 },
+      {
+        $project: {
+          _id: 0,
+          city: "$_id",
+          count: 1
+        }
+      }
+    ]);
 
-    const getGenderStats = async (match) => {
-      return await viewsModel.aggregate([
-        { $match: { ...match, viewer_type: "User" } },
-        {
-          $lookup: {
-            from: "users",
-            localField: "viewer_id",
-            foreignField: "_id",
-            as: "user"
-          }
-        },
-        { $unwind: "$user" },
-        {
-          $group: {
-            _id: "$user.gender",
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            gender: "$_id",
-            count: 1
-          }
-        }
-      ]);
-    };
     console.log(cityStats, "cityStats")
 
     const genderStats = await viewsModel.aggregate([
@@ -1381,72 +1275,6 @@ if (fromDate || toDate) {
       }
     ]);
 
-    const getAgeStats = async (match) => {
-      return await viewsModel.aggregate([
-        { $match: { ...match, viewer_type: "User" } },
-        {
-          $lookup: {
-            from: "users",
-            localField: "viewer_id",
-            foreignField: "_id",
-            as: "user"
-          }
-        },
-        { $unwind: "$user" },
-        {
-          $addFields: {
-            age: {
-              $floor: {
-                $divide: [
-                  {
-                    $subtract: [
-                      "$$NOW",
-                      {
-                        $dateFromString: {
-                          dateString: "$user.DOB",
-                          format: "%d-%m-%Y"
-                        }
-                      }
-                    ]
-                  },
-                  1000 * 60 * 60 * 24 * 365
-                ]
-              }
-            }
-          }
-        },
-        {
-          $addFields: {
-            ageRange: {
-              $switch: {
-                branches: [
-                  { case: { $lt: ["$age", 18] }, then: "Under 18" },
-                  { case: { $and: [{ $gte: ["$age", 18] }, { $lte: ["$age", 24] }] }, then: "18-24" },
-                  { case: { $and: [{ $gte: ["$age", 25] }, { $lte: ["$age", 34] }] }, then: "25-34" },
-                  { case: { $and: [{ $gte: ["$age", 35] }, { $lte: ["$age", 44] }] }, then: "35-44" },
-                  { case: { $and: [{ $gte: ["$age", 45] }, { $lte: ["$age", 54] }] }, then: "45-54" },
-                  { case: { $and: [{ $gte: ["$age", 55] }, { $lte: ["$age", 64] }] }, then: "55-64" }
-                ],
-                default: "65+"
-              }
-            }
-          }
-        },
-        {
-          $group: {
-            _id: "$ageRange",
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            ageRange: "$_id",
-            count: 1
-          }
-        }
-      ]);
-    };
     const ageCategory = await viewsModel.aggregate([
       {
         $match: {
@@ -1517,36 +1345,6 @@ if (fromDate || toDate) {
       }
     ]);
 
-    const getInterestStats = async (match) => {
-      return await viewsModel.aggregate([
-        { $match: { ...match, viewer_type: "User" } },
-        {
-          $lookup: {
-            from: "users",
-            localField: "viewer_id",
-            foreignField: "_id",
-            as: "user"
-          }
-        },
-        { $unwind: "$user" },
-        { $unwind: "$user.interest" },
-        {
-          $group: {
-            _id: "$user.interest",
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { count: -1 } },
-        { $limit: 7 },
-        {
-          $project: {
-            _id: 0,
-            interest: "$_id",
-            count: 1
-          }
-        }
-      ]);
-    };
 
     const interestCategory = await viewsModel.aggregate([
       {
@@ -1582,48 +1380,18 @@ if (fromDate || toDate) {
       }
     ]);
 
-    
-    const [allCityStats, followerCityStats] = await Promise.all([
-      getCityStats(sharedMatch),
-      getCityStats(followerMatch)
-    ]);
-    const [allGenderStats, followerGenderStats] = await Promise.all([
-      getGenderStats(sharedMatch),
-      getGenderStats(followerMatch)
-    ]);
-    const [allAgeStats, followerAgeStats] = await Promise.all([
-      getAgeStats(sharedMatch),
-      getAgeStats(followerMatch)
-    ]);
-    const [allInterestStats, followerInterestStats] = await Promise.all([
-      getInterestStats(sharedMatch),
-      getInterestStats(followerMatch)
-    ]);
-
-    // Final Response
     res.status(200).json({
       success: true,
       message: "Analytics fetched successfully",
       data: {
-        allVisitors: {
-          totalVisitors: allVisitorCount,
-          repeatVisitors: repeatAll,
-          topCities: allCityStats,
-          genderStats: allGenderStats,
-          ageCategory: allAgeStats,
-          interestCategory: allInterestStats
-        },
-        followerVisitors: {
-          totalVisitors: followerVisitorCount,
-          repeatVisitors: repeatFollowers,
-          topCities: followerCityStats,
-          genderStats: followerGenderStats,
-          ageCategory: followerAgeStats,
-          interestCategory: followerInterestStats
-        }
+        totalVisitors,
+        repeatVisitors: repeatVisitorsCount,
+        topCities: cityStats,
+        genderStats,
+        ageCategory,
+        interestCategory
       }
     });
-
 
   } catch (error) {
     console.error("Error fetching analytics:", error);

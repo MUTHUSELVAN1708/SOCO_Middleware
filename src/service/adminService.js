@@ -5316,10 +5316,10 @@ getWishlist: async (user_id) => {
 
     // Step 2: Get post IDs from wishlist
     const postIds = wishlistItems.map(item => item.post_id);
-
+console.log(postIds,"ppppp")
     // Step 3: Fetch post documents to get productIds
     const posts = await createPostModel.find({ _id: { $in: postIds }, isProductPost: true }).lean();
-
+console.log(posts,"posy")
     const productIds = posts
       .map(post => post.productId)
       .filter(Boolean);
@@ -5333,6 +5333,7 @@ getWishlist: async (user_id) => {
 
     // Step 5: Format response
     const result = products.map(product => ({
+        post_id:postIds,
       user_id: userId,
       product_id: product?._id || null,
       productName: product?.basicInfo?.productTitle || "Unknown",
