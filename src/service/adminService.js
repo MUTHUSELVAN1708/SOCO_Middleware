@@ -3787,14 +3787,6 @@ const adminService = {
                 });
             }
 
-            let totalPrice = 0;
-            if (unit === "gram" || unit === "piece") {
-                totalPrice = cartItem.quantity * cartItem.price;
-            } else {
-                throw new Error("Invalid unit specified");
-            }
-
-            cartItem.price = totalPrice;
             await cartItem.save();
 
             return cartItem;

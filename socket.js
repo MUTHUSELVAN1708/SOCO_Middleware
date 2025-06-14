@@ -86,7 +86,7 @@ const initializeSocket = (server) => {
 
                     if (!sharedPostsPlaylist) {
                         sharedPostsPlaylist = await Playlist.create({
-                            playlistId:uuidv4(),
+                            playlistId: uuidv4(),
                             userId: new mongoose.Types.ObjectId(from),
                             name: "SharedPosts",
                             videos: [],
@@ -132,6 +132,44 @@ const initializeSocket = (server) => {
             } catch (err) {
                 console.error("Error in sendMsg:", err.message);
                 socket.emit("sendedMsg", { success: false, message: err.message });
+            }
+        });
+
+
+        socket.on("deleteMsg", async (data) => {
+            try {
+                const { chatKey, chatId, messagesToDelete } = data;
+
+                if (!chatKey || !chatId || !Array.isArray(messagesToDelete)) {
+                    return socket.emit("deletedMsg", {
+                        success: false,
+                        message: "chatKey, chatId, and messagesToDelete (array) are required"
+                    });
+                }
+
+                const deleteResults = [];
+
+                for (const message of messagesToDelete) {
+                    // Delete from Redis
+                    const redisResult = await redisService.deleteFromRedis(chatKey, message);
+
+                    // Delete from MongoDB
+                    const mongoResult = await MessageModel.updateOne(
+                        { _id: chatId },
+                        { $pull: { messages: { _id: message._id } } }
+                    );
+
+                    deleteResults.push({
+                        messageId: message._id,
+                        redis: redisResult,
+                        mongo: mongoResult.modifiedCount > 0 ? "Deleted from DB" : "Not found in DB"
+                    });
+                }
+
+                socket.emit("deletedMsg", { success: true, results: deleteResults });
+            } catch (err) {
+                console.error("Error in deleteMsg:", err.message);
+                socket.emit("deletedMsg", { success: false, message: err.message });
             }
         });
 
