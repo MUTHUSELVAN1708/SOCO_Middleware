@@ -730,12 +730,12 @@ const adminController = {
     },
 
     fetchUserPosts: async (req, res, next) => {
-        const id = req.body.id;
-        const limit = req.body.limit;
-        const page = req.body.page;
+       const {userId,otherUserId,limit,page}=req.body;
+        console.log(req.body,"kkk")
 
         try {
-            const getUserDetails = await adminService.fetchUserPosts(id, page, limit);
+            const getUserDetails = await adminService.fetchUserPosts(req.body);
+
 
             res.status(200).json({
                 status: 200,
