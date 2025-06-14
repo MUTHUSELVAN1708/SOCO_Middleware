@@ -36,10 +36,8 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true })); 
 app.use(express.raw({ type: 'text/plain', limit: '1mb' })); 
 
-// Static files
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/socouploads', express.static(process.env.UPLOAD_FOLDER));
+
 
 // Routes
 app.use("/admin", adminRouter);

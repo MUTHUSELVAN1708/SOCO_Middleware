@@ -4,10 +4,8 @@ const PlaylistSchema = new mongoose.Schema({
   playlistId: { type: String, unique: true, required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   name: { type: String, required: true },
- videos: [{
-  postId: String,
-  sharedAt: { type: Date, default: Date.now }
-}],
+  videos: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
+
 
   isPublic: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },

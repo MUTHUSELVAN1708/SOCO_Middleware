@@ -3,7 +3,8 @@ import adminService from "./src/service/adminService.js";
 import redisService from "./src/service/redisService.js";
 import MessageModel from "./src/model/chatModel.js";
 import Playlist from "./src/model/playlistModel.js";
-
+import mongoose from "mongoose";
+import { v4 as uuidv4 } from "uuid";
 const connectedUsers = new Map(); // userId => socketId
 
 const initializeSocket = (server) => {
@@ -85,6 +86,7 @@ const initializeSocket = (server) => {
 
                     if (!sharedPostsPlaylist) {
                         sharedPostsPlaylist = await Playlist.create({
+                            playlistId:uuidv4(),
                             userId: new mongoose.Types.ObjectId(from),
                             name: "SharedPosts",
                             videos: [],

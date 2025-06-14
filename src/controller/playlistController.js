@@ -196,6 +196,7 @@ const getAllPlaylistsPaginated = async (req, res) => {
 
 
 const getPlaylistItems = async (req, res) => {
+
   try {
     const { playlistId, page = 1, limit = 15, userId } = req.query;
     console.log(req.params, "kkkkkkkk")
@@ -337,24 +338,24 @@ const getPlaylistItems = async (req, res) => {
           timestamp: post.timestamp,
           isFavorite,
           isBookmarked,
-        };
-      })
-    );
 
-    return handleSuccessV1(res, 200, "Playlist items fetched successfully", {
-      posts: formattedPosts,
-      pagination: {
-        totalResults,
-        totalPages,
-        currentPage: pageNumber,
-        limit: pageSize,
-        hasNextPage: pageNumber < totalPages,
-        hasPreviousPage: pageNumber > 1,
-      },
-    });
-  } catch (error) {
-    return handleError(res, 500, error.message);
-  }
+        };
+      });
+  
+      return handleSuccessV1(res, 200, "Playlist items fetched successfully", {
+        posts: formattedPosts,
+        pagination: {
+          totalResults,
+          totalPages,
+          currentPage: pageNumber,
+          limit: pageSize,
+          hasNextPage: pageNumber < totalPages,
+          hasPreviousPage: pageNumber > 1,
+        }
+      });
+    } catch (error) {
+      return handleError(res, 500, error.message);
+    }
 };
 
 
