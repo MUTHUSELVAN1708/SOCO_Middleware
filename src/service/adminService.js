@@ -41,6 +41,9 @@ import Follow from "../model/FollowModel.js";
 import redisService from "./redisService.js";
 // import Playlist from "../model/playlistModel.js";
 import { v4 as uuidv4 } from "uuid";
+import wishlist from "../model/wishlist.js";
+import wishlistModel from "../model/wishlist.js";
+import WishlistModel from "../model/wishlist.js";
 
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
@@ -4031,7 +4034,7 @@ const adminService = {
             const comments = await CommentModel.find({ postId: post_id }).lean();
 
             const liked = await FavoriteModel.findOne({ post_id: post_id }).lean();
-           
+
             return {
                 id: post._id.toString() ?? '',
                 userId: post.userId ?? '',
@@ -4051,7 +4054,7 @@ const adminService = {
                         id: comment._id?.toString() ?? '',
                         userId: comment.userId ?? '',
                         likesCount: comment.likesCount ?? '',
-                        replyCount:comment.replyCount ?? "",
+                        replyCount: comment.replyCount ?? "",
                         text: comment.content ?? '',
                         timestamp: comment.createdAt ?? '',
                     }))
@@ -4067,7 +4070,7 @@ const adminService = {
                 isOwnPost: viewerId === post.userId,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-                
+
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -4386,7 +4389,7 @@ const adminService = {
         try {
             // console.log(`Fetching user profile for ID: ${id}`);
 
-           
+
             let user = await registerModel.findById(id);
 
             const isBusinessAccount = !user;
@@ -5020,19 +5023,28 @@ const adminService = {
         }
     },
     //   =========================
-    wishlist: async (data) => {
-        const { user_id, post_id } = data
-        try {
-            const exist = await FavoriteModel.findOne({ post_id });
-            if (exist) {
-                throw error("this product already exist")
-            }
-            const createWishlist = await FavoriteModel.create({ user_id, post_id })
-            return createWishlist
-        } catch (error) {
-            throw error
+  toggleWishlist: async (data) => {
+    const { user_id, post_id, isBusinessAccount = false } = data;
+    console.log(data);
+
+    try {
+        const exists = await WishlistModel.findOne({ user_id, post_id });
+        console.log(exists, "exists");
+
+        if (exists) {
+            await WishlistModel.deleteOne({ user_id, post_id });
+            return { message: "Removed from wishlist" };
         }
-    },
+
+        const added = await WishlistModel.create({ user_id, post_id, isBusinessAccount });
+        console.log(added);
+        return added;
+
+    } catch (err) {
+        throw new Error(err.message || "Error handling wishlist");
+    }
+},
+
 
     toggleBookmark: async (data) => {
         const { user_id, post_id, isBusinessAccount, isProduct } = data;
@@ -5287,57 +5299,65 @@ const adminService = {
         }
     },
     // ===========================
-    getWishlist: async (user_id) => {
-        console.log(user_id, "Received user_id");
+getWishlist: async (user_id) => {
+  try {
+    const userId = user_id?.id ? user_id.id.toString() : user_id;
 
-        try {
-            const userId = user_id?.id ? user_id.id.toString() : user_id;
-            // console.log(userId, "Processed userId");
+    if (!userId) {
+      throw new Error("Invalid user_id provided");
+    }
 
-            if (!userId) {
-                throw new Error("Invalid user_id provided");
-            }
+    // Step 1: Get wishlist items by user
+    const wishlistItems = await wishlist.find({ user_id: userId }).lean();
 
-            // Fetch wishlist items only for the given user_id
-            const getWishList = await FavoriteModel.find({ user_id: userId }).lean();
-            // console.log(getWishList, "Fetched wishlist items");
+    if (!wishlistItems.length) {
+      return [];
+    }
 
-            if (getWishList.length === 0) {
-                return [];
-            }
+    // Step 2: Get post IDs from wishlist
+    const postIds = wishlistItems.map(item => item.post_id);
 
-            // Extract post_ids from the wishlist
-            const productIds = getWishList.map(item => item.post_id);
+    // Step 3: Fetch post documents to get productIds
+    const posts = await createPostModel.find({ _id: { $in: postIds }, isProductPost: true }).lean();
 
-            // Fetch products that match the wishlist items
-            const products = await Product.find({ _id: { $in: productIds } }).lean();
-            // console.log(products, "Fetched products");
+    const productIds = posts
+      .map(post => post.productId)
+      .filter(Boolean);
 
-            // Format the response
-            const result = products.map(product => ({
-                user_id: userId,
-                product_id: product?._id || null,
-                productName: product?.productName || "Unknown",
-                images: product?.images || null,
-                category: product?.basicInfo?.categories || null,
-                colors: product?.variants?.[0]?.color || null,
-                size: product?.variants?.[0]?.variant || null,
-                quantity: product?.variants?.[0]?.quantity || 0,
-                price: product?.pricing.salePrice || 0,
-                gst: product?.pricing.gstDetails.gstPercentage || 0,
-                originalPrice: product?.pricing.regularPrice || 0,
-                discount: product?.discount || 0,
-                unit: product?.unit || "N/A"
-            }));
+    if (!productIds.length) {
+      return [];
+    }
 
-            // console.log(result, "Formatted wishlist response");
-            return result;
+    // Step 4: Fetch products using extracted product IDs
+    const products = await Product.find({ _id: { $in: productIds } }).lean();
 
-        } catch (error) {
-            console.error("Error in getWishlist:", error);
-            throw error;
-        }
-    },
+    // Step 5: Format response
+    const result = products.map(product => ({
+      user_id: userId,
+      product_id: product?._id || null,
+      productName: product?.basicInfo?.productTitle || "Unknown",
+      images: product?.images || [],
+      category: product?.basicInfo?.categories || null,
+      color: product?.variants?.[0]?.color || null,
+      size: product?.variants?.[0]?.variant || null,
+      quantity: product?.variants?.[0]?.quantity || 0,
+      price: Number(product?.pricing?.salePrice || 0),
+      gst: Number(product?.pricing?.gstDetails?.gstPercentage || 0),
+      originalPrice: Number(product?.pricing?.regularPrice || 0),
+      discount: Number(product?.pricing?.discount || 0),
+      unit: product?.unit || "N/A",
+    }));
+
+    return result;
+
+  } catch (error) {
+    console.error("Error in getWishlist:", error);
+    throw error;
+  }
+}
+,
+
+
 
     // =====================
     getOrderHistory: async (user_id) => {

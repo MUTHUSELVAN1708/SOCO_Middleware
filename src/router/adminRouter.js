@@ -19,7 +19,7 @@ router.get("/getOrderHistory/:user_id",adminController.getOrderHistory);
 router.put("/updateOrderStatus/:checkout_id",adminController.updateOrderStatus);
 
 
-router.post("/wishlist",adminController.wishlist);
+router.post("/wishlist",adminController.handleWishlist);
 router.get("/getWishlist/:id",adminController.getWishlist)
 router.delete("/deleteWishlist",adminController.deleteWishlist);
 
