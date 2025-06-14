@@ -1,3 +1,4 @@
+import MessageModel from "../model/chatModel.js";
 import registerModel from "../model/registerModel.js";
 import adminService from "../service/adminService.js";
 import redisService from "../service/redisService.js";
@@ -1088,29 +1089,41 @@ const adminController = {
         }
     },
     //   ======================================
-    deleteFromRedis: async (req, res) => {
-        const { chatKey, messagesToDelete } = req.body;
-        console.log(req.body, "ki")
+  deleteFromRedis: async (req, res) => {
+    const { chatKey, messagesToDelete, chatId } = req.body;
+    console.log(req.body, "→ delete request");
 
-        if (!chatKey || !messagesToDelete || !Array.isArray(messagesToDelete)) {
-            return res.status(400).json({ error: 'chatKey must be provided and messagesToDelete must be an array' });
-        }
+    if (!chatKey || !chatId || !Array.isArray(messagesToDelete)) {
+        return res.status(400).json({ error: 'chatKey, chatId, and messagesToDelete array are required' });
+    }
 
-        try {
+    try {
+        const deleteResults = [];
 
-            const deleteResults = [];
+       for (const message of messagesToDelete) {
+ 
+    const redisResult = await redisService.deleteFromRedis(chatKey, message);
 
-            for (const messageToDelete of messagesToDelete) {
-                const result = await redisService.deleteFromRedis(chatKey, messageToDelete);
-                deleteResults.push(result);
-            }
+    const mongoResult = await MessageModel.updateOne(
+        { _id: chatId },
+        { $pull: { messages: { _id: message._id } } }
+    );
 
-            res.status(200).json({ success: true, deletedMessages: deleteResults });
-        } catch (err) {
-            console.error('Error in deleteFromRedis:', err);
-            res.status(500).json({ error: 'Error deleting messages' });
-        }
-    },
+    deleteResults.push({
+        messageId: message._id,
+        redis: redisResult,
+        mongo: mongoResult.modifiedCount > 0 ? "Deleted from DB" : "Not found in DB"
+    });
+}
+
+
+        res.status(200).json({ success: true, results: deleteResults });
+    } catch (err) {
+        console.error('Error deleting from Redis/DB:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+},
+
 
     //  =================================
     updateMsg: async (req, res) => {
