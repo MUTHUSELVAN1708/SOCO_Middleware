@@ -5023,27 +5023,27 @@ const adminService = {
         }
     },
     //   =========================
-  toggleWishlist: async (data) => {
-    const { user_id, post_id, isBusinessAccount = false } = data;
-    console.log(data);
+    toggleWishlist: async (data) => {
+        const { user_id, post_id, isBusinessAccount = false } = data;
+        console.log(data);
 
-    try {
-        const exists = await WishlistModel.findOne({ user_id, post_id });
-        console.log(exists, "exists");
+        try {
+            const exists = await WishlistModel.findOne({ user_id, post_id });
+            console.log(exists, "exists");
 
-        if (exists) {
-            await WishlistModel.deleteOne({ user_id, post_id });
-            return { message: "Removed from wishlist" };
+            if (exists) {
+                await WishlistModel.deleteOne({ user_id, post_id });
+                return { message: "Removed from wishlist" };
+            }
+
+            const added = await WishlistModel.create({ user_id, post_id, isBusinessAccount });
+            console.log(added);
+            return added;
+
+        } catch (err) {
+            throw new Error(err.message || "Error handling wishlist");
         }
-
-        const added = await WishlistModel.create({ user_id, post_id, isBusinessAccount });
-        console.log(added);
-        return added;
-
-    } catch (err) {
-        throw new Error(err.message || "Error handling wishlist");
-    }
-},
+    },
 
 
     toggleBookmark: async (data) => {
@@ -5299,64 +5299,70 @@ const adminService = {
         }
     },
     // ===========================
-getWishlist: async (user_id) => {
-  try {
-    const userId = user_id?.id ? user_id.id.toString() : user_id;
+  getWishlist: async (user_id) => {
+    try {
+        const userId = user_id?.id ? user_id.id.toString() : user_id;
 
-    if (!userId) {
-      throw new Error("Invalid user_id provided");
+        if (!userId) {
+            throw new Error("Invalid user_id provided");
+        }
+
+        // Step 1: Get wishlist items
+        const wishlistItems = await wishlist.find({ user_id: userId }).lean();
+
+        if (!wishlistItems.length) return [];
+
+        // Step 2: Get post IDs
+        const postIds = wishlistItems.map(item => item.post_id);
+
+        // Step 3: Get product posts
+        const posts = await createPostModel.find({
+            _id: { $in: postIds },
+            isProductPost: true
+        }).lean();
+
+        if (!posts.length) return [];
+
+        const productPostMap = new Map();
+        posts.forEach(post => {
+            if (post.productId) {
+                productPostMap.set(post.productId.toString(), post._id.toString());
+            }
+        });
+
+        const productIds = [...productPostMap.keys()];
+
+        const products = await Product.find({ _id: { $in: productIds } }).lean();
+
+        // Step 5: Format final response
+        const result = products.map(product => {
+            const productIdStr = product._id.toString();
+            return {
+                post_id: productPostMap.get(productIdStr) || null,
+                user_id: userId,
+                product_id: product._id,
+                productName: product?.basicInfo?.productTitle || "Unknown",
+                images: product?.images || [],
+                category: product?.basicInfo?.categories || null,
+                color: product?.variants?.[0]?.color || null,
+                size: product?.variants?.[0]?.variant || null,
+                quantity: product?.variants?.[0]?.quantity || 0,
+                price: Number(product?.pricing?.salePrice || 0),
+                gst: Number(product?.pricing?.gstDetails?.gstPercentage || 0),
+                originalPrice: Number(product?.pricing?.regularPrice || 0),
+                discount: Number(product?.pricing?.discount || 0),
+                unit: product?.unit || "N/A",
+            };
+        });
+
+        return result;
+
+    } catch (error) {
+        console.error("Error in getWishlist:", error.message);
+        throw error;
     }
+},
 
-    // Step 1: Get wishlist items by user
-    const wishlistItems = await wishlist.find({ user_id: userId }).lean();
-
-    if (!wishlistItems.length) {
-      return [];
-    }
-
-    // Step 2: Get post IDs from wishlist
-    const postIds = wishlistItems.map(item => item.post_id);
-console.log(postIds,"ppppp")
-    // Step 3: Fetch post documents to get productIds
-    const posts = await createPostModel.find({ _id: { $in: postIds }, isProductPost: true }).lean();
-console.log(posts,"posy")
-    const productIds = posts
-      .map(post => post.productId)
-      .filter(Boolean);
-
-    if (!productIds.length) {
-      return [];
-    }
-
-    // Step 4: Fetch products using extracted product IDs
-    const products = await Product.find({ _id: { $in: productIds } }).lean();
-
-    // Step 5: Format response
-    const result = products.map(product => ({
-        post_id:postIds,
-      user_id: userId,
-      product_id: product?._id || null,
-      productName: product?.basicInfo?.productTitle || "Unknown",
-      images: product?.images || [],
-      category: product?.basicInfo?.categories || null,
-      color: product?.variants?.[0]?.color || null,
-      size: product?.variants?.[0]?.variant || null,
-      quantity: product?.variants?.[0]?.quantity || 0,
-      price: Number(product?.pricing?.salePrice || 0),
-      gst: Number(product?.pricing?.gstDetails?.gstPercentage || 0),
-      originalPrice: Number(product?.pricing?.regularPrice || 0),
-      discount: Number(product?.pricing?.discount || 0),
-      unit: product?.unit || "N/A",
-    }));
-
-    return result;
-
-  } catch (error) {
-    console.error("Error in getWishlist:", error);
-    throw error;
-  }
-}
-,
 
 
 
