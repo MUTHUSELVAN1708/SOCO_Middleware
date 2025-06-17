@@ -389,4 +389,7 @@ router.get("/getUserBookmarks",adminController.getUserBookmarks );
 
 router.put("/addInterest",adminController.addInterest);
 router.get("/getCollection/:userId",adminController.getCollection);
+
+
+router.post("/togglePin",adminController.togglePin)
 export default router;

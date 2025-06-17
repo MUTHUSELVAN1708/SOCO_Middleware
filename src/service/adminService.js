@@ -442,6 +442,11 @@ const adminService = {
                 businessLat,
                 businessLng,
                 businessDescription,
+                launchedIn,
+                openTime,
+                closeTime,
+                website,
+                socialMediaLinks
             } = data;
 
             // console.log(data)
@@ -552,6 +557,7 @@ const adminService = {
                 year,
                 grade,
                 achievements,
+
             });
 
             // Create the address
@@ -605,7 +611,10 @@ const adminService = {
                 lng: businessLng || "",
                 description: businessDescription || "",
                 important,
-
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks, closeTime,
                 // Chat-related fields
                 onlineStatus,
                 isTyping,
@@ -840,6 +849,11 @@ const adminService = {
                 businessLat,
                 businessLng,
                 businessDescription,
+                closeTime,
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks,
                 accessAccountsIds = [] // New field for additional linked accounts
             } = data;
 
@@ -916,7 +930,12 @@ const adminService = {
                 lastOnline,
                 currentChatRoom,
                 unreadMessagesCount,
-                accessAccountsIds // Store linked account IDs
+                accessAccountsIds,
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks,
+                closeTime// Store linked account IDs
             });
 
             if (natureOfBusiness) {
@@ -972,6 +991,10 @@ const adminService = {
                 busPhone,
                 businessType,
                 natureOfBusiness,
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks, closeTime,
             } = data;
 
             let errors = [];
@@ -1043,6 +1066,11 @@ const adminService = {
                 ...(busPhone && { businessPhone: busPhone }),
                 ...(businessType && { businessType }),
                 ...(natureOfBusiness && { natureOfBusiness }),
+                ...(launchedIn && { launchedIn }),
+                ...(openTime && { openTime }),
+                ...(website && { website }),
+                ...(socialMediaLinks && { socialMediaLinks }),
+                ...(closeTime && { closeTime }),
             };
 
             // Update the business profile
@@ -2817,6 +2845,7 @@ const adminService = {
                         timestamp: post.timestamp,
                         isFavorite,
                         isBookmarked,
+                        ispinned: post.ispinned
                     };
                 })
             );
@@ -4079,7 +4108,7 @@ const adminService = {
                 isOwnPost: post.isOwnPost,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-
+                ispinned: post.ispinned,
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -5450,7 +5479,49 @@ const adminService = {
             console.log(error);
             throw error;
         }
-    }
+    },
+
+
+
+    // ==================
+
+    togglePin: async (data) => {
+        try {
+            const { userId, post_id } = data;
+            console.log(data, "data")
+
+            if (!userId || !post_id) {
+                throw new Error({ error: "post_id and post_id are required" });
+            }
+
+            const post = await createPostModel.findById({ _id: post_id });
+
+            if (!post) {
+                throw new Error({ error: "Post not found" });
+            }
+
+            if (post.ispinned) {
+                post.ispinned = false;
+                await post.save();
+                return ({ message: "Post unpinned successfully", data: post });
+            }
+
+            await createPostModel.findOneAndUpdate(
+                { userId, ispinned: true },
+                { $set: { ispinned: false } }
+            );
+
+            // Now pin the selected post
+            post.ispinned = true;
+            await post.save();
+
+            return ({ message: "Post pinned successfully", data: post });
+        } catch (error) {
+            console.error("Error toggling pin:", error);
+            throw new Error({ error: "Internal server error" });
+        }
+    },
+
 
 
 

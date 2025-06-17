@@ -10,7 +10,7 @@ const adminController = {
     register: async (req, res, next) => {
         try {
             const register = await adminService.register(req.body);
-            console.log(register,"te")
+            console.log(register, "te")
             res.status(200).json({
                 status: 200,
                 msg: "successfully created",
@@ -730,8 +730,8 @@ const adminController = {
     },
 
     fetchUserPosts: async (req, res, next) => {
-       const {userId,otherUserId,limit,page}=req.body;
-        console.log(req.body,"kkk")
+        const { userId, otherUserId, limit, page } = req.body;
+        console.log(req.body, "kkk")
 
         try {
             const getUserDetails = await adminService.fetchUserPosts(req.body);
@@ -1077,8 +1077,8 @@ const adminController = {
     },
 
     // ====================
-    getSinglePost:async (req, res) => {
-        const { post_id} = req.params;
+    getSinglePost: async (req, res) => {
+        const { post_id } = req.params;
 
         try {
             const post = await adminService.getSinglePost(post_id);
@@ -1089,40 +1089,40 @@ const adminController = {
         }
     },
     //   ======================================
-  deleteFromRedis: async (req, res) => {
-    const { chatKey, messagesToDelete, chatId } = req.body;
-    console.log(req.body, "→ delete request");
+    deleteFromRedis: async (req, res) => {
+        const { chatKey, messagesToDelete, chatId } = req.body;
+        console.log(req.body, "→ delete request");
 
-    if (!chatKey || !chatId || !Array.isArray(messagesToDelete)) {
-        return res.status(400).json({ error: 'chatKey, chatId, and messagesToDelete array are required' });
-    }
+        if (!chatKey || !chatId || !Array.isArray(messagesToDelete)) {
+            return res.status(400).json({ error: 'chatKey, chatId, and messagesToDelete array are required' });
+        }
 
-    try {
-        const deleteResults = [];
+        try {
+            const deleteResults = [];
 
-       for (const message of messagesToDelete) {
- 
-    const redisResult = await redisService.deleteFromRedis(chatKey, message);
+            for (const message of messagesToDelete) {
 
-    const mongoResult = await MessageModel.updateOne(
-        { _id: chatId },
-        { $pull: { messages: { _id: message._id } } }
-    );
+                const redisResult = await redisService.deleteFromRedis(chatKey, message);
 
-    deleteResults.push({
-        messageId: message._id,
-        redis: redisResult,
-        mongo: mongoResult.modifiedCount > 0 ? "Deleted from DB" : "Not found in DB"
-    });
-}
+                const mongoResult = await MessageModel.updateOne(
+                    { _id: chatId },
+                    { $pull: { messages: { _id: message._id } } }
+                );
+
+                deleteResults.push({
+                    messageId: message._id,
+                    redis: redisResult,
+                    mongo: mongoResult.modifiedCount > 0 ? "Deleted from DB" : "Not found in DB"
+                });
+            }
 
 
-        res.status(200).json({ success: true, results: deleteResults });
-    } catch (err) {
-        console.error('Error deleting from Redis/DB:', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-},
+            res.status(200).json({ success: true, results: deleteResults });
+        } catch (err) {
+            console.error('Error deleting from Redis/DB:', err);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    },
 
 
     //  =================================
@@ -1146,12 +1146,12 @@ const adminController = {
 
     // =================
 
-    getAllChatUser:async (req, res) => {
+    getAllChatUser: async (req, res) => {
         const { user_id } = req.params;
 
         try {
             const getAllChatUser = await adminService.getAllChatUser(user_id);
-            console.log(getAllChatUser,"llool")
+            console.log(getAllChatUser, "llool")
             res.status(200).json(getAllChatUser);
 
         } catch (err) {
@@ -1246,21 +1246,21 @@ const adminController = {
         }
     },
     // =========================\
-   handleWishlist: async (req, res, next) => {
-    const { user_id, post_id, isBusinessAccount } = req.body;
+    handleWishlist: async (req, res, next) => {
+        const { user_id, post_id, isBusinessAccount } = req.body;
 
-    try {
-        const result = await adminService.toggleWishlist(req.body);
-        console.log(result, "wishlist result");
+        try {
+            const result = await adminService.toggleWishlist(req.body);
+            console.log(result, "wishlist result");
 
-        res.status(200).json(result);
-    } catch (error) {
-        console.error("Wishlist error:", error);
-        error.statuscode = 500;
-        next(error);
+            res.status(200).json(result);
+        } catch (error) {
+            console.error("Wishlist error:", error);
+            error.statuscode = 500;
+            next(error);
+        }
     }
-}
-,
+    ,
 
 
     toggleBookmark: async (req, res, next) => {
@@ -1422,6 +1422,17 @@ const adminController = {
             res.status(500).json({ success: false, msg: error.message })
         }
 
+    },
+    togglePin: async (req, res) => {
+        const { userId, post_id } = req.body;
+        try {
+            const togglePin = await adminService.togglePin(req.body);
+            res.status(200).json({ success:true, togglePin })
+        }
+        catch (error) {
+            console.log(error)
+            res.status(500).json({ success: false, msg: error.message })
+        }
     }
 
 };

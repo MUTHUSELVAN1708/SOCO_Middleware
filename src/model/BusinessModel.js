@@ -46,45 +46,66 @@ const BusinessregisterSchema = new mongoose.Schema(
     oneSignalIDs: { type: [String], default: [] },
     subscriptionIDs: { type: [String], default: [] },
     accessAccountsIds: { type: [String], default: [] },
-    
+
     // Chat-related fields
-    onlineStatus: { 
-      type: Boolean, 
+    onlineStatus: {
+      type: Boolean,
       default: false,  // Default to false, indicating the business is offline
-      required: false 
+      required: false
     },
-    isTyping: { 
-      type: Boolean, 
+    isTyping: {
+      type: Boolean,
       default: false,  // Default to false, indicating the business is not typing
-      required: false 
+      required: false
     },
-    lastOnline: { 
-      type: Date, 
+    lastOnline: {
+      type: Date,
       default: null,  // Default to null, indicating the business hasn't been online yet
-      required: false 
+      required: false
     },
-    currentChatRoom: { 
-      type: mongoose.Schema.Types.ObjectId, 
+    currentChatRoom: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'ChatRoom',  // Reference to a ChatRoom model (optional)
-      required: false 
+      required: false
     },
     unreadMessagesCount: {
       type: Number,
-      default: 0, 
+      default: 0,
       required: false
     },
-    deviceToken: { 
-      type: String, 
-      required: false 
+    deviceToken: {
+      type: String,
+      required: false
     },
-    deviceType: { 
-      type: String, 
-      enum: ['android', 'ios', 'web'], 
-      required: false 
+    deviceType: {
+      type: String,
+      enum: ['android', 'ios', 'web'],
+      required: false
     },
-    viewCount :{
-      type:Number,
+    viewCount: {
+      type: Number,
     },
+    launchedIn: {
+      type: Date,
+      required: false,
+    },
+    openTime: {
+      type: String,
+      required: false
+    },
+    website: {
+      type: String,
+      required: false,
+    },
+    socialMediaLinks:[ {
+      type: String,
+      required: false
+    }],
+    closeTime: {
+      type: String,
+      required: false
+    },
+
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }
