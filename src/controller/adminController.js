@@ -728,6 +728,29 @@ const adminController = {
             next(error);
         }
     },
+    // ======================
+    getAllFollowing: async (req, res, next) => {
+        const { userId, limit, page } = req.params;
+        console.log(req.params, "kkk")
+
+        try {
+            const getAllFollowing = await adminService.getAllFollowing(req.params);
+
+
+            res.status(200).json({
+                status: 200,
+                data: getAllFollowing,
+            });
+        } catch (error) {
+            console.error("Error fetching getAllFollowing :", error.message);
+            error.statusCode = 400;
+            error.error = error.message;
+            console.error(error);
+            error.statuscode = 400;
+            next(error);
+        }
+    },
+    // ========================
 
     fetchUserPosts: async (req, res, next) => {
         const { userId, otherUserId, limit, page } = req.body;
@@ -1411,7 +1434,20 @@ const adminController = {
         }
     },
 
+    // =====================
+    getInterst: async (req, res) => {
+        try {
+            const getInterst = await adminService.getInterst()
+            res.status(200).json({ success: true, msg: "successfully fetched", getInterst })
+        } catch (error) {
+            console.log(error)
+            res.status(500).json({ success: false, msg: error.message })
+        }
 
+    },
+
+
+    
     getCollection: async (req, res) => {
         const { userId } = req.params;
         try {
@@ -1423,11 +1459,12 @@ const adminController = {
         }
 
     },
+    // ==============
     togglePin: async (req, res) => {
         const { userId, post_id } = req.body;
         try {
             const togglePin = await adminService.togglePin(req.body);
-            res.status(200).json({ success:true, togglePin })
+            res.status(200).json({ success: true, togglePin })
         }
         catch (error) {
             console.log(error)

@@ -4575,7 +4575,57 @@ const adminService = {
         }
     },
 
+    // ==========================
+    getAllFollowing: async (userId) => {
+        try {
+            if (!userId) {
+                throw new Error("userId is required");
+            }
 
+            const followings = await Follow.find(userId);
+
+            const followingDetails = await Promise.all(
+                followings.map(async (follow) => {
+                    const id = follow.followingId;
+
+
+                    let user = await businessregisterModel
+                        .findById(id)
+                        .select("_id businessName brand_logo");
+
+                    if (user) {
+                        return {
+                            user_id: user._id,
+                            name: user.businessName,
+                            profile_url: user.brand_logo,
+                        };
+                    }
+
+
+                    user = await registerModel
+                        .findById(id)
+                        .select("_id full_Name profile_url");
+
+                    if (user) {
+                        return {
+                            user_id: user._id,
+                            name: user.full_Name,
+                            profile_url: user.profile_url,
+                        };
+                    }
+
+                    return null;
+                })
+            );
+
+            return followingDetails.filter((user) => user !== null);
+        } catch (error) {
+            console.error("Error fetching followings:", error);
+            throw new Error("Failed to fetch following users");
+        }
+    },
+
+    // ===================
     fetchUserPosts: async (data) => {
         const { viewerId, profileOwnerId, page = 1, limit = 12 } = data;
         console.log(data)
@@ -5431,6 +5481,7 @@ const adminService = {
     },
     addInterest: async (data) => {
         const { user_id, interest } = data;
+        console.log(data)
         try {
             const addInterest = await registerModel.findByIdAndUpdate(user_id,
                 { interest: interest },
@@ -5443,7 +5494,23 @@ const adminService = {
     },
 
 
+    // =======================
+    getInterst: async () => {
 
+        try {
+            const getInterst = await registerModel.find({}, "interest");
+            const allInterests = getInterst
+                .map(user => user.interest)
+                .flat()
+                .filter(Boolean);
+            const uniqueInterests = [...new Set(allInterests)];
+
+            return uniqueInterests;
+        } catch (error) {
+            console.log(error)
+            throw error
+        }
+    },
 
 
     getCollection: async (userId) => {
@@ -5488,39 +5555,32 @@ const adminService = {
     togglePin: async (data) => {
         try {
             const { userId, post_id } = data;
-            console.log(data, "data")
 
             if (!userId || !post_id) {
-                throw new Error({ error: "post_id and post_id are required" });
+                throw new Error("userId and post_id are required");
             }
 
-            const post = await createPostModel.findById({ _id: post_id });
+            const post = await createPostModel.findById(post_id);
 
             if (!post) {
-                throw new Error({ error: "Post not found" });
+                throw new Error("Post not found");
             }
 
-            if (post.ispinned) {
-                post.ispinned = false;
-                await post.save();
-                return ({ message: "Post unpinned successfully", data: post });
-            }
-
-            await createPostModel.findOneAndUpdate(
-                { userId, ispinned: true },
-                { $set: { ispinned: false } }
-            );
-
-            // Now pin the selected post
-            post.ispinned = true;
+            // Toggle pin status
+            post.ispinned = !post.ispinned;
             await post.save();
 
-            return ({ message: "Post pinned successfully", data: post });
+            const message = post.ispinned
+                ? "Post pinned successfully"
+                : "Post unpinned successfully";
+
+            return { message, data: post };
         } catch (error) {
             console.error("Error toggling pin:", error);
-            throw new Error({ error: "Internal server error" });
+            throw new Error("Internal server error");
         }
     },
+
 
 
 
