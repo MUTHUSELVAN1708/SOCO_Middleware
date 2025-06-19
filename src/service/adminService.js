@@ -2431,6 +2431,7 @@ const adminService = {
                 user_id,
                 isBusinessAccount,
                 originalPostId,
+                postType,
                 caption = "",
                 mediaItems = []
             } = data;
@@ -2464,6 +2465,7 @@ const adminService = {
                 productId: originalPost.productId,
                 isBusinessAccount,
                 mediaItems: combinedMediaItems,
+                postType,
                 repostDetails: {
                     originalPostId: originalPost._id,
                     originalUserId: originalPost.userId,
@@ -2495,7 +2497,7 @@ const adminService = {
 
     createPostByProduct: async (data) => {
         try {
-            const { user_id, productId, mediaItems, caption,postType } = data;
+            const { user_id, productId, mediaItems, caption, postType } = data;
 
             const user = await businessregisterModel.findById(user_id);
             if (!user) throw new Error("Business user not found");
@@ -3770,7 +3772,10 @@ const adminService = {
         } = data;
 
         try {
-            const user = await registerModel.findById(user_id);
+            const user =
+                (await registerModel.findById(user_id)) ||
+                (await businessregisterModel.findOne({ _id: user_id }));
+
             if (!user) {
                 throw new Error("User not found");
             }

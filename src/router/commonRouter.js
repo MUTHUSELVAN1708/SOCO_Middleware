@@ -392,5 +392,6 @@ router.get("/getInterst",adminController.getInterst);
 router.get("/getCollection/:userId",adminController.getCollection);
 
 
-router.post("/togglePin",adminController.togglePin)
+router.post("/togglePin",adminController.togglePin);
+
 export default router;
