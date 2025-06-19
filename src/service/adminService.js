@@ -2354,6 +2354,7 @@ const adminService = {
                 isBusinessAccount,
                 caption,
                 webSiteLink,
+                postType,
                 mediaItems = [],
                 isRepost = false,
                 isOwnPost = true,
@@ -2383,6 +2384,7 @@ const adminService = {
                 userName,
                 userAvatar,
                 caption,
+                postType,
                 webSiteLink,
                 mediaItems,
                 isRepost,
@@ -2493,7 +2495,7 @@ const adminService = {
 
     createPostByProduct: async (data) => {
         try {
-            const { user_id, productId, mediaItems, caption } = data;
+            const { user_id, productId, mediaItems, caption,postType } = data;
 
             const user = await businessregisterModel.findById(user_id);
             if (!user) throw new Error("Business user not found");
@@ -2547,6 +2549,7 @@ const adminService = {
                 userId: user_id,
                 userName,
                 userAvatar,
+                postType,
                 productId: productId,
                 caption: finalCaption,
                 webSiteLink: "",

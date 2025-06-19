@@ -92,7 +92,7 @@ const createPostSchema = new mongoose.Schema({
   userName: { type: String, required: true },
   userAvatar: { type: String },
   productId: { type: String },
-
+  postType: { type: String, required: true },
 
   likesCount: { type: Number, default: 0 },
   commentsCount: { type: Number, default: 0 },
