@@ -1087,6 +1087,28 @@ const adminService = {
         }
     },
 
+    // ===================
+    getProfile: async (userId) => {
+        try {
+            if (!userId) throw new Error("userId is required");
+
+            let profile = await registerModel.findById(userId);
+
+            if (!profile) {
+                profile = await businessregisterModel.findById(userId);
+            }
+
+            if (!profile) {
+                throw new Error("User not found");
+            }
+
+            return profile;
+        } catch (error) {
+            console.error("Error in getProfile:", error);
+            throw error;
+        }
+    }
+    ,
     //   ========== User (Add & Update) ==========
     updateUserDetails: async (data) => {
         try {
@@ -4595,7 +4617,7 @@ const adminService = {
             const followingDetails = await Promise.all(
                 followings.map(async (follow) => {
                     const id = follow.followingId;
-
+                    const acc = follow.followingReference;
 
                     let user = await businessregisterModel
                         .findById(id)
@@ -4606,6 +4628,7 @@ const adminService = {
                             user_id: user._id,
                             name: user.businessName,
                             profile_url: user.brand_logo,
+                            acc
                         };
                     }
 
@@ -4619,6 +4642,7 @@ const adminService = {
                             user_id: user._id,
                             name: user.full_Name,
                             profile_url: user.profile_url,
+                            acc
                         };
                     }
 
