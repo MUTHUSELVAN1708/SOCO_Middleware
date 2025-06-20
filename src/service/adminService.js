@@ -442,6 +442,11 @@ const adminService = {
                 businessLat,
                 businessLng,
                 businessDescription,
+                launchedIn,
+                openTime,
+                closeTime,
+                website,
+                socialMediaLinks
             } = data;
 
             // console.log(data)
@@ -552,6 +557,7 @@ const adminService = {
                 year,
                 grade,
                 achievements,
+
             });
 
             // Create the address
@@ -605,7 +611,10 @@ const adminService = {
                 lng: businessLng || "",
                 description: businessDescription || "",
                 important,
-
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks, closeTime,
                 // Chat-related fields
                 onlineStatus,
                 isTyping,
@@ -840,6 +849,11 @@ const adminService = {
                 businessLat,
                 businessLng,
                 businessDescription,
+                closeTime,
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks,
                 accessAccountsIds = [] // New field for additional linked accounts
             } = data;
 
@@ -916,7 +930,12 @@ const adminService = {
                 lastOnline,
                 currentChatRoom,
                 unreadMessagesCount,
-                accessAccountsIds // Store linked account IDs
+                accessAccountsIds,
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks,
+                closeTime// Store linked account IDs
             });
 
             if (natureOfBusiness) {
@@ -972,6 +991,10 @@ const adminService = {
                 busPhone,
                 businessType,
                 natureOfBusiness,
+                launchedIn,
+                openTime,
+                website,
+                socialMediaLinks, closeTime,
             } = data;
 
             let errors = [];
@@ -1043,6 +1066,11 @@ const adminService = {
                 ...(busPhone && { businessPhone: busPhone }),
                 ...(businessType && { businessType }),
                 ...(natureOfBusiness && { natureOfBusiness }),
+                ...(launchedIn && { launchedIn }),
+                ...(openTime && { openTime }),
+                ...(website && { website }),
+                ...(socialMediaLinks && { socialMediaLinks }),
+                ...(closeTime && { closeTime }),
             };
 
             // Update the business profile
@@ -2326,6 +2354,7 @@ const adminService = {
                 isBusinessAccount,
                 caption,
                 webSiteLink,
+                postType,
                 mediaItems = [],
                 isRepost = false,
                 isOwnPost = true,
@@ -2355,6 +2384,7 @@ const adminService = {
                 userName,
                 userAvatar,
                 caption,
+                postType,
                 webSiteLink,
                 mediaItems,
                 isRepost,
@@ -2401,6 +2431,7 @@ const adminService = {
                 user_id,
                 isBusinessAccount,
                 originalPostId,
+                postType,
                 caption = "",
                 mediaItems = []
             } = data;
@@ -2434,6 +2465,7 @@ const adminService = {
                 productId: originalPost.productId,
                 isBusinessAccount,
                 mediaItems: combinedMediaItems,
+                postType,
                 repostDetails: {
                     originalPostId: originalPost._id,
                     originalUserId: originalPost.userId,
@@ -2465,7 +2497,7 @@ const adminService = {
 
     createPostByProduct: async (data) => {
         try {
-            const { user_id, productId, mediaItems, caption } = data;
+            const { user_id, productId, mediaItems, caption, postType } = data;
 
             const user = await businessregisterModel.findById(user_id);
             if (!user) throw new Error("Business user not found");
@@ -2519,6 +2551,7 @@ const adminService = {
                 userId: user_id,
                 userName,
                 userAvatar,
+                postType,
                 productId: productId,
                 caption: finalCaption,
                 webSiteLink: "",
@@ -2817,6 +2850,7 @@ const adminService = {
                         timestamp: post.timestamp,
                         isFavorite,
                         isBookmarked,
+                        ispinned: post.ispinned
                     };
                 })
             );
@@ -3738,7 +3772,10 @@ const adminService = {
         } = data;
 
         try {
-            const user = await registerModel.findById(user_id);
+            const user =
+                (await registerModel.findById(user_id)) ||
+                (await businessregisterModel.findOne({ _id: user_id }));
+
             if (!user) {
                 throw new Error("User not found");
             }
@@ -4079,7 +4116,7 @@ const adminService = {
                 isOwnPost: post.isOwnPost,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-
+                ispinned: post.ispinned,
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -4546,7 +4583,57 @@ const adminService = {
         }
     },
 
+    // ==========================
+    getAllFollowing: async (userId) => {
+        try {
+            if (!userId) {
+                throw new Error("userId is required");
+            }
 
+            const followings = await Follow.find(userId);
+
+            const followingDetails = await Promise.all(
+                followings.map(async (follow) => {
+                    const id = follow.followingId;
+
+
+                    let user = await businessregisterModel
+                        .findById(id)
+                        .select("_id businessName brand_logo");
+
+                    if (user) {
+                        return {
+                            user_id: user._id,
+                            name: user.businessName,
+                            profile_url: user.brand_logo,
+                        };
+                    }
+
+
+                    user = await registerModel
+                        .findById(id)
+                        .select("_id full_Name profile_url");
+
+                    if (user) {
+                        return {
+                            user_id: user._id,
+                            name: user.full_Name,
+                            profile_url: user.profile_url,
+                        };
+                    }
+
+                    return null;
+                })
+            );
+
+            return followingDetails.filter((user) => user !== null);
+        } catch (error) {
+            console.error("Error fetching followings:", error);
+            throw new Error("Failed to fetch following users");
+        }
+    },
+
+    // ===================
     fetchUserPosts: async (data) => {
         const { viewerId, profileOwnerId, page = 1, limit = 12 } = data;
         console.log(data)
@@ -5402,6 +5489,7 @@ const adminService = {
     },
     addInterest: async (data) => {
         const { user_id, interest } = data;
+        console.log(data)
         try {
             const addInterest = await registerModel.findByIdAndUpdate(user_id,
                 { interest: interest },
@@ -5414,7 +5502,23 @@ const adminService = {
     },
 
 
+    // =======================
+    getInterst: async () => {
 
+        try {
+            const getInterst = await registerModel.find({}, "interest");
+            const allInterests = getInterst
+                .map(user => user.interest)
+                .flat()
+                .filter(Boolean);
+            const uniqueInterests = [...new Set(allInterests)];
+
+            return uniqueInterests;
+        } catch (error) {
+            console.log(error)
+            throw error
+        }
+    },
 
 
     getCollection: async (userId) => {
@@ -5450,7 +5554,42 @@ const adminService = {
             console.log(error);
             throw error;
         }
-    }
+    },
+
+
+
+    // ==================
+
+    togglePin: async (data) => {
+        try {
+            const { userId, post_id } = data;
+
+            if (!userId || !post_id) {
+                throw new Error("userId and post_id are required");
+            }
+
+            const post = await createPostModel.findById(post_id);
+
+            if (!post) {
+                throw new Error("Post not found");
+            }
+
+            // Toggle pin status
+            post.ispinned = !post.ispinned;
+            await post.save();
+
+            const message = post.ispinned
+                ? "Post pinned successfully"
+                : "Post unpinned successfully";
+
+            return { message, data: post };
+        } catch (error) {
+            console.error("Error toggling pin:", error);
+            throw new Error("Internal server error");
+        }
+    },
+
+
 
 
 

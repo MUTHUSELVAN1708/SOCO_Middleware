@@ -423,8 +423,8 @@ export const getProductCategories = async (req, res) => {
 
   try {
     const products = await Product.find({
-        createdBy,
-        status: { $ne: "Deactivate" }
+      createdBy,
+      status: { $ne: "Deactivate" }
     }).select("basicInfo.categories images");
 
 
@@ -1269,7 +1269,7 @@ export const getBusinessAnalytics = async (req, res, next) => {
       {
         $project: {
           _id: 0,
-          gender: "$_id",
+          _id: "$_id",
           count: 1
         }
       }
@@ -1379,6 +1379,20 @@ export const getBusinessAnalytics = async (req, res, next) => {
         }
       }
     ]);
+    const [newOrders,cancelledOrders, deliveredOrders, confirmedOrders] = await Promise.all([
+      Order.countDocuments({ seller_id: id, order_status: "Pending" }),
+      Order.countDocuments({ seller_id: id, order_status: "Cancelled" }),
+      Order.countDocuments({ seller_id: id, order_status: "Delivered" }),
+      Order.countDocuments({ seller_id: id, order_status: "Confirmed" }),
+    ]);
+
+    const orderSummary = {
+      newOrders,
+      cancelledOrders,
+      deliveredOrders,
+      confirmedOrders
+    };
+
 
     res.status(200).json({
       success: true,
@@ -1386,9 +1400,10 @@ export const getBusinessAnalytics = async (req, res, next) => {
       data: {
         totalVisitors,
         repeatVisitors: repeatVisitorsCount,
-        topCities: cityStats,
+        cityStats: cityStats,
         genderStats,
         ageCategory,
+        orderSummary,
         interestCategory
       }
     });

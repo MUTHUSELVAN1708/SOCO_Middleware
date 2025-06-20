@@ -92,25 +92,24 @@ const createPostSchema = new mongoose.Schema({
   userName: { type: String, required: true },
   userAvatar: { type: String },
   productId: { type: String },
-
+  postType: { type: String, required: false },
 
   likesCount: { type: Number, default: 0 },
   commentsCount: { type: Number, default: 0 },
   viewsCount: { type: Number, default: 0 },
   sharesCount: { type: Number, default: 0 },
   rePostCount: { type: Number, default: 0 },
-
+  // category: [{ type: String, required: true }],
   caption: { type: String },
   webSiteLink: { type: String },
   timestamp: { type: Date, default: Date.now },
-   Product_status: { type: String ,default:"Activated"},
+  Product_status: { type: String, default: "Activated" },
   mediaItems: { type: [mediaItemSchema], default: [] },
-
   isRepost: { type: Boolean, default: false },
   isOwnPost: { type: Boolean, default: true },
   isProductPost: { type: Boolean, default: false },
   isBusinessAccount: { type: Boolean, default: false },
-
+  ispinned: { type: Boolean, default: false },
   repostDetails: { type: repostDetailsSchema, default: null },
 }, {
   versionKey: false,

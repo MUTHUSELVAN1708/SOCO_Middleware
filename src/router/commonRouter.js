@@ -342,7 +342,7 @@ router.get("/getFollowing/:id", adminController.getFollowing);
 router.put("/AcceptRequest", adminController.AcceptRequest);
 router.get("/suggestUsers/:id", adminController.suggestUsers);
 router.get("/getMentionUser", adminController.getMentionUser);
-
+router.get("/getAllFollowing/:userId",adminController.getAllFollowing);
 router.post("/addMention",adminController.addMention);
 
 router.get("/getDynamicFollowers/:id",adminController.getDynamicFollowers);
@@ -388,5 +388,10 @@ router.get("/getUserFavorites",adminController.getUserFavorites );
 router.get("/getUserBookmarks",adminController.getUserBookmarks );
 
 router.put("/addInterest",adminController.addInterest);
+router.get("/getInterst",adminController.getInterst);
 router.get("/getCollection/:userId",adminController.getCollection);
+
+
+router.post("/togglePin",adminController.togglePin);
+
 export default router;

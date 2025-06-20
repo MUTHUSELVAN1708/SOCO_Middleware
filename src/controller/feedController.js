@@ -221,16 +221,23 @@ export const getDashboardFeed = async (req, res) => {
     const user = isBusinessAccount
       ? await businessRegisterModel.findById(objectId)
       : await registerModel.findById(objectId);
-
+console.log(user,"user")
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const tracked = await trackingModel.findOne({ user_id: objectId }).select("sentPosts.post_id").lean();
+    console.log(tracked,"oooo")
+    const trackedPostIds = (tracked?.sentPosts || []).map(entry => entry.post_id);
+
+    
+
     const posts = await createPostModel
-      .find({})
+      .find({ _id: { $nin: trackedPostIds } })
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit);
+
 
     const totalResults = await createPostModel.countDocuments({});
     const totalPages = Math.ceil(totalResults / limit);
