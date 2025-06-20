@@ -1269,7 +1269,7 @@ export const getBusinessAnalytics = async (req, res, next) => {
       {
         $project: {
           _id: 0,
-          gender: "$_id",
+          _id: "$_id",
           count: 1
         }
       }
@@ -1400,7 +1400,7 @@ export const getBusinessAnalytics = async (req, res, next) => {
       data: {
         totalVisitors,
         repeatVisitors: repeatVisitorsCount,
-        topCities: cityStats,
+        cityStats: cityStats,
         genderStats,
         ageCategory,
         orderSummary,
