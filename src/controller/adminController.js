@@ -216,11 +216,9 @@ const adminController = {
             });
         } catch (error) {
             console.error(error);
-            // Ensure error structure is consistent
-            error.status = error.status || 400; // Default to 400 if no status set
+            error.status = error.status || 400;
             error.message = error.message || 'Something went wrong';
 
-            // Pass the error to the next middleware
             next(error);
         }
     },
@@ -244,6 +242,25 @@ const adminController = {
         }
     },
 
+    // ====================
+    getProfile: async (req, res) => {
+        const { userId } = req.params;
+        try {
+            const getProfile = await adminService.getProfile(userId);
+            res.status(200).json({
+                status: 200,
+                msg: "Successfully fetched",
+                data: getProfile,
+            });
+        } catch (error) {
+            console.error(error);
+            error.status = error.status || 400;
+            error.message = error.message || 'Something went wrong';
+
+            next(error);
+        }
+
+    },
 
     // ==============================
     login: async (req, res, next) => {
@@ -1447,7 +1464,7 @@ const adminController = {
     },
 
 
-    
+
     getCollection: async (req, res) => {
         const { userId } = req.params;
         try {

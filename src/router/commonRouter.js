@@ -105,7 +105,7 @@ router.post("/addAccessIdToBusinessAccount", adminController.addAccessIdToBusine
 router.post("/registerBusinessAccount", adminController.registerBusinessAccount);
 router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 
-
+router.get("/getProfile/:userId",adminController.getProfile);
         
 
 
