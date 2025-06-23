@@ -3807,6 +3807,7 @@ const adminService = {
     cart: async (data) => {
         const {
             user_id,
+            post_id,
             product_id,
             images,
             colors,
@@ -3846,6 +3847,7 @@ const adminService = {
             if (cartItem) {
                 cartItem.quantity += Number(quantity);
                 cartItem.unit = unit;
+                cartItem.post_id = post_id;
                 cartItem.productName = productName || product.productName;
                 cartItem.size = size || product.size;
                 cartItem.images = images || product.images;
@@ -3856,6 +3858,7 @@ const adminService = {
             } else {
                 cartItem = await cartModel.create({
                     user_id,
+                    post_id,
                     product_id,
                     productName: productName || product.productName,
                     size: size || product.size,

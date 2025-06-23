@@ -18,4 +18,6 @@ router.get("/analytics",getBusinessAnalytics);
 router.put("/De-ActivateProdct",deactivateProduct);
 // =========deactivateProduct
 router.post("/visitPage",visitPage);
+
+// router.get("similarProduct",similarProduct);
 export default router;
