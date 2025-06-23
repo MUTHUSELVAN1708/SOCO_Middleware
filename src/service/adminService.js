@@ -98,55 +98,48 @@ const adminService = {
     },
 
     // ==================
-    verifyEmail: async (email, context = 'register') => {
-    try {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            throw new Error("Invalid email format");
-        }
-
-        if (context === 'register') {
+    verifyEmail: async (email) => {
+        // console.log(email)
+        try {
             const existingEmail = await registerModel.findOne({ email });
             if (existingEmail) {
                 throw new Error("Email already exists");
             }
-        }
-
-        if (context === 'forgot') {
-            const existingEmail = await registerModel.findOne({ email });
-            if (!existingEmail) {
-                throw new Error("Email not found");
+            // console.log(existingEmail)
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                throw new Error("Invalid email format");
             }
-        }
 
-        const otp = otpGenerator.generate(4, {
-            digits: true,
-            specialChars: false,
-            lowerCaseAlphabets: false,
-            upperCaseAlphabets: false,
-        });
-
-        await adminService.SendOTPEmail(email, otp);
-
-        const hashedOtp = await bcrypt.hash(otp, 10);
-        const existingOtpRecord = await otpModel.findOne({ email });
-
-        if (existingOtpRecord) {
-            existingOtpRecord.reg_otp = hashedOtp;
-            await existingOtpRecord.save();
-            return existingOtpRecord;
-        } else {
-            const otpRecord = await otpModel.create({
-                email,
-                reg_otp: hashedOtp,
+            const otp = otpGenerator.generate(4, {
+                digits: true,
+                specialChars: false,
+                lowerCaseAlphabets: false,
+                upperCaseAlphabets: false,
             });
-            return otpRecord;
-        }
+            // console.log(otp, "otp")
+            const emailSent = await adminService.SendOTPEmail(email, otp);
+            const existingOtpRecord = await otpModel.findOne({ email });
+            if (existingOtpRecord) {
+                const hashedOtp = await bcrypt.hash(otp, 10);
+                existingOtpRecord.reg_otp = hashedOtp;
+                await existingOtpRecord.save();
+                return existingOtpRecord;
+            } else {
+                const hashedOtp = await bcrypt.hash(otp, 10);
+                const otpRecord = await otpModel.create({
+                    email,
+                    reg_otp: hashedOtp,
+                });
 
-    } catch (error) {
-        throw new Error(error.message || "Failed to verify email");
-    }
-},
+                return otpRecord
+            }
+
+        } catch (error) {
+            // console.error("Error in verifyEmail service:", error);
+            throw new Error(error.message || "Failed to verify email");
+        }
+    },
 
     // ====================
     storedOtp: async (user_id, reg_otp) => {
@@ -453,7 +446,8 @@ const adminService = {
                 openTime,
                 closeTime,
                 website,
-                socialMediaLinks
+                socialMediaLinks,
+                service_category
             } = data;
 
             // console.log(data)
@@ -621,6 +615,7 @@ const adminService = {
                 launchedIn,
                 openTime,
                 website,
+                service_category,
                 socialMediaLinks, closeTime,
                 // Chat-related fields
                 onlineStatus,
@@ -860,6 +855,7 @@ const adminService = {
                 launchedIn,
                 openTime,
                 website,
+                service_category,
                 socialMediaLinks,
                 accessAccountsIds = [] // New field for additional linked accounts
             } = data;
@@ -941,8 +937,9 @@ const adminService = {
                 launchedIn,
                 openTime,
                 website,
+                service_category,
                 socialMediaLinks,
-                closeTime// Store linked account IDs
+                closeTime
             });
 
             if (natureOfBusiness) {
@@ -1001,8 +998,10 @@ const adminService = {
                 launchedIn,
                 openTime,
                 website,
+                service_category,
                 socialMediaLinks, closeTime,
             } = data;
+            console.log(data, "data")
 
             let errors = [];
             if (!businessId) errors.push("Business ID is required.");
@@ -1010,7 +1009,6 @@ const adminService = {
                 throw { status: 400, message: errors.join(" ") };
             }
 
-            // Fetch the existing business profile using businessId
             const existingBusiness = await businessregisterModel.findById(businessId);
             if (!existingBusiness) {
                 throw { status: 404, message: "Business profile not found for the given business ID." };
@@ -1018,20 +1016,18 @@ const adminService = {
 
             const userId = existingBusiness.user_id;
 
-            // Fetch the user document using the userId found in businessregisterModel
             const existingUser = await registerModel.findById(userId);
             if (!existingUser) {
                 throw { status: 404, message: "User not found for the given user ID in business profile." };
             }
 
-            // Check for duplicate businessName (case-insensitive, trimmed), phone, or email
             const duplicateCheck = await businessregisterModel.findOne({
                 $or: [
                     { businessName: { $regex: `^${businessName.trim()}$`, $options: "i" } },
                     { businessPhone: phn_number },
                     { businessEmail: email }
                 ],
-                _id: { $ne: businessId }, // Exclude the current document
+                _id: { $ne: businessId },
             });
 
             if (duplicateCheck) {
@@ -1050,7 +1046,6 @@ const adminService = {
                 throw { status: 400, message: errors.join(" ") };
             }
 
-            // Prepare updated business fields
             const updatedBusinessFields = {
                 ...(businessName && { businessName: businessName.trim() }),
                 ...(phn_number && { businessPhone: phn_number }),
@@ -1078,9 +1073,10 @@ const adminService = {
                 ...(website && { website }),
                 ...(socialMediaLinks && { socialMediaLinks }),
                 ...(closeTime && { closeTime }),
+                ...(service_category && { service_category }),
+
             };
 
-            // Update the business profile
             const updatedBusiness = await businessregisterModel.findByIdAndUpdate(
                 existingBusiness._id,
                 { $set: updatedBusinessFields },
@@ -1094,6 +1090,27 @@ const adminService = {
         }
     },
 
+
+    // =======================
+    updateSomeBusinessDetails: async (data) => {
+        const { businessId, launchedIn, openTime, website, service_category, socialMediaLinks, closeTime } = data;
+        try {
+            const updateSomeBusinessDetails = await businessregisterModel.findByIdAndUpdate(businessId,
+                {
+                    launchedIn,
+                    openTime,
+                    website,
+                    socialMediaLinks,
+                    closeTime,
+                    service_category
+                },
+                { new: true }
+            )
+            return updateSomeBusinessDetails
+        } catch (error) {
+            throw { status: error.status || 500, message: error.message || "Internal Server Error" };
+        }
+    },
     // ===================
     getProfile: async (userId) => {
         try {

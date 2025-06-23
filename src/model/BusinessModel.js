@@ -97,7 +97,7 @@ const BusinessregisterSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
-    socialMediaLinks:[ {
+    socialMediaLinks: [{
       type: String,
       required: false
     }],
@@ -105,7 +105,10 @@ const BusinessregisterSchema = new mongoose.Schema(
       type: String,
       required: false
     },
-
+    service_category: {
+      type: String,
+      required: false
+    },
     timestamp: { type: Date, default: Date.now },
   },
   { versionKey: false }

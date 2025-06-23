@@ -26,22 +26,22 @@ const adminController = {
     },
     // =================
     verifyEmail: async (req, res, next) => {
-    const { email } = req.params;
-    const { context } = req.query; // 'register' or 'forgot'
-    try {
-        const verifyEmailResult = await adminService.verifyEmail(email, context);
-        res.status(200).json({
-            status: 200,
-            msg: "OTP sent to email successfully",
-            data: verifyEmailResult
-        });
-    } catch (error) {
-        error.error = error.message;
-        error.statuscode = 400;
-        next(error);
+        const { email } = req.params;
+        const { context } = req.query; // 'register' or 'forgot'
+        try {
+            const verifyEmailResult = await adminService.verifyEmail(email, context);
+            res.status(200).json({
+                status: 200,
+                msg: "OTP sent to email successfully",
+                data: verifyEmailResult
+            });
+        } catch (error) {
+            error.error = error.message;
+            error.statuscode = 400;
+            next(error);
+        }
     }
-}
-,
+    ,
 
     verifyNameUnique: async (req, res, next) => {
         try {
@@ -243,6 +243,22 @@ const adminController = {
         }
     },
 
+    // =============================
+    updateSomeBusinessDetails: async (req, res, next) => {
+        try {
+            const updateSomeBusinessDetails = await adminService.updateSomeBusinessDetails(req.body);
+            res.status(200).json({
+                status: 200,
+                msg: "Successfully updated",
+                data: updateSomeBusinessDetails,
+            });
+        } catch (error) {
+            console.error(error);
+            error.status = error.status || 400;
+            error.message = error.message || 'Something went wrong';
+            next(error);
+        }
+    },
     // ====================
     getProfile: async (req, res) => {
         const { userId } = req.params;
