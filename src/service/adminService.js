@@ -98,48 +98,55 @@ const adminService = {
     },
 
     // ==================
-    verifyEmail: async (email) => {
-        // console.log(email)
-        try {
+    verifyEmail: async (email, context = 'register') => {
+    try {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error("Invalid email format");
+        }
+
+        if (context === 'register') {
             const existingEmail = await registerModel.findOne({ email });
             if (existingEmail) {
                 throw new Error("Email already exists");
             }
-            // console.log(existingEmail)
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                throw new Error("Invalid email format");
-            }
-
-            const otp = otpGenerator.generate(4, {
-                digits: true,
-                specialChars: false,
-                lowerCaseAlphabets: false,
-                upperCaseAlphabets: false,
-            });
-            // console.log(otp, "otp")
-            const emailSent = await adminService.SendOTPEmail(email, otp);
-            const existingOtpRecord = await otpModel.findOne({ email });
-            if (existingOtpRecord) {
-                const hashedOtp = await bcrypt.hash(otp, 10);
-                existingOtpRecord.reg_otp = hashedOtp;
-                await existingOtpRecord.save();
-                return existingOtpRecord;
-            } else {
-                const hashedOtp = await bcrypt.hash(otp, 10);
-                const otpRecord = await otpModel.create({
-                    email,
-                    reg_otp: hashedOtp,
-                });
-
-                return otpRecord
-            }
-
-        } catch (error) {
-            // console.error("Error in verifyEmail service:", error);
-            throw new Error(error.message || "Failed to verify email");
         }
-    },
+
+        if (context === 'forgot') {
+            const existingEmail = await registerModel.findOne({ email });
+            if (!existingEmail) {
+                throw new Error("Email not found");
+            }
+        }
+
+        const otp = otpGenerator.generate(4, {
+            digits: true,
+            specialChars: false,
+            lowerCaseAlphabets: false,
+            upperCaseAlphabets: false,
+        });
+
+        await adminService.SendOTPEmail(email, otp);
+
+        const hashedOtp = await bcrypt.hash(otp, 10);
+        const existingOtpRecord = await otpModel.findOne({ email });
+
+        if (existingOtpRecord) {
+            existingOtpRecord.reg_otp = hashedOtp;
+            await existingOtpRecord.save();
+            return existingOtpRecord;
+        } else {
+            const otpRecord = await otpModel.create({
+                email,
+                reg_otp: hashedOtp,
+            });
+            return otpRecord;
+        }
+
+    } catch (error) {
+        throw new Error(error.message || "Failed to verify email");
+    }
+},
 
     // ====================
     storedOtp: async (user_id, reg_otp) => {
