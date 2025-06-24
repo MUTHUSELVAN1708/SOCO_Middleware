@@ -1379,7 +1379,7 @@ export const getBusinessAnalytics = async (req, res, next) => {
         }
       }
     ]);
-    const [newOrders,cancelledOrders, deliveredOrders, confirmedOrders] = await Promise.all([
+    const [newOrders, cancelledOrders, deliveredOrders, confirmedOrders] = await Promise.all([
       Order.countDocuments({ seller_id: id, order_status: "Pending" }),
       Order.countDocuments({ seller_id: id, order_status: "Cancelled" }),
       Order.countDocuments({ seller_id: id, order_status: "Delivered" }),
@@ -1470,7 +1470,6 @@ export const deactivateProduct = async (req, res) => {
   console.log(req.query, "Received query params");
 
   try {
-    // Step 1: Update product status in the Product collection
     const updatedProduct = await Product.findByIdAndUpdate(
       product_id,
       { status },
@@ -1481,7 +1480,6 @@ export const deactivateProduct = async (req, res) => {
       return res.status(404).json({ status: false, message: "Product not found" });
     }
 
-    // Step 2: Update all posts where mediaItems contain this productId
     const updatedPosts = await createPostModel.updateMany(
       { 'mediaItems.productId': product_id },
       { $set: { Product_status: status } }
@@ -1503,3 +1501,66 @@ export const deactivateProduct = async (req, res) => {
   }
 };
 
+
+export const similarProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({ message: "Product ID is required" });
+    }
+
+    const product = await Product.findById(productId).lean();
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const categories = product?.basicInfo?.categories || {};
+    const categoryKeys = Object.keys(categories);
+    if (categoryKeys.length === 0) {
+      return res.status(400).json({ message: "No valid category found in product" });
+    }
+
+    const mainCategory = categoryKeys[0];
+
+    // Get similar products
+    const similarProductsRaw = await Product.find({
+      _id: { $ne: productId },
+      [`basicInfo.categories.${mainCategory}`]: { $exists: true },
+      status: "Activate"
+    }).limit(10).lean();
+
+    const similarProducts = similarProductsRaw.map(product => {
+      const productIdStr = product._id?.toString();
+      return {
+        product_id: product._id,
+        productName: product?.basicInfo?.productTitle || "Unknown",
+        images: product?.images || [],
+        category: product?.basicInfo?.categories || null,
+        color: product?.variants?.[0]?.color || null,
+        size: product?.variants?.[0]?.variant || null,
+        quantity: product?.variants?.[0]?.quantity || 0,
+        price: Number(product?.pricing?.salePrice || 0),
+        gst: Number(product?.pricing?.gstDetails?.gstPercentage || 0),
+        originalPrice: Number(product?.pricing?.regularPrice || 0),
+        discount: Number(product?.pricing?.discount || 0),
+        unit: product?.unit || "N/A"
+      };
+    });
+
+    return res.status(200).json({
+      category: mainCategory,
+      similarProducts
+    });
+
+  } catch (error) {
+    console.error("Error in similarProduct:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
+
+export const recommentProduct=async(req,res)=>{
+  
+}
