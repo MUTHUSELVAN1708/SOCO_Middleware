@@ -9,6 +9,7 @@ import registerModel from '../model/registerModel.js';
 import createPostModel from '../model/createPostModel.js';
 import ReviewModel from '../model/reviewModel.js';
 import Follow from '../model/FollowModel.js';
+import followerModel from '../model/followerModel.js';
 
 const ERROR_MESSAGES = {
   VALIDATION: {
@@ -636,10 +637,10 @@ export const getProduct = async (req, res) => {
         sort = { createdAt: -1 };
         break;
       case 'nameAsc':
-        sort = { name: 1 };
+        sort = { "basicInfo.productTitle": 1 };
         break;
       case 'nameDesc':
-        sort = { name: -1 };
+        sort = { "basicInfo.productTitle": -1 };
         break;
       case 'priceAsc':
         sort = { salePriceNum: 1 };
@@ -1379,7 +1380,7 @@ export const getBusinessAnalytics = async (req, res, next) => {
         }
       }
     ]);
-    const [newOrders,cancelledOrders, deliveredOrders, confirmedOrders] = await Promise.all([
+    const [newOrders, cancelledOrders, deliveredOrders, confirmedOrders] = await Promise.all([
       Order.countDocuments({ seller_id: id, order_status: "Pending" }),
       Order.countDocuments({ seller_id: id, order_status: "Cancelled" }),
       Order.countDocuments({ seller_id: id, order_status: "Delivered" }),
@@ -1470,7 +1471,6 @@ export const deactivateProduct = async (req, res) => {
   console.log(req.query, "Received query params");
 
   try {
-    // Step 1: Update product status in the Product collection
     const updatedProduct = await Product.findByIdAndUpdate(
       product_id,
       { status },
@@ -1481,7 +1481,6 @@ export const deactivateProduct = async (req, res) => {
       return res.status(404).json({ status: false, message: "Product not found" });
     }
 
-    // Step 2: Update all posts where mediaItems contain this productId
     const updatedPosts = await createPostModel.updateMany(
       { 'mediaItems.productId': product_id },
       { $set: { Product_status: status } }
@@ -1503,3 +1502,300 @@ export const deactivateProduct = async (req, res) => {
   }
 };
 
+
+// export const similarProduct = async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+
+//     if (!productId) {
+//       return res.status(400).json({ message: "Product ID is required" });
+//     }
+
+//     const product = await Product.findById(productId).lean();
+//     if (!product) {
+//       return res.status(404).json({ message: "Product not found" });
+//     }
+
+//     const categories = product?.basicInfo?.categories || {};
+//     const categoryKeys = Object.keys(categories);
+//     if (categoryKeys.length === 0) {
+//       return res.status(400).json({ message: "No valid category found in product" });
+//     }
+
+//     const mainCategory = categoryKeys[0];
+
+//     const similarProductsRaw = await Product.find({
+//       _id: { $ne: productId },
+//       [`basicInfo.categories.${mainCategory}`]: { $exists: true },
+//       status: "Activate"
+//     }).limit(10).lean();
+
+//     const similarProductIds = similarProductsRaw.map(p => p._id.toString());
+
+//     const posts = await createPostModel.find({
+//       productId: { $in: similarProductIds }
+//     }).select("productId _id").lean();
+
+//     const productPostMap = new Map();
+//     posts.forEach(p => {
+//       productPostMap.set(p.productId.toString(), p._id.toString());
+//     });
+
+//     const getFollowing=await Follow.find({userId});
+//     console.log(getFollowing,"getFollowing")
+//     const similarProducts = similarProductsRaw.map(product => {
+//       const productIdStr = product._id?.toString();
+//       return {
+//         post_id: productPostMap.get(productIdStr) || null,
+//         product_id: product._id,
+//         productName: product?.basicInfo?.productTitle || "Unknown",
+//         images: product?.images || [],
+//         category: product?.basicInfo?.categories || null,
+//         color: product?.variants?.[0]?.color || null,
+//         size: product?.variants?.[0]?.variant || null,
+//         quantity: product?.variants?.[0]?.quantity || 0,
+//         price: Number(product?.pricing?.salePrice || 0),
+//         gst: Number(product?.pricing?.gstDetails?.gstPercentage || 0),
+//         originalPrice: Number(product?.pricing?.regularPrice || 0),
+//         discount: Number(product?.pricing?.discount || 0),
+//         unit: product?.unit || "N/A",
+//         rating: product?.ratings?.averageRating || 0
+//       };
+//     });
+
+//     return res.status(200).json({
+//       category: mainCategory,
+//       similarProducts
+//     });
+
+//   } catch (error) {
+//     console.error("Error in similarProduct:", error);
+//     return res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
+
+export const recommendedProducts = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Step 1: Get followers and followings
+    const followData = await Follow.find({
+      $or: [{ userId }, { followingId: userId }]
+    }).lean();
+
+    const followers = [];
+    const following = [];
+
+    followData.forEach(entry => {
+      if (entry.followingId === userId) {
+        followers.push(entry.userId); // they follow me
+      } else if (entry.userId === userId) {
+        following.push(entry.followingId); // I follow them
+      }
+    });
+
+    const socialCircle = [...new Set([...followers, ...following])];
+
+    if (socialCircle.length === 0) {
+      return res.status(200).json({ recommended: [] });
+    }
+
+    // Step 2: Find all orders by followers/followings
+    const orders = await Order.find({ user_id: { $in: socialCircle } }).lean();
+
+    const productToUserMap = new Map();
+    for (const order of orders) {
+      const prodId = order.product_id.toString();
+      if (!productToUserMap.has(prodId)) {
+        productToUserMap.set(prodId, []);
+      }
+      productToUserMap.get(prodId).push(order.user_id.toString());
+    }
+
+    const recommendedProductIds = Array.from(productToUserMap.keys());
+
+    if (recommendedProductIds.length === 0) {
+      return res.status(200).json({ recommended: [] });
+    }
+
+    // Step 3: Fetch product details
+    const products = await Product.find({
+      _id: { $in: recommendedProductIds },
+      status: { $ne: "Deactivate" }
+    }).lean();
+
+    // Step 4: Fetch user names
+    const buyerUserIds = Array.from(
+      new Set(orders.map(o => o.user_id.toString()))
+    );
+    const buyers = await registerModel
+      .find({ _id: { $in: buyerUserIds } })
+      .select("_id full_Name")
+      .lean();
+    console.log(buyers, "buyers")
+    const userNameMap = new Map();
+    buyers.forEach(user => {
+      userNameMap.set(user._id.toString(), user.userName);
+    });
+
+    // Step 5: Format recommended product list
+    const recommended = products.map(product => {
+      const buyerIds = productToUserMap.get(product._id.toString()) || [];
+
+      return {
+        product_id: product._id,
+        productName: product.basicInfo?.productTitle || "Unknown",
+        price: product.pricing?.salePrice || 0,
+        image: product.images?.[0] || null,
+        boughtBy: buyerIds.map(id => userNameMap.get(id) || "Unknown")
+      };
+    });
+
+    return res.status(200).json({ recommended });
+
+  } catch (error) {
+    console.error("Error in recommendedProducts:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
+export const similarProduct = async (req, res) => {
+  try {
+    const { userId,productId } = req.body;
+
+    if (!productId || !userId) {
+      return res.status(400).json({ message: "Product ID and User ID are required" });
+    }
+
+    // Fetch base product
+    const product = await Product.findById(productId).lean();
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const categories = product?.basicInfo?.categories || {};
+    const categoryKeys = Object.keys(categories);
+    if (categoryKeys.length === 0) {
+      return res.status(400).json({ message: "No valid category found in product" });
+    }
+
+    const mainCategory = categoryKeys[0];
+
+    // Fetch similar products
+    const similarProductsRaw = await Product.find({
+      _id: { $ne: productId },
+      [`basicInfo.categories.${mainCategory}`]: { $exists: true },
+      status: { $ne: "Deactivate" }
+    }).limit(10).lean();
+
+    const similarProductIds = similarProductsRaw.map(p => p._id.toString());
+
+    const posts = await createPostModel.find({
+      productId: { $in: similarProductIds }
+    }).select("productId _id").lean();
+
+    const productPostMap = new Map(posts.map(p => [p.productId.toString(), p._id.toString()]));
+
+    // Get user's social circle
+    const followDocs = await Follow.find({
+      $or: [{ userId }, { followingId: userId }]
+    }).lean();
+
+    const followers = [], following = [];
+
+    followDocs.forEach(doc => {
+      if (doc.followingId === userId) followers.push(doc.userId);
+      else if (doc.userId === userId) following.push(doc.followingId);
+    });
+
+    const socialCircle = [...new Set([...followers, ...following])];
+
+    // Build similar product response
+    const similarProducts = similarProductsRaw.map(product => {
+      const productIdStr = product._id?.toString();
+      return {
+        post_id: productPostMap.get(productIdStr) || null,
+        product_id: product._id,
+        productName: product?.basicInfo?.productTitle || "Unknown",
+        images: product?.images || [],
+        category: product?.basicInfo?.categories || null,
+        color: product?.variants?.[0]?.color || null,
+        size: product?.variants?.[0]?.variant || null,
+        quantity: product?.variants?.[0]?.quantity || 0,
+        price: Number(product?.pricing?.salePrice || 0),
+        gst: Number(product?.pricing?.gstDetails?.gstPercentage || 0),
+        originalPrice: Number(product?.pricing?.regularPrice || 0),
+        discount: Number(product?.pricing?.discount || 0),
+        unit: product?.unit || "N/A",
+        rating: product?.ratings?.averageRating || 0
+      };
+    });
+
+    // Fetch all orders by social circle
+    const orders = await Order.find({ user_id: { $in: socialCircle } }).lean();
+
+    const productToBuyers = new Map();
+    orders.forEach(o => {
+      const pid = o.product_id.toString();
+      if (!productToBuyers.has(pid)) productToBuyers.set(pid, []);
+      productToBuyers.get(pid).push(o.user_id.toString());
+    });
+
+    // Ensure current product is included if bought
+    let recommendedProductIds = new Set(orders.map(o => o.product_id.toString()));
+    if (recommendedProductIds.has(productId)) {
+      recommendedProductIds.add(productId);
+    }
+
+    const recommendedProductsRaw = await Product.find({
+      _id: { $in: Array.from(recommendedProductIds) },
+      status: { $ne: "Deactivate" }
+    }).lean();
+
+    const buyerIds = [...new Set(orders.map(o => o.user_id.toString()))];
+
+    const [users, businessUsers] = await Promise.all([
+      registerModel.find({ _id: { $in: buyerIds } }).select("_id full_Name").lean(),
+      businessregisterModel.find({ _id: { $in: buyerIds } }).select("_id businessName").lean()
+    ]);
+
+    const userMap = new Map();
+    users.forEach(u => userMap.set(u._id.toString(), u.full_Name));
+    businessUsers.forEach(b => {
+      if (!userMap.has(b._id.toString())) {
+        userMap.set(b._id.toString(), b.businessName);
+      }
+    });
+
+    const recommendedProducts = Array.from(new Set(
+  recommendedProductsRaw.flatMap(product => {
+    const buyers = productToBuyers.get(product._id.toString()) || [];
+    return buyers.map(uid => userMap.get(uid) || "Unknown");
+  })
+));
+
+
+    return res.status(200).json({
+      category: mainCategory,
+      similarProducts,
+      recommendedProducts
+    });
+
+  } catch (error) {
+    console.error("Error in similarProduct:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
+
+
+export const recommentProduct = async (req, res) => {
+
+}
