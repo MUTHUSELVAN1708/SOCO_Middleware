@@ -1,7 +1,7 @@
 import express from 'express';
 import { createAndUpdateProduct,getProductDetail,deleteProducts,
     getProductCategories,deactivateProduct ,getProduct,
-    getProductFilters,getBusinessAnalytics,visitPage,getProductById,similarProduct} from '../controller/ProductController.js';
+    getProductFilters,getBusinessAnalytics,visitPage,getProductById,similarProduct,recommendedProducts} from '../controller/ProductController.js';
 
 const router = express.Router();
 
@@ -19,4 +19,6 @@ router.put("/De-ActivateProdct",deactivateProduct);
 // =========deactivateProduct
 router.post("/visitPage",visitPage);
 router.get("/similarProduct/:productId",similarProduct);
+router.get("/recommendedProducts/:userId",recommendedProducts);
+
 export default router;
