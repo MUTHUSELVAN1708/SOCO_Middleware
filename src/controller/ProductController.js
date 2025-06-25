@@ -1667,8 +1667,7 @@ export const recommendedProducts = async (req, res) => {
 
 export const similarProduct = async (req, res) => {
   try {
-    const { productId } = req.params;
-    const { userId } = req.body;
+    const { userId,productId } = req.body;
 
     if (!productId || !userId) {
       return res.status(400).json({ message: "Product ID and User ID are required" });
