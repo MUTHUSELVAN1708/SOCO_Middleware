@@ -107,7 +107,7 @@ router.post("/updateBusinessProfile", adminController.updateBusinessProfile);
 router.post("/updateSomeBusinessDetails",adminController.updateSomeBusinessDetails);
 router.get("/getProfile/:userId",adminController.getProfile);
         
-
+router.get("/getAllBusinessDetails/:BusinessId",adminController.getAllBusinessDetails)
 
 router.post('/sendMessage', uploadFiles.single('filename'), (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });

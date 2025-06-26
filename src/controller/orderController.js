@@ -84,7 +84,7 @@ import { v4 as uuidv4, validate as isValidUUID } from "uuid";
 import orderEmailController from "./orderEmailController.js";
 import registerModel from "../model/registerModel.js";
 import businessregisterModel from "../model/BusinessModel.js";
-import {storeNotificationMessage} from "../controller/linkAccountController.js"
+import { storeNotificationMessage } from "../controller/linkAccountController.js"
 
 export const getOrderDetails = async (req, res) => {
     try {
@@ -191,7 +191,7 @@ export const cancelOrderByUser = async (req, res) => {
         console.log(validPlayerIds);
 
         const notificationPayload = {
-            userId:userId,
+            userId: userId,
             playerIds: validPlayerIds,
             title: "Order Cancelled ✅",
             message: `The order for ${product.basicInfo.productTitle.trim()} has been cancelled by the buyer. Please check for further details.`,
@@ -251,7 +251,7 @@ export const confirmOrderByUser = async (req, res) => {
         console.log(validPlayerIds);
 
         const notificationPayload = {
-            userId:userId,
+            userId: userId,
             playerIds: validPlayerIds,
             title: "Order Initiated ✅",
             message: `The order for ${product.basicInfo.productTitle.trim()} has been confirmed by the customer. Get ready to process it!`,
@@ -310,7 +310,7 @@ export const rejectOrderByUser = async (req, res) => {
         console.log(validPlayerIds);
 
         const notificationPayload = {
-            userId:userId,
+            userId: userId,
             playerIds: validPlayerIds,
             title: "Order Rejected",
             message: `Your order for ${product.basicInfo.productTitle.trim()} has been rejected by the buyer. Please check your dashboard for details.`,
@@ -600,7 +600,7 @@ export const confirmOrderBySeller = async (req, res) => {
         console.log(validPlayerIds);
 
         const notificationPayload = {
-            userId:order.seller_id,
+            userId: order.seller_id,
             playerIds: validPlayerIds,
             title: "Order Accepted by Seller ✅",
             message: `Your order for ${product.basicInfo.productTitle.trim()} has been accepted! Processing will begin soon. Stay tuned for updates.`,
@@ -655,6 +655,7 @@ export const cancelOrderBySeller = async (req, res) => {
         order.tracking_info.push({ status: "Order Cancelled By Seller", reason: cancelReason, timestamp: new Date() });
 
         await order.save();
+        
         const user = await registerModel.findById(order.user_id);
         console.log(user, "user");
 
@@ -667,7 +668,7 @@ export const cancelOrderBySeller = async (req, res) => {
         console.log(validPlayerIds);
 
         const notificationPayload = {
-            userId:order.seller_id,
+            userId: order.seller_id,
             playerIds: validPlayerIds,
             title: "Order Canceled ",
             message: `The seller has canceled your order for ${product.basicInfo.productTitle.trim()}.`,
@@ -776,7 +777,7 @@ export const createOrder = async (req, res) => {
         };
 
         sendPushNotification(notificationPayload);
-        
+
         return handleSuccessV1(res, 201, "Order placed successfully", {
             order: savedOrder,
             tracking: {
@@ -1035,7 +1036,7 @@ export const getConfirmedOrders = async (req, res) => {
         console.log(`Fetching confirmed orders for ID: ${id}, Page: ${pageNumber}, Limit: ${pageSize}, Skip: ${skip}`);
 
         const queryFilter = {
-            order_status: isBusiness === "true" ? { $nin: ["Pending", "Cancelled", "Rejected"] } : { $in: ["Confirmed", "Shipped","Delivered"] },
+            order_status: isBusiness === "true" ? { $nin: ["Pending", "Cancelled", "Rejected"] } : { $in: ["Confirmed", "Shipped", "Delivered"] },
             [isBusiness === "true" ? "seller_id" : "user_id"]: id,
         };
 
@@ -1045,6 +1046,7 @@ export const getConfirmedOrders = async (req, res) => {
         const totalPages = Math.ceil(totalItems / pageSize);
 
         const orders = await Order.find(queryFilter)
+            .sort({ created_at: -1 })
             .skip(skip)
             .limit(pageSize)
             .populate("product_id")

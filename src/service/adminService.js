@@ -44,7 +44,9 @@ import { v4 as uuidv4 } from "uuid";
 import wishlist from "../model/wishlist.js";
 import wishlistModel from "../model/wishlist.js";
 import WishlistModel from "../model/wishlist.js";
-
+import { getReviewAndViewCount } from "../controller/reviewController.js"
+import viewsModel from "../model/VisitModel.js";
+import ReviewModel from "../model/reviewModel.js";
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
 
@@ -1133,6 +1135,65 @@ const adminService = {
         }
     }
     ,
+
+    // =================
+    getAllBusinessDetails: async (BusinessId) => {
+        try {
+            const getProfile = await businessregisterModel.findById(BusinessId);
+            console.log(getProfile, "getProfile")
+
+
+
+            const getAllBusinessDetails = {
+                businessName: getProfile.businessName,
+                description: getProfile.description,
+                lat: getProfile.lat,
+                lng: getProfile.lng,
+                views: getProfile.viewCount,
+                follower: getProfile.followerCount,
+                city: getProfile.businessCity,
+                launchedIn: getProfile.launchedIn,
+                openTime: getProfile.openTime,
+                website: getProfile.website,
+                socialMediaLinks: getProfile.socialMediaLinks,
+                closeTime: getProfile.closeTime,
+                email: getProfile.businessEmail,
+                phn_no: getProfile.businessPhone,
+                cover_img: getProfile.cover_img,
+                brand_logo: getProfile.brand_logo,
+            };
+
+
+            const getProductPosts = await createPostModel
+                .find({ userId: BusinessId })
+                .select("productId");
+
+            const productIds = getProductPosts
+                .map(p => p.productId)
+                .filter(id => id);
+
+
+            const reviews = await ReviewModel.find({
+                productId: { $in: productIds }
+            });
+            const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+            const avgRating = reviews.length > 0 ? (totalRating / reviews.length).toFixed(2) : 0;
+
+            const views = await viewsModel.find({ viewed_page_id: BusinessId });
+            const totalVisitors = views.length;
+
+            console.log(totalVisitors)
+            return {
+                getAllBusinessDetails, totalVisitors,
+                totalReviews: reviews.length,
+                averageRating: parseFloat(avgRating),
+            };
+        }
+        catch (error) {
+            console.error("Error in getProfile:", error);
+            throw error
+        }
+    },
     //   ========== User (Add & Update) ==========
     updateUserDetails: async (data) => {
         try {

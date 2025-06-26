@@ -279,6 +279,27 @@ const adminController = {
 
     },
 
+
+
+    // =============
+    getAllBusinessDetails: async (req, res,next) => {
+        const { BusinessId } = req.params;
+        try {
+            const getAllBusinessDetails = await adminService.getAllBusinessDetails(BusinessId);
+            res.status(200).json({
+                status: 200,
+                msg: "Successfully fetched",
+                data: getAllBusinessDetails,
+            });
+        } catch (error) {
+            console.error(error);
+            error.status = error.status || 400;
+            error.message = error.message || 'Something went wrong';
+
+            next(error);
+        }
+
+    },
     // ==============================
     login: async (req, res, next) => {
         try {

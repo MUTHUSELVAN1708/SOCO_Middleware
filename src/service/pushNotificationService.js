@@ -96,6 +96,80 @@ export const sendPushNotification = async ({userId,
     }
 };
 
+
+export const sendChatNotification = async ({
+    
+    playerIds,
+    title,
+    appLogoUrl,
+     additionalData ={},
+}) => {
+    console.log(
+    playerIds,
+    title,"llllllllllllll")
+    try {
+        const notificationPayload = {
+            app_id: ONE_SIGNAL_APP_ID,
+            include_player_ids: playerIds,
+
+            headings: { en: title },       // Only show title
+            contents: { en: "" },          // Hide message content
+
+            data: {
+                  ...additionalData,
+                type: "chat_message",
+                timestamp: new Date().toISOString()
+            },
+
+            android_group: "chat",         // Optional: group all chat messages
+            priority: 10,
+            ttl: 3600,
+
+            android_sound: "default",
+            ios_sound: "default",
+
+            small_icon: "ic_notification_icon",
+                large_icon: appLogoUrl,
+
+            ios_badgeType: "Increase",
+            ios_badgeCount: 1,
+
+
+            
+            chrome_web_icon: appLogoUrl,
+            firefox_icon: appLogoUrl,
+
+            content_available: true,
+            mutable_content: true
+        };
+
+        const response = await axios.post(
+            ONE_SIGNAL_API_URL,
+            notificationPayload,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Basic ${ONE_SIGNAL_API_KEY}`,
+                },
+            }
+        );
+
+        if (response.data.errors?.invalid_player_ids?.length) {
+            const invalidIds = response.data.errors.invalid_player_ids;
+            await Promise.all([
+                updateModel(User, invalidIds),
+                updateModel(BusinessModel, invalidIds)
+            ]);
+        }
+
+        console.log("✅ Title-only Notification Sent:", response.data);
+        return { success: true, data: response.data };
+    } catch (error) {
+        console.error("❌ Error Sending Notification:", error.response?.data || error.message);
+        throw new Error(`Notification failed: ${error.response?.data?.errors?.[0] || error.message}`);
+    }
+};
+
 /**
  * Removes invalid subscription IDs and their corresponding oneSignalIDs
  * @param {Object} model - Mongoose model (User or BusinessModel)
