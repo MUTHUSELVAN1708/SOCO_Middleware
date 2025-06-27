@@ -460,6 +460,7 @@ export const getPendingOrders = async (req, res) => {
         const totalPages = Math.ceil(totalItems / pageSize);
 
         const orders = await Order.find({ seller_id, order_status: "Pending" })
+            .sort({ timestamp: -1 })
             .skip(skip)
             .limit(pageSize)
             .populate("product_id")
@@ -655,7 +656,7 @@ export const cancelOrderBySeller = async (req, res) => {
         order.tracking_info.push({ status: "Order Cancelled By Seller", reason: cancelReason, timestamp: new Date() });
 
         await order.save();
-        
+
         const user = await registerModel.findById(order.user_id);
         console.log(user, "user");
 
@@ -1046,7 +1047,7 @@ export const getConfirmedOrders = async (req, res) => {
         const totalPages = Math.ceil(totalItems / pageSize);
 
         const orders = await Order.find(queryFilter)
-            .sort({ created_at: -1 })
+            .sort({ timestamp: -1 })
             .skip(skip)
             .limit(pageSize)
             .populate("product_id")

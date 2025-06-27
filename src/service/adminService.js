@@ -4226,7 +4226,7 @@ const adminService = {
                 isOwnPost: post.isOwnPost,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-                ispinned: post.ispinned,
+    
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -4765,6 +4765,7 @@ const adminService = {
                 .limit(limit)
                 .lean();
 
+                console.log(posts,"post")
             // Fetch viewer's favorites and bookmarks
             const [favoritePosts, bookmarkedPosts] = await Promise.all([
                 FavoriteModel.find({ user_id: viewerId }).select("post_id").lean(),
