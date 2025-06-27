@@ -59,6 +59,7 @@ const orderSchema = new mongoose.Schema(
     reject_reason_by_buyer: { type: String },
     cancel_category: { type: String },
     additionalCommentsForCancel: { type: String },
+    quantity:{ type: Number },
     delivery_partner: {
       name: { type: String },
       tracking_number: { type: String, default: null },

@@ -44,7 +44,9 @@ import { v4 as uuidv4 } from "uuid";
 import wishlist from "../model/wishlist.js";
 import wishlistModel from "../model/wishlist.js";
 import WishlistModel from "../model/wishlist.js";
-
+import { getReviewAndViewCount } from "../controller/reviewController.js"
+import viewsModel from "../model/VisitModel.js";
+import ReviewModel from "../model/reviewModel.js";
 
 const { RAZORPAY_ID_KEY, RAZORPAY_SECRET_KEY } = process.env;
 
@@ -98,48 +100,55 @@ const adminService = {
     },
 
     // ==================
-    verifyEmail: async (email) => {
-        // console.log(email)
-        try {
+  verifyEmail: async (email, context = 'register') => {
+    try {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error("Invalid email format");
+        }
+
+        if (context === 'register') {
             const existingEmail = await registerModel.findOne({ email });
             if (existingEmail) {
                 throw new Error("Email already exists");
             }
-            // console.log(existingEmail)
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                throw new Error("Invalid email format");
-            }
-
-            const otp = otpGenerator.generate(4, {
-                digits: true,
-                specialChars: false,
-                lowerCaseAlphabets: false,
-                upperCaseAlphabets: false,
-            });
-            // console.log(otp, "otp")
-            const emailSent = await adminService.SendOTPEmail(email, otp);
-            const existingOtpRecord = await otpModel.findOne({ email });
-            if (existingOtpRecord) {
-                const hashedOtp = await bcrypt.hash(otp, 10);
-                existingOtpRecord.reg_otp = hashedOtp;
-                await existingOtpRecord.save();
-                return existingOtpRecord;
-            } else {
-                const hashedOtp = await bcrypt.hash(otp, 10);
-                const otpRecord = await otpModel.create({
-                    email,
-                    reg_otp: hashedOtp,
-                });
-
-                return otpRecord
-            }
-
-        } catch (error) {
-            // console.error("Error in verifyEmail service:", error);
-            throw new Error(error.message || "Failed to verify email");
         }
-    },
+
+        if (context === 'forgot') {
+            const existingEmail = await registerModel.findOne({ email });
+            if (!existingEmail) {
+                throw new Error("Email not found");
+            }
+        }
+
+        const otp = otpGenerator.generate(4, {
+            digits: true,
+            specialChars: false,
+            lowerCaseAlphabets: false,
+            upperCaseAlphabets: false,
+        });
+
+        await adminService.SendOTPEmail(email, otp);
+
+        const hashedOtp = await bcrypt.hash(otp, 10);
+        const existingOtpRecord = await otpModel.findOne({ email });
+
+        if (existingOtpRecord) {
+            existingOtpRecord.reg_otp = hashedOtp;
+            await existingOtpRecord.save();
+            return existingOtpRecord;
+        } else {
+            const otpRecord = await otpModel.create({
+                email,
+                reg_otp: hashedOtp,
+            });
+            return otpRecord;
+        }
+
+    } catch (error) {
+        throw new Error(error.message || "Failed to verify email");
+    }
+},
 
     // ====================
     storedOtp: async (user_id, reg_otp) => {
@@ -1133,6 +1142,65 @@ const adminService = {
         }
     }
     ,
+
+    // =================
+    getAllBusinessDetails: async (BusinessId) => {
+        try {
+            const getProfile = await businessregisterModel.findById(BusinessId);
+            console.log(getProfile, "getProfile")
+
+
+
+            const getAllBusinessDetails = {
+                businessName: getProfile.businessName,
+                description: getProfile.description,
+                lat: getProfile.lat,
+                lng: getProfile.lng,
+                views: getProfile.viewCount,
+                follower: getProfile.followerCount,
+                city: getProfile.businessCity,
+                launchedIn: getProfile.launchedIn,
+                openTime: getProfile.openTime,
+                website: getProfile.website,
+                socialMediaLinks: getProfile.socialMediaLinks,
+                closeTime: getProfile.closeTime,
+                email: getProfile.businessEmail,
+                phn_no: getProfile.businessPhone,
+                cover_img: getProfile.cover_img,
+                brand_logo: getProfile.brand_logo,
+            };
+
+
+            const getProductPosts = await createPostModel
+                .find({ userId: BusinessId })
+                .select("productId");
+
+            const productIds = getProductPosts
+                .map(p => p.productId)
+                .filter(id => id);
+
+
+            const reviews = await ReviewModel.find({
+                productId: { $in: productIds }
+            });
+            const totalRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
+            const avgRating = reviews.length > 0 ? (totalRating / reviews.length).toFixed(2) : 0;
+
+            const views = await viewsModel.find({ viewed_page_id: BusinessId });
+            const totalVisitors = views.length;
+
+            console.log(totalVisitors)
+            return {
+                getAllBusinessDetails, totalVisitors,
+                totalReviews: reviews.length,
+                averageRating: parseFloat(avgRating),
+            };
+        }
+        catch (error) {
+            console.error("Error in getProfile:", error);
+            throw error
+        }
+    },
     //   ========== User (Add & Update) ==========
     updateUserDetails: async (data) => {
         try {
@@ -4165,7 +4233,7 @@ const adminService = {
                 isOwnPost: post.isOwnPost,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-                ispinned: post.ispinned,
+    
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -4704,6 +4772,7 @@ const adminService = {
                 .limit(limit)
                 .lean();
 
+                console.log(posts,"post")
             // Fetch viewer's favorites and bookmarks
             const [favoritePosts, bookmarkedPosts] = await Promise.all([
                 FavoriteModel.find({ user_id: viewerId }).select("post_id").lean(),

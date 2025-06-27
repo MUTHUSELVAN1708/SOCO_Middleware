@@ -4,7 +4,11 @@ import redisService from "./src/service/redisService.js";
 import MessageModel from "./src/model/chatModel.js";
 import Playlist from "./src/model/playlistModel.js";
 import mongoose from "mongoose";
-import { v4 as uuidv4 } from "uuid";
+
+import { v4 as uuidv4, validate as isValidUUID } from "uuid";
+import { sendChatNotification } from "./src/service/pushNotificationService.js";
+import registerModel from "./src/model/registerModel.js";
+import businessregisterModel from "./src/model/BusinessModel.js";
 const connectedUsers = new Map(); // userId => socketId
 
 const initializeSocket = (server) => {
@@ -127,8 +131,33 @@ const initializeSocket = (server) => {
                 } else {
                     await redisClient.rPush(`offlineMessages:${to}`, JSON.stringify(messageObj));
                 }
-
+               
                 socket.emit("sendedMsg", { success: true, data: messageObj });
+ let user = await registerModel.findById(to);
+
+                if (!user) {
+                    user = await businessregisterModel.findById(to);
+                }
+
+                if (!user) {
+                    console.warn(`User not found for ID: ${to}`);
+                } else {
+                    const validPlayerIds = (user.subscriptionIDs || []).filter(id => isValidUUID(id));
+
+                    if (validPlayerIds.length > 0) {
+                        const notificationPayload = {
+                            // userId: from,
+                            playerIds: validPlayerIds,
+                            title: "New Message",
+                           
+                        };
+
+                        await sendChatNotification(notificationPayload);
+                    } else {
+                        console.warn(`No valid player IDs for user: ${to}`);
+                    }
+                }
+
             } catch (err) {
                 console.error("Error in sendMsg:", err.message);
                 socket.emit("sendedMsg", { success: false, message: err.message });
