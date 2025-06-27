@@ -477,17 +477,21 @@ export const getPendingOrders = async (req, res) => {
                 }
 
                 console.log(buyer);
+                const quantity = order.quantity || 1;
 
-                let finalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
+                let unitPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
+
                 if (product?.pricing?.gstDetails?.gstIncluded) {
-                    finalPrice += (finalPrice * product.pricing.gstDetails.gstPercentage) / 100;
+                    unitPrice += (unitPrice * product.pricing.gstDetails.gstPercentage) / 100;
                 }
                 if (product?.pricing?.additionalTaxes?.length > 0) {
                     product.pricing.additionalTaxes.forEach(tax => {
-                        finalPrice += (finalPrice * tax.percentage) / 100;
+                        unitPrice += (unitPrice * tax.percentage) / 100;
                     });
                 }
-                finalPrice = finalPrice.toFixed(2);
+
+                const totalPrice = (unitPrice * quantity).toFixed(2);
+
 
                 return {
                     id: order._id,
@@ -499,11 +503,13 @@ export const getPendingOrders = async (req, res) => {
                         : "Address Not Found",
                     productName: product?.basicInfo?.productTitle || "Unknown Product",
                     productId: `PROD${product?._id}`,
-                    price: `${finalPrice} ${product?.pricing?.currency || "INR"}`,
+                    quantity,
+                    price: `${totalPrice} ${product?.pricing?.currency || "INR"}`,
                     productImage: product?.images?.length > 0 ? product.images[0] : "https://picsum.photos/200",
                     requestDate: order.timestamp,
                     status: order.order_status.toLowerCase(),
                 };
+
             })
         );
 
@@ -692,7 +698,7 @@ export const cancelOrderBySeller = async (req, res) => {
 
 export const createOrder = async (req, res) => {
     try {
-        const { product_id, delivery_address_id, user_id, isBusinessAccount } = req.body;
+        const { product_id, delivery_address_id, user_id, isBusinessAccount, quantity } = req.body;
 
         if (!product_id || !delivery_address_id || !user_id) {
             return handleError(res, 400, "Missing required fields");
@@ -716,24 +722,25 @@ export const createOrder = async (req, res) => {
         const seller_id = product.createdBy;
         const trackingNumber = generateTrackingNumber();
 
-        let totalPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
+        let unitPrice = parseFloat(product?.pricing?.salePrice || product?.pricing?.regularPrice || "0");
 
         if (product?.pricing?.gstDetails?.gstIncluded) {
-            totalPrice += (totalPrice * product.pricing.gstDetails.gstPercentage) / 100;
+            unitPrice += (unitPrice * product.pricing.gstDetails.gstPercentage) / 100;
         }
 
         if (product?.pricing?.additionalTaxes?.length > 0) {
             product.pricing.additionalTaxes.forEach(tax => {
-                totalPrice += (totalPrice * tax.percentage) / 100;
+                unitPrice += (unitPrice * tax.percentage) / 100;
             });
         }
 
-        totalPrice = totalPrice.toFixed(2);
+        let totalPrice = (unitPrice * quantity).toFixed(2);
 
         const newOrder = new Order({
             user_id,
             seller_id,
             product_id,
+            quantity,
             delivery_address_id,
             delivery_partner: { tracking_number: trackingNumber },
             order_date: new Date(),
@@ -773,7 +780,8 @@ export const createOrder = async (req, res) => {
                 customer_name: isBusinessAccount ? user.businessName : user.full_Name || "Customer",
                 order_value: `${totalPrice} ${product.currency || "INR"}`,
                 order_date: new Date().toISOString(),
-                needs_confirmation: true
+                needs_confirmation: true,
+                quantity,
             }
         };
 
