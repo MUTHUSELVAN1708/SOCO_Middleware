@@ -131,9 +131,9 @@ const initializeSocket = (server) => {
                 } else {
                     await redisClient.rPush(`offlineMessages:${to}`, JSON.stringify(messageObj));
                 }
-
+               
                 socket.emit("sendedMsg", { success: true, data: messageObj });
-                let user = await registerModel.findById(to);
+ let user = await registerModel.findById(to);
 
                 if (!user) {
                     user = await businessregisterModel.findById(to);
@@ -148,12 +148,8 @@ const initializeSocket = (server) => {
                         const notificationPayload = {
                             // userId: from,
                             playerIds: validPlayerIds,
-                            title: `New message from ${user.username || "a user"}`,
-                            additionalData: {
-                                from,
-                                to,
-                                msgType
-                            }
+                            title: "New Message",
+                           
                         };
 
                         await sendChatNotification(notificationPayload);
