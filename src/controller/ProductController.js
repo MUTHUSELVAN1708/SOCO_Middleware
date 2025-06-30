@@ -1157,91 +1157,112 @@ export const getBusinessAnalytics = async (req, res, next) => {
     const repeatVisitorsCount = Object.values(repeatVisitorsMap).filter(count => count > 1).length;
 
     console.log('Repeat Visitors:', repeatVisitorsCount);
-    const cityStats = await viewsModel.aggregate([
-      {
-        $match: { viewed_page_id: target._id }
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "viewer_id",
-          foreignField: "_id",
-          as: "user"
-        }
-      },
-      {
-        $lookup: {
-          from: "businessregisters",
-          localField: "viewer_id",
-          foreignField: "_id",
-          as: "business"
-        }
-      },
-      {
-        $addFields: {
-          // Handle case if location_id is an array, and take the first element
-          userLocationId: {
-            $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
-          }
-        }
-      },
-      {
-        $lookup: {
-          from: "locations",
-          localField: "userLocationId",
-          foreignField: "_id",
-          as: "location"
-        }
-      },
-      {
-        $addFields: {
-          city: {
+   const cityStats = await viewsModel.aggregate([
+  {
+    $match: { viewed_page_id: target._id }
+  },
+  {
+    $lookup: {
+      from: "users",
+      localField: "viewer_id",
+      foreignField: "_id",
+      as: "user"
+    }
+  },
+  {
+    $lookup: {
+      from: "businessregisters",
+      localField: "viewer_id",
+      foreignField: "_id",
+      as: "business"
+    }
+  },
+  {
+    $addFields: {
+      userLocationId: {
+        $toObjectId: { $arrayElemAt: ["$user.location_id", 0] }
+      }
+    }
+  },
+  {
+    $lookup: {
+      from: "locations",
+      localField: "userLocationId",
+      foreignField: "_id",
+      as: "location"
+    }
+  },
+  {
+    $addFields: {
+      city: {
+        $let: {
+          vars: {
+            userCity: {
+              $toLower: {
+                $trim: {
+                  input: {
+                    $ifNull: [
+                      { $arrayElemAt: ["$location.address.city", 0] },
+                      null
+                    ]
+                  }
+                }
+              }
+            },
+            businessCity: {
+              $toLower: {
+                $trim: {
+                  input: {
+                    $ifNull: [
+                      { $arrayElemAt: ["$business.businessCity", 0] },
+                      null
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          in: {
             $cond: [
-              { $gt: [{ $size: "$user" }, 0] },
+              { $and: [{ $ne: ["$$userCity", null] }, { $ne: ["$$userCity", ""] }] },
+              "$$userCity",
               {
-                $toLower: {
-                  $trim: {
-                    input: {
-                      $ifNull: [
-                        { $arrayElemAt: ["$location.address.city", 0] },
-                        "" // Default to empty string if city is null
-                      ]
-                    }
-                  }
-                }
-              },
-              {
-                $toLower: {
-                  $trim: {
-                    input: {
-                      $ifNull: [
-                        { $arrayElemAt: ["$business.address.city", 0] },
-                        ""
-                      ]
-                    }
-                  }
-                }
+                $cond: [
+                  { $and: [{ $ne: ["$$businessCity", null] }, { $ne: ["$$businessCity", ""] }] },
+                  "$$businessCity",
+                  "unknown"
+                ]
               }
             ]
           }
         }
-      },
-      {
-        $group: {
-          _id: "$city",
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { count: -1 } },
-      { $limit: 7 },
-      {
-        $project: {
-          _id: 0,
-          city: "$_id",
-          count: 1
-        }
       }
-    ]);
+    }
+  },
+  {
+    $match: { city: { $ne: "unknown" } } // Optional: filter out missing cities
+  },
+  {
+    $group: {
+      _id: "$city",
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $sort: { count: -1 }
+  },
+  {
+    $limit: 7
+  },
+  {
+    $project: {
+      _id: 0,
+      city: "$_id",
+      count: 1
+    }
+  }
+]);
+
 
     console.log(cityStats, "cityStats")
 
