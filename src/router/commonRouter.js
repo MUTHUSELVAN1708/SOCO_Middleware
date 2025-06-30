@@ -38,7 +38,7 @@ const uploadMedia = multer({
    // Fix here
   fileFilter: (req, file, cb) => {
     const allowedMimeTypes = [
-      'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif','image/webp',
       'video/mp4', 'video/mpeg', 'video/avi',
     ];
     if (allowedMimeTypes.includes(file.mimetype)) cb(null, true);
@@ -72,7 +72,7 @@ const upload = multer({
 
 // General File Upload Configuration
 const allowedMimeTypes = [
-    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif','image/webp', 
     'video/mp4', 'application/msword', 'application/pdf', 
     'application/vnd.ms-excel', 
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

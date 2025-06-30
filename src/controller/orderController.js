@@ -1060,7 +1060,7 @@ export const getConfirmedOrders = async (req, res) => {
             .limit(pageSize)
             .populate("product_id")
             .populate("delivery_address_id");
-
+        console.log(orders, "orders")
         // ✅ Custom sort: "Confirmed" first, then "Accepted"
         orders.sort((a, b) => (a.order_status === "Confirmed" ? -1 : 1));
 
