@@ -100,55 +100,55 @@ const adminService = {
     },
 
     // ==================
-  verifyEmail: async (email, context = 'register') => {
-    try {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            throw new Error("Invalid email format");
-        }
-
-        if (context === 'register') {
-            const existingEmail = await registerModel.findOne({ email });
-            if (existingEmail) {
-                throw new Error("Email already exists");
+    verifyEmail: async (email, context = 'register') => {
+        try {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                throw new Error("Invalid email format");
             }
-        }
 
-        if (context === 'forgot') {
-            const existingEmail = await registerModel.findOne({ email });
-            if (!existingEmail) {
-                throw new Error("Email not found");
+            if (context === 'register') {
+                const existingEmail = await registerModel.findOne({ email });
+                if (existingEmail) {
+                    throw new Error("Email already exists");
+                }
             }
-        }
 
-        const otp = otpGenerator.generate(4, {
-            digits: true,
-            specialChars: false,
-            lowerCaseAlphabets: false,
-            upperCaseAlphabets: false,
-        });
+            if (context === 'forgot') {
+                const existingEmail = await registerModel.findOne({ email });
+                if (!existingEmail) {
+                    throw new Error("Email not found");
+                }
+            }
 
-        await adminService.SendOTPEmail(email, otp);
-
-        const hashedOtp = await bcrypt.hash(otp, 10);
-        const existingOtpRecord = await otpModel.findOne({ email });
-
-        if (existingOtpRecord) {
-            existingOtpRecord.reg_otp = hashedOtp;
-            await existingOtpRecord.save();
-            return existingOtpRecord;
-        } else {
-            const otpRecord = await otpModel.create({
-                email,
-                reg_otp: hashedOtp,
+            const otp = otpGenerator.generate(4, {
+                digits: true,
+                specialChars: false,
+                lowerCaseAlphabets: false,
+                upperCaseAlphabets: false,
             });
-            return otpRecord;
-        }
 
-    } catch (error) {
-        throw new Error(error.message || "Failed to verify email");
-    }
-},
+            await adminService.SendOTPEmail(email, otp);
+
+            const hashedOtp = await bcrypt.hash(otp, 10);
+            const existingOtpRecord = await otpModel.findOne({ email });
+
+            if (existingOtpRecord) {
+                existingOtpRecord.reg_otp = hashedOtp;
+                await existingOtpRecord.save();
+                return existingOtpRecord;
+            } else {
+                const otpRecord = await otpModel.create({
+                    email,
+                    reg_otp: hashedOtp,
+                });
+                return otpRecord;
+            }
+
+        } catch (error) {
+            throw new Error(error.message || "Failed to verify email");
+        }
+    },
 
     // ====================
     storedOtp: async (user_id, reg_otp) => {
@@ -4188,18 +4188,22 @@ const adminService = {
                 id: post._id.toString() ?? '',
                 userId: post.userId ?? '',
                 username: post.userName ?? '',
+                 productId: post.productId ?? '',
                 userAvatar: post.userAvatar ?? '',
                 mediaItems: Array.isArray(post.mediaItems)
                     ? post.mediaItems.map(item => ({
                         url: item.url ?? '',
                         type: item.type ?? '',
-                        productId: item.productId ?? '',
+                       
+                        productName: item.productName ?? '',
+                        price: item.price ?? '',
+                        originalPrice: item.originalPrice ?? '',
+                        hasDiscount: item.hasDiscount ?? false
                     }))
                     : [],
                 likes: post.likes ?? 0,
                 caption: post.caption ?? '',
                 comments: Array.isArray(comments)
-
                     ? await Promise.all(
                         comments.map(async (comment) => {
                             const user = await UserInfo.findOne({ id: comment.userId });
@@ -4218,9 +4222,7 @@ const adminService = {
                             };
                         })
                     )
-
                     : [],
-
                 timestamp: post.timestamp ?? new Date(),
                 isFavorite: liked ? true : false,
                 isBookmarked: book ? true : false,
@@ -4233,7 +4235,7 @@ const adminService = {
                 isOwnPost: post.isOwnPost,
                 isProductPost: post.isProductPost ?? false,
                 isBusinessAccount: post.isBusinessAccount ?? false,
-    
+
                 repostDetails: post.repostDetails
                     ? {
                         originalUserId: post.repostDetails.originalUserId ?? '',
@@ -4242,6 +4244,7 @@ const adminService = {
                     }
                     : null,
             };
+
         } catch (error) {
             console.error('Error fetching post:', error);
             throw new Error('Error fetching post');
@@ -4772,7 +4775,7 @@ const adminService = {
                 .limit(limit)
                 .lean();
 
-                console.log(posts,"post")
+            console.log(posts, "post")
             // Fetch viewer's favorites and bookmarks
             const [favoritePosts, bookmarkedPosts] = await Promise.all([
                 FavoriteModel.find({ user_id: viewerId }).select("post_id").lean(),
