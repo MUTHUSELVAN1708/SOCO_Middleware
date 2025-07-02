@@ -6,6 +6,7 @@ import ReviewHelpfulModel from '../model/ReviewHelpfulModel.js';
 import mongoose from "mongoose";
 import createPostModel from "../model/createPostModel.js";
 import viewsModel from "../model/VisitModel.js";
+import businessregisterModel from "../model/BusinessModel.js";
 
 
 export const createReview = async (req, res) => {
@@ -30,7 +31,7 @@ export const createReview = async (req, res) => {
     let user;
 
     if (isBusinessAccount) {
-      user = await BusinessModel.findById(user_id).select("businessName brand_logo lastOnline");
+      user = await businessregisterModel.findById(user_id).select("businessName brand_logo lastOnline");
       if (!user) {
         return res.status(404).json({ message: 'Business account not found' });
       }
