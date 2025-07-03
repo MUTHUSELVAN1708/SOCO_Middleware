@@ -1,6 +1,10 @@
 import ServiceModel from "../model/serviceModel.js";
-import BusinessAccount from "../model/BusinessModel.js"; 
+import BusinessAccount from "../model/BusinessModel.js";
 import { handleSuccessV1, handleError } from "../utils/responseHandler.js";
+import Order from "../model/orderModel.js";
+import Product from "../model/Product.js";
+import DeliveryAddressModel from "../model/deliveryAddressModel.js";
+import mongoose from "mongoose";
 
 export const getAllServices = async (req, res) => {
     try {
@@ -109,23 +113,23 @@ export const getAllProviders = async (req, res) => {
         const totalPages = Math.ceil(totalCount / pageSize);
 
         const result = providers.map((provider) => ({
-        id: provider._id,
-        name: provider.businessName || provider.org_name || provider.businessName || '',
-        imageUrl: provider.brand_logo || '',
-        type: provider.type || 'Business',
-        lat: provider.lat || 0.0,
-        lng: provider.lng || 0.0,
-        address: provider.businessAddress || '',
-        natureOfBusiness: provider.natureOfBusiness || '',
-    }));
+            id: provider._id,
+            name: provider.businessName || provider.org_name || provider.businessName || '',
+            imageUrl: provider.brand_logo || '',
+            type: provider.type || 'Business',
+            lat: provider.lat || 0.0,
+            lng: provider.lng || 0.0,
+            address: provider.businessAddress || '',
+            natureOfBusiness: provider.natureOfBusiness || '',
+        }));
 
-    handleSuccessV1(res, 200, "Providers fetched successfully", {
-        page: pageNumber,
-        limit: pageSize,
-        totalCount,
-        totalPages,
-        providers: result,
-    });
+        handleSuccessV1(res, 200, "Providers fetched successfully", {
+            page: pageNumber,
+            limit: pageSize,
+            totalCount,
+            totalPages,
+            providers: result,
+        });
 
     } catch (error) {
         console.error("Error fetching providers:", error);
@@ -229,6 +233,90 @@ export const getCategories = async (req, res) => {
     } catch (error) {
         console.error("Error fetching categories:", error);
         handleError(res, 500, "Failed to fetch categories", error.message);
+    }
+};
+
+
+export const getRejectedOrders = async (req, res) => {
+    try {
+        const { id, page = 1, limit = 10, isBusiness = false } = req.query;
+        console.log( req.query)
+
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return handleError(res, 400, "Invalid or missing 'id'");
+        }
+
+        const isBusinessUser = isBusiness === "true" || isBusiness === true;
+
+        const pageNumber = parseInt(page, 10);
+        const pageSize = parseInt(limit, 10);
+        const skip = (pageNumber - 1) * pageSize;
+
+        const queryFilter = {
+            order_status: isBusinessUser ? "Rejected" : "Cancelled",
+            [isBusinessUser ? "seller_id" : "user_id"]: new mongoose.Types.ObjectId(id),
+        };
+
+        console.log("Query Filter:", queryFilter);
+
+        const totalItems = await Order.countDocuments(queryFilter);
+        const totalPages = Math.ceil(totalItems / pageSize);
+
+        const orders = await Order.find(queryFilter)
+            .sort({ timestamp: -1 })
+            .skip(skip)
+            .limit(pageSize)
+            .populate("product_id")
+            .populate("delivery_address_id");
+
+        const orderRequests = await Promise.all(
+            orders.map(async (order) => {
+                const product = await Product.findById(order.product_id);
+                const address = await DeliveryAddressModel.findById(order.delivery_address_id);
+
+                return {
+                    id: order._id,
+                    trackId: order.delivery_partner?.tracking_number || "N/A",
+                    delivery_type: order.delivery_type,
+                    return_type: order.return_type,
+                    delivery_charge: order.delivery_charge,
+                    productName: product?.basicInfo?.productTitle || "Unknown Product",
+                    productId: `${product?._id}`,
+                    is_Shipped: order.is_Shipped,
+                    is_Delivered: order.is_Delivered,
+                    is_Payment: order.is_Payment,
+                    estimated_delivery_date: order.estimated_delivery_date,
+                    price: `${product?.pricing?.currency === "INR" ? "₹" : product?.pricing?.currency || ""} ${order.total_price}`,
+                    productImage: product?.images?.[0] || "",
+                    buyerAddress: address
+                        ? `${address.streetAddress}, ${address.apartment ? address.apartment + ', ' : ''}${address.city}, ${address.state}, ${address.postalCode}, ${address.country}${address.phoneNumber ? ' ✆ ' + address.phoneNumber : ''}`
+                        : "Address Not Found",
+                    requestDate: order.timestamp,
+                    status: order.order_status,
+                    cancel_reason: order.cancel_reason,
+                    cancel_category: order.cancel_category,
+                    additionalCommentsForCancel: order.additionalCommentsForCancel,
+                    tracking_info:order.tracking_info
+                };
+            })
+        );
+
+        const pagination = {
+            totalResults: totalItems,
+            totalPages,
+            currentPage: pageNumber,
+            limit: pageSize,
+            hasNextPage: pageNumber < totalPages,
+            hasPreviousPage: pageNumber > 1,
+        };
+
+        return handleSuccessV1(res, 200, "Rejected orders retrieved successfully", {
+            orders: orderRequests,
+            pagination,
+        });
+    } catch (error) {
+        console.error("Error fetching rejected orders:", error);
+        return handleError(res, 500, `Error fetching rejected orders: ${error.message}`);
     }
 };
 
