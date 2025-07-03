@@ -240,7 +240,7 @@ export const getCategories = async (req, res) => {
 export const getRejectedOrders = async (req, res) => {
     try {
         const { id, page = 1, limit = 10, isBusiness = false } = req.query;
-        console.log( req.query)
+        console.log(req.query)
 
         if (!id || !mongoose.Types.ObjectId.isValid(id)) {
             return handleError(res, 400, "Invalid or missing 'id'");
@@ -252,10 +252,28 @@ export const getRejectedOrders = async (req, res) => {
         const pageSize = parseInt(limit, 10);
         const skip = (pageNumber - 1) * pageSize;
 
-        const queryFilter = {
-            order_status: isBusinessUser ? "Rejected" : "Cancelled",
-            [isBusinessUser ? "seller_id" : "user_id"]: new mongoose.Types.ObjectId(id),
-        };
+        let queryFilter = {};
+
+        if (isBusinessUser) {
+            queryFilter = {
+                order_status: "Rejected",
+                seller_id: new mongoose.Types.ObjectId(id),
+            };
+        } else {
+            queryFilter = {
+                $or: [
+                    {
+                        order_status: "Cancelled",
+                        user_id: new mongoose.Types.ObjectId(id),
+                    },
+                    {
+                        order_status: "Rejected",
+                        user_id: new mongoose.Types.ObjectId(id),
+                    },
+                ],
+            };
+        }
+
 
         console.log("Query Filter:", queryFilter);
 
@@ -268,7 +286,7 @@ export const getRejectedOrders = async (req, res) => {
             .limit(pageSize)
             .populate("product_id")
             .populate("delivery_address_id");
-
+        console.log(orders)
         const orderRequests = await Promise.all(
             orders.map(async (order) => {
                 const product = await Product.findById(order.product_id);
@@ -293,10 +311,10 @@ export const getRejectedOrders = async (req, res) => {
                         : "Address Not Found",
                     requestDate: order.timestamp,
                     status: order.order_status,
-                    cancel_reason: order.cancel_reason,
-                    cancel_category: order.cancel_category,
+                    cancel_reason: order.cancel_reason || order.reject_reason_by_buyer ||order.cancel_reason_by_buyer,
+                    cancel_category: order.cancel_category ,
                     additionalCommentsForCancel: order.additionalCommentsForCancel,
-                    tracking_info:order.tracking_info
+                    tracking_info: order.tracking_info,
                 };
             })
         );

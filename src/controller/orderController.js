@@ -176,7 +176,7 @@ export const cancelOrderByUser = async (req, res) => {
             order.cancel_reason_by_buyer = cancelReason;
         }
 
-        order.tracking_info.push({ status: "Cancelled", timestamp: moment().tz("Asia/Kolkata").toDate() });
+        order.tracking_info.push({ status: "Cancelled By Order Creater", timestamp: moment().tz("Asia/Kolkata").toDate() });
 
         await order.save();
         const business = await BusinessModel.findById(product.createdBy);
