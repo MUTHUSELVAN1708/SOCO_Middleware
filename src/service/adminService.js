@@ -4188,13 +4188,13 @@ const adminService = {
                 id: post._id.toString() ?? '',
                 userId: post.userId ?? '',
                 username: post.userName ?? '',
-                 productId: post.productId ?? '',
+                productId: post.productId ?? '',
                 userAvatar: post.userAvatar ?? '',
                 mediaItems: Array.isArray(post.mediaItems)
                     ? post.mediaItems.map(item => ({
                         url: item.url ?? '',
                         type: item.type ?? '',
-                       
+
                         productName: item.productName ?? '',
                         price: item.price ?? '',
                         originalPrice: item.originalPrice ?? '',
@@ -4415,13 +4415,14 @@ const adminService = {
             const result = [];
 
             for (const chat of chats) {
-                const otherUserId = chat.participants.find(id => id !== user_id);
+               const otherUserId = chat.participants.find(id => id !== user_id) || user_id;
+
 
                 let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
                 if (!otherUser) {
                     otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
                 }
-
+                console.log(otherUser, "poooiuu")
                 const lastMessage = chat.messages[chat.messages.length - 1];
 
                 const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
