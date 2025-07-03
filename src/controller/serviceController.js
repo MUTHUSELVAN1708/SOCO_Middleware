@@ -252,27 +252,38 @@ export const getRejectedOrders = async (req, res) => {
         const pageSize = parseInt(limit, 10);
         const skip = (pageNumber - 1) * pageSize;
 
-        let queryFilter = {};
+let queryFilter = {};
 
-        if (isBusinessUser) {
-            queryFilter = {
-                order_status: "Rejected",
-                seller_id: new mongoose.Types.ObjectId(id),
-            };
-        } else {
-            queryFilter = {
-                $or: [
-                    {
-                        order_status: "Cancelled",
-                        user_id: new mongoose.Types.ObjectId(id),
-                    },
-                    {
-                        order_status: "Rejected",
-                        user_id: new mongoose.Types.ObjectId(id),
-                    },
-                ],
-            };
-        }
+if (isBusinessUser) {
+  // Seller view: show seller's rejected orders or user-cancelled orders involving the seller
+  queryFilter = {
+    $or: [
+      {
+        order_status: "Rejected",
+        seller_id: new mongoose.Types.ObjectId(id),
+      },
+      {
+        order_status: "Cancelled",
+        seller_id: new mongoose.Types.ObjectId(id),
+      },
+    ],
+  };
+} else {
+  // User view: show user's cancelled or rejected orders
+  queryFilter = {
+    $or: [
+      {
+        order_status: "Cancelled",
+        user_id: new mongoose.Types.ObjectId(id),
+      },
+      {
+        order_status: "Rejected",
+        user_id: new mongoose.Types.ObjectId(id),
+      },
+    ],
+  };
+}
+
 
 
         console.log("Query Filter:", queryFilter);
