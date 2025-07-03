@@ -176,7 +176,7 @@ export const cancelOrderByUser = async (req, res) => {
             order.cancel_reason_by_buyer = cancelReason;
         }
 
-        order.tracking_info.push({ status: "Cancelled", timestamp: moment().tz("Asia/Kolkata").toDate() });
+        order.tracking_info.push({ status: "Cancelled By Order Creater", timestamp: moment().tz("Asia/Kolkata").toDate() });
 
         await order.save();
         const business = await BusinessModel.findById(product.createdBy);
@@ -587,11 +587,14 @@ export const confirmOrderBySeller = async (req, res) => {
         order.needs_signature = needsSignature;
         order.is_fragile = isFragile;
 
-        // Ensure delivery_partner exists
         if (!order.delivery_partner) {
             order.delivery_partner = {};
         }
-        order.delivery_partner.tracking_number = trackingInfo || generateTrackingNumber();
+
+        if (!order.delivery_partner.tracking_number) {
+            order.delivery_partner.tracking_number = trackingInfo || generateTrackingNumber();
+        }
+
 
         order.tracking_info.push({ status: "Order Accepted By Seller", timestamp: new Date() });
 
@@ -649,11 +652,11 @@ export const cancelOrderBySeller = async (req, res) => {
         if (!product) {
             return handleError(res, 404, "Product not found");
         }
-        if (order.order_status === "Cancelled") {
+        if (order.order_status === "Rejected") {
             return handleError(res, 400, "Order is already cancelled");
         }
 
-        order.order_status = "Cancelled";
+        order.order_status = "Rejected";
         order.seller_review_status = "Rejected";
         order.buyer_approval_status = "Rejected By Seller";
         order.cancel_reason = cancelReason;
@@ -1113,6 +1116,10 @@ export const getConfirmedOrders = async (req, res) => {
         return handleError(res, 500, `Error fetching confirmed orders: ${error.message}`);
     }
 };
+confirmOrderBySeller
+
+//====================
+
 
 
 export const DeliveredBySeller = async (req, res) => {
