@@ -2609,6 +2609,92 @@ const adminService = {
     },
     // adjust the path based on your project
 
+    //     createPostByProduct: async (data) => {
+    //         try {
+    //             const { user_id, productId, mediaItems, caption, postType } = data;
+
+    //             const user = await businessregisterModel.findById(user_id);
+    //             if (!user) throw new Error("Business user not found");
+
+    //             const product = await Product.findById(productId);
+    //             if (!product) throw new Error("Product not found");
+    //             console.log(product,"kkkkk")
+    //             const userName = user.businessName || "Business User";
+    //             const userAvatar = user.brand_logo || "";
+
+    //             let finalMediaItems = mediaItems || [];
+    //             let finalCaption = caption || "";
+
+    //             // If mediaItems or caption are missing, derive from product
+    //             if (!mediaItems || mediaItems.length === 0) {
+    //                 const regularPrice = parseFloat(product.pricing?.regularPrice || 0);
+    //                 const salePrice = parseFloat(product.pricing?.salePrice || regularPrice);
+    // console.log(regularPrice,salePrice,"salePrice")
+    //                 let totalTaxPercentage = 0;
+
+    //                 if (product.pricing?.gstDetails?.gstIncluded === false) {
+    //                     totalTaxPercentage += product.pricing.gstDetails.gstPercentage || 0;
+    //                 }
+
+    //                 if (Array.isArray(product.pricing?.additionalTaxes)) {
+    //                     for (const tax of product.pricing.additionalTaxes) {
+    //                         totalTaxPercentage += parseFloat(tax.percentage || 0);
+    //                     }
+    //                 }
+
+    //                 const totalPrice = salePrice + (salePrice * totalTaxPercentage / 100);
+    // console.log("first",totalPrice)
+    //                 finalMediaItems = (product.images || []).map((imgUrl) => ({
+    //                     url: imgUrl,
+    //                     type: "image",
+    //                     thumbnailUrl: imgUrl,
+    //                     productId: product._id.toString(),
+    //                     productName: product.basicInfo?.productTitle || "",
+    //                     price: totalPrice.toFixed(2),
+    //                     originalPrice: regularPrice.toFixed(2),
+    //                     hasDiscount: !!product.pricing?.discount,
+    //                     aspectRatio: 1,
+    //                 }));
+    //             }
+    // console.log(finalMediaItems,"finalMediaItems")
+    //             if (!finalCaption) {
+    //                 finalCaption = product.basicInfo?.productTitle || "";
+    //             }
+
+    //             const newPost = new createPostModel({
+    //                 userId: user_id,
+    //                 userName,
+    //                 userAvatar,
+    //                 postType,
+    //                 productId: productId,
+    //                 caption: finalCaption,
+    //                 webSiteLink: "",
+    //                 mediaItems: finalMediaItems,
+    //                 isRepost: false,
+    //                 isOwnPost: false,
+    //                 isProductPost: true,
+    //                 isBusinessAccount: true,
+    //                 repostDetails: null,
+    //                 Product_status: "Activated",
+    //             });
+    // console.log(newPost,"newPost")
+    //             const savedPost = await newPost.save();
+
+    //             const totalPosts = await createPostModel.countDocuments({ userId: user_id });
+    //             await businessregisterModel.updateOne({ _id: user_id }, { $set: { postCount: totalPosts } });
+
+    //             return {
+    //                 success: true,
+    //                 message: "Product post created successfully",
+    //                 post: savedPost,
+    //             };
+    //         } catch (error) {
+    //             console.error("Error creating product post:", error);
+    //             throw new Error(`Failed to create product post: ${error.message}`);
+    //         }
+    //     },
+
+
     createPostByProduct: async (data) => {
         try {
             const { user_id, productId, mediaItems, caption, postType } = data;
@@ -2616,17 +2702,17 @@ const adminService = {
             const user = await businessregisterModel.findById(user_id);
             if (!user) throw new Error("Business user not found");
 
-            const product = await Product.findById(productId);
-            if (!product) throw new Error("Product not found");
-
             const userName = user.businessName || "Business User";
             const userAvatar = user.brand_logo || "";
 
-            let finalMediaItems = mediaItems || [];
+            let finalMediaItems = [];
             let finalCaption = caption || "";
+            let product = null;
 
-            // If mediaItems or caption are missing, derive from product
-            if (!mediaItems || mediaItems.length === 0) {
+            if (productId) {
+                product = await Product.findById(productId);
+                if (!product) throw new Error("Product not found");
+
                 const regularPrice = parseFloat(product.pricing?.regularPrice || 0);
                 const salePrice = parseFloat(product.pricing?.salePrice || regularPrice);
 
@@ -2644,7 +2730,14 @@ const adminService = {
 
                 const totalPrice = salePrice + (salePrice * totalTaxPercentage / 100);
 
-                finalMediaItems = (product.images || []).map((imgUrl) => ({
+                const enrichedUploadedMedia = (mediaItems || []).map((item) => ({
+                    url: item.url,
+                    type: item.type || "image",
+                    thumbnailUrl: item.thumbnailUrl || item.url,
+                    aspectRatio: item.aspectRatio || 1,
+                }));
+
+                const enrichedProductImages = (product.images || []).map((imgUrl) => ({
                     url: imgUrl,
                     type: "image",
                     thumbnailUrl: imgUrl,
@@ -2655,10 +2748,14 @@ const adminService = {
                     hasDiscount: !!product.pricing?.discount,
                     aspectRatio: 1,
                 }));
-            }
 
-            if (!finalCaption) {
-                finalCaption = product.basicInfo?.productTitle || "";
+                finalMediaItems = [...enrichedUploadedMedia, ...enrichedProductImages];
+
+                if (!finalCaption) {
+                    finalCaption = product.basicInfo?.productTitle || "";
+                }
+            } else {
+                finalMediaItems = mediaItems || [];
             }
 
             const newPost = new createPostModel({
@@ -2666,16 +2763,16 @@ const adminService = {
                 userName,
                 userAvatar,
                 postType,
-                productId: productId,
+                productId: product ? product._id : null,
                 caption: finalCaption,
                 webSiteLink: "",
                 mediaItems: finalMediaItems,
                 isRepost: false,
                 isOwnPost: false,
-                isProductPost: true,
+                isProductPost: !!product,
                 isBusinessAccount: true,
                 repostDetails: null,
-                Product_status: "Activated",
+                Product_status: product ? "Activated" : "N/A",
             });
 
             const savedPost = await newPost.save();
@@ -2693,6 +2790,7 @@ const adminService = {
             throw new Error(`Failed to create product post: ${error.message}`);
         }
     },
+
 
     returnMySearchProduct: async ({ createdBy, query }) => {
         try {
@@ -2865,7 +2963,7 @@ const adminService = {
             const totalPages = Math.ceil(totalResults / limit);
 
             const posts = await createPostModel.find({ userId: user_id, Product_status: { $ne: "Deactivate" } })
-                .sort({ likesCount: -1 })
+                .sort({ timestamp: -1 })
                 .skip(skip)
                 .limit(limit);
 
@@ -3041,7 +3139,7 @@ const adminService = {
 
             // Fetch top 3 most popular comments based on likesCount
             const comments = await Comment.find({ postId })
-                .sort({ likesCount: -1 })
+                .sort({ timestamp: -1 })
                 .limit(3)
                 .populate({
                     path: "userInfo",
@@ -4188,13 +4286,13 @@ const adminService = {
                 id: post._id.toString() ?? '',
                 userId: post.userId ?? '',
                 username: post.userName ?? '',
-                 productId: post.productId ?? '',
+                productId: post.productId ?? '',
                 userAvatar: post.userAvatar ?? '',
                 mediaItems: Array.isArray(post.mediaItems)
                     ? post.mediaItems.map(item => ({
                         url: item.url ?? '',
                         type: item.type ?? '',
-                       
+
                         productName: item.productName ?? '',
                         price: item.price ?? '',
                         originalPrice: item.originalPrice ?? '',
@@ -4415,13 +4513,14 @@ const adminService = {
             const result = [];
 
             for (const chat of chats) {
-                const otherUserId = chat.participants.find(id => id !== user_id);
+                const otherUserId = chat.participants.find(id => id !== user_id) || user_id;
+
 
                 let otherUser = await registerModel.findOne({ _id: otherUserId }, 'full_Name profile_url');
                 if (!otherUser) {
                     otherUser = await businessregisterModel.findOne({ _id: otherUserId }, 'businessName brand_logo');
                 }
-
+                console.log(otherUser, "poooiuu")
                 const lastMessage = chat.messages[chat.messages.length - 1];
 
                 const name = otherUser?.full_Name || otherUser?.businessName || "Unknown";
@@ -4770,7 +4869,7 @@ const adminService = {
 
             const posts = await createPostModel
                 .find({ userId: profileOwnerId, Product_status: { $ne: "Deactivate" } })
-                .sort({ likesCount: -1, commentsCount: -1, timestamp: -1 })
+                .sort({ timestamp: -1 })
                 .skip(skip)
                 .limit(limit)
                 .lean();

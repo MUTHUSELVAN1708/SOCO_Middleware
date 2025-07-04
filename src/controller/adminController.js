@@ -600,10 +600,8 @@ const adminController = {
         try {
             console.log("Received request to productPost:", req.body);
 
-            // Pass the request body to the service for processing
             const post = await adminService.createPostByProduct(req.body);
 
-            // Respond with the status and created post
             res.status(200).json({
                 status: 200,
                 post
